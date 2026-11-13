@@ -1,0 +1,30 @@
+name: Sincronizar labels
+
+on:
+  push:
+    paths:
+      - ".github/labels.yml"
+      - ".github/workflows/labels.yml"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Criar ou atualizar labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          total=$(yq '. | length' .github/labels.yml)
+          for i in $(seq 0 $((total - 1))); do
+            nome=$(yq -r ".[$i].name" .github/labels.yml)
+            cor=$(yq -r ".[$i].color" .github/labels.yml)
+            descricao=$(yq -r ".[$i].description" .github/labels.yml)
+            gh label create "$nome" --repo "$GITHUB_REPOSITORY" \
+              --color "$cor" --description "$descricao" --force
+          done
