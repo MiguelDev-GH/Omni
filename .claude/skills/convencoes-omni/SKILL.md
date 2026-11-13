@@ -1,16 +1,17 @@
 ---
 name: convencoes-omni
-description: Use quando for criar um branch, escrever uma mensagem de commit, abrir ou nomear um pull request, ou declarar uma mudança como pronta no repositório Omni (backend Go, frontend React + TypeScript).
+description: Use quando for criar um branch, uma issue ou um pull request, escrever uma mensagem de commit, escolher labels, ou declarar uma mudança como pronta no repositório Omni (backend Go, frontend React + TypeScript).
 ---
 
 # Convenções do Omni
 
 ## Visão geral
 
-Todo trabalho no Omni segue duas regras:
+Todo trabalho no Omni segue três regras:
 
 1. **Nomes seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/)**: branches, commits e títulos de PR.
-2. **Nada é declarado pronto sem verificação**: testes, lint e typecheck rodam antes de cada commit, e o resultado real é relatado.
+2. **Toda issue e todo PR têm labels**: pelo menos uma, escolhida na tabela de labels abaixo.
+3. **Nada é declarado pronto sem verificação**: testes, lint e typecheck rodam antes de cada commit, e o resultado real é relatado.
 
 ## Tipos permitidos
 
@@ -75,7 +76,35 @@ BREAKING CHANGE: clientes que usam /scans precisam migrar para /varreduras.
 
 - **Título:** mesmo formato do cabeçalho de commit, por exemplo `feat(poller): adiciona teste de STARTTLS no SMTP`.
 - **Base:** `main`. A `main` é protegida: toda mudança entra por PR, nunca por push direto.
+- **Labels:** obrigatórias, conforme a seção abaixo.
 - **Descrição:** o que mudou, por quê, e o resultado da verificação (seção abaixo).
+
+## Labels
+
+A lista oficial fica em `.github/labels.yml`. Um workflow cria e atualiza as labels no GitHub quando esse arquivo muda; para criar uma label nova, edite o arquivo.
+
+| Label | Quando aplicar |
+|---|---|
+| `funcionalidade` | Adiciona uma funcionalidade nova |
+| `visual` | Mexe na interface ou nos gráficos (frontend) |
+| `motor` | Mexe no backend e nas ferramentas do motor (sniffer, poller, API, WebSocket, banco), exceto Docker |
+| `docker` | Mexe no orquestrador Docker ou nos containers do Arsenal |
+| `remoção` | Apaga código, arquivos ou funcionalidades |
+| `documentação` | Mexe no README, em skills ou em outros documentos |
+
+**Como escolher:** aplique uma label de natureza (`funcionalidade`, `remoção` ou `documentação`) quando ela couber e todas as labels de área (`visual`, `motor`, `docker`) das partes tocadas.
+
+| Mudança | Labels |
+|---|---|
+| `feat(frontend): adiciona gráfico de banda` | `funcionalidade`, `visual` |
+| `feat(sniffer): adiciona decodificador PostgreSQL` | `funcionalidade`, `motor` |
+| `fix(orquestrador): corrige limpeza dos containers` | `docker` |
+| `refactor(api)!: remove rota /scans` | `remoção`, `motor` |
+| `docs: atualiza o README` | `documentação` |
+
+- **Issues:** aplique as labels já na criação.
+- **Branches:** o GitHub não aplica labels a branches. As labels do trabalho de um branch vão no PR aberto a partir dele, já na criação do PR.
+- **Nenhuma label se encaixa:** crie uma nova em `.github/labels.yml` no mesmo PR, em vez de deixar o PR sem label.
 
 ## Verificação antes de commitar
 
@@ -103,3 +132,4 @@ Regras:
 | `feat` e `fix` misturados num commit | Dois commits, um de cada tipo |
 | "Testes passando" com base num teste rodado antes da última edição | Rodar de novo e relatar a saída atual |
 | Push direto na `main` | Branch `<tipo>/<descricao>` e PR |
+| Issue ou PR criado sem label | Aplicar as labels na criação, conforme a tabela de labels |
