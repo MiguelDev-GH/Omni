@@ -245,11 +245,18 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 
 ## Roadmap
 
-1. **Núcleo:** API REST, Hub WebSocket, SQLite e Poller.
-2. **Sniffer, camadas 3 e 4:** banda, protocolos, conexões, RTT e retransmissões.
-3. **Decodificadores da camada 7:** HTTP/1.1 e PostgreSQL.
-4. **Orquestrador Docker** com os parsers do Nmap e do Nuclei.
-5. **Restante:** demais ferramentas do Arsenal, relatórios em PDF, comparação entre scans, HTTP/2, MySQL e recursos das camadas 2 e 1.
+A implementação está dividida em **4 fases e 8 sprints**, e cada sprint entrega uma versão funcional que serve de base para a seguinte:
+
+| Fase | Sprints |
+|---|---|
+| 1. Fundação | 1. Núcleo do backend · 2. Poller e WebSocket · 3. Frontend base |
+| 2. Observação passiva | 4. Sniffer (camadas 3 e 4) · 5. HTTP · 6. PostgreSQL |
+| 3. Arsenal | 7. Orquestrador Docker e Nmap · 8. Nuclei, testssl e comparação entre scans |
+| 4. Expansão | Backlog com o restante das pendências por camada |
+
+**➡️ O que é feito em cada sprint, com entregas e status: [docs/SPRINTS.md](docs/SPRINTS.md)**
+
+O plano técnico detalhado (arquivos, interfaces e testes de cada tarefa) fica em [docs/superpowers/plans/2026-11-18-implementacao-basica.md](docs/superpowers/plans/2026-11-18-implementacao-basica.md).
 
 ## Stack
 
