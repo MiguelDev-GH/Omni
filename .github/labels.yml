@@ -1,0 +1,27 @@
+# Fonte única das labels do repositório.
+# O workflow .github/workflows/labels.yml cria ou atualiza estas labels no GitHub
+# sempre que este arquivo muda. Para adicionar uma label, edite aqui.
+
+- name: visual
+  color: "5319E7"
+  description: "Interface e gráficos da aplicação (frontend)"
+
+- name: docker
+  color: "0DB7ED"
+  description: "Orquestrador Docker e containers do Arsenal"
+
+- name: funcionalidade
+  color: "0E8A16"
+  description: "Nova funcionalidade"
+
+- name: remoção
+  color: "B60205"
+  description: "Remove código, arquivos ou funcionalidades"
+
+- name: documentação
+  color: "0075CA"
+  description: "README, skills e demais documentos"
+
+- name: motor
+  color: "FBCA04"
+  description: "Backend e ferramentas do motor (sniffer, poller, API), exceto Docker"
