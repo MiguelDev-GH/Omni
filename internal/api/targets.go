@@ -14,7 +14,7 @@ import (
 func (s *Server) listTargets(w http.ResponseWriter, r *http.Request) {
 	list, err := s.targets.ListTargets(r.Context())
 	if err != nil {
-		s.storeError(w, err)
+		storeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -27,7 +27,7 @@ func (s *Server) createTarget(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := s.targets.CreateTarget(r.Context(), t)
 	if err != nil {
-		s.storeError(w, err)
+		storeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
@@ -40,7 +40,7 @@ func (s *Server) getTarget(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := s.targets.GetTarget(r.Context(), id)
 	if err != nil {
-		s.storeError(w, err)
+		storeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, t)
@@ -57,7 +57,7 @@ func (s *Server) updateTarget(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ID = id
 	if err := s.targets.UpdateTarget(r.Context(), t); err != nil {
-		s.storeError(w, err)
+		storeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, t)
@@ -69,7 +69,7 @@ func (s *Server) deleteTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.targets.DeleteTarget(r.Context(), id); err != nil {
-		s.storeError(w, err)
+		storeError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -105,7 +105,7 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return id, true
 }
 
-func (s *Server) storeError(w http.ResponseWriter, err error) {
+func storeError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "alvo não encontrado")
 		return

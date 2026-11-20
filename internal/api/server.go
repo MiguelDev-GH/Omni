@@ -43,3 +43,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.outer.Ser
 
 // Handle registra uma rota extra, já atrás da autenticação.
 func (s *Server) Handle(pattern string, h http.Handler) { s.private.Handle(pattern, h) }
+
+// HandlePublic registra uma rota sem o token da API; o handler cuida da própria autorização.
+func (s *Server) HandlePublic(pattern string, h http.Handler) { s.outer.Handle(pattern, h) }

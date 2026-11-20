@@ -202,3 +202,11 @@ func TestHandleIsBehindAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, do(t, srv, "GET", "/api/extra", "", false).Code)
 	assert.Equal(t, http.StatusOK, do(t, srv, "GET", "/api/extra", "", true).Code)
 }
+
+func TestHandlePublicSkipsAuth(t *testing.T) {
+	srv := newTestServer(t)
+	srv.HandlePublic("GET /ws", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	assert.Equal(t, http.StatusOK, do(t, srv, "GET", "/ws", "", false).Code)
+}

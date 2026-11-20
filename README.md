@@ -6,7 +6,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
 
-> **Status:** em implementação. A Sprint 1 (núcleo do backend) está em andamento; veja [docs/SPRINTS.md](docs/SPRINTS.md).
+> **Status:** em implementação. A Sprint 1 (núcleo do backend) está concluída e a Sprint 2 (Poller e WebSocket) está em andamento; veja [docs/SPRINTS.md](docs/SPRINTS.md).
 
 ---
 
@@ -123,14 +123,26 @@ graph TD
 - **Cada cliente tem um canal com buffer próprio.** Se o cliente ficar lento, mensagens antigas são descartadas em vez de travar o hub.
 - **Pacotes são enviados em lotes** (por exemplo, a cada 500 ms), nunca um a um.
 
-Exemplos de mensagens:
+**Conexão:** o cliente pede um ticket em `POST /api/ws/ticket`, com o token da API, e abre a conexão em `GET /ws?ticket=<ticket>`. O ticket vale por 30 s e só pode ser usado uma vez:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $OMNI_TOKEN" 127.0.0.1:8080/api/ws/ticket
+# {"ticket":"..."}  →  ws://127.0.0.1:8080/ws?ticket=...
+```
+
+Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta sprint:
 
 ```json
-{ "tipo": "ALERTA_QUEDA", "alvo": "api", "servico": "PostgreSQL", "hora": "14:00:00" }
-{ "tipo": "METRICAS", "janela": "14:00:01", "req_s": 120, "status": { "2xx": 115, "4xx": 4, "5xx": 1 } }
-{ "tipo": "PACOTES", "lote": [ { "origem": "203.0.113.10", "destino": "127.0.0.1:3000", "proto": "HTTP", "tamanho": 512 } ] }
-{ "tipo": "SCAN_CONCLUIDO", "ferramenta": "nmap", "achados": 3, "novos_desde_ultimo": 1 }
+{ "tipo": "STATUS_ALVOS", "dados": { "resultados": [ { "alvo_id": 1, "porta": 3000, "tipo": "http", "no_ar": true, "status_http": 200, "latencia_ms": 1.2, "hora": "2026-11-20T17:31:46Z" } ] } }
+{ "tipo": "ALERTA_QUEDA", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "erro": "dial tcp 127.0.0.1:3000: connect: connection refused", "hora": "2026-11-20T17:31:52Z" } }
+{ "tipo": "SERVICO_RESTAURADO", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "hora": "2026-11-20T17:31:56Z" } }
+{ "tipo": "METRICAS_SISTEMA", "dados": { "cpu": 10.9, "memoria": 50.2, "disco": 4.7, "hora": "2026-11-20T17:31:49Z" } }
 ```
+
+- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco.
+- `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
+- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem.
+- O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
 
 ## Interface (frontend)
 
@@ -230,7 +242,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
   ssh -L 8080:127.0.0.1:8080 usuario@servidor
   ```
 - **Autenticação obrigatória** por token, mesmo em acesso local.
-- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH).
+- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente de 8080 exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`). Com `OMNI_DEV=1`, as origens do Vite (porta 5173) também são liberadas.
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
 - **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto.
