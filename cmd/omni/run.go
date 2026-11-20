@@ -75,6 +75,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 
 	select {
 	case err := <-serveErr:
+		_ = httpSrv.Close()
 		return err
 	case <-ctx.Done():
 	}
@@ -82,6 +83,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		_ = httpSrv.Close()
 		return err
 	}
 	if err := <-serveErr; !errors.Is(err, http.ErrServerClosed) {
