@@ -91,10 +91,11 @@ func buildOrigins(addr string, dev bool, extra string) ([]string, error) {
 	if strings.TrimSpace(extra) != "" {
 		for _, item := range strings.Split(extra, ",") {
 			item = strings.TrimSpace(item)
-			if !validOrigin(item) {
-				return nil, fmt.Errorf("%w: %s", ErrOrigemInvalida, item)
+			origin, ok := normalizeOrigin(item)
+			if !ok {
+				return nil, fmt.Errorf("%w: %q", ErrOrigemInvalida, item)
 			}
-			origins = append(origins, item)
+			origins = append(origins, origin)
 		}
 	}
 	seen := make(map[string]bool, len(origins))
@@ -108,13 +109,23 @@ func buildOrigins(addr string, dev bool, extra string) ([]string, error) {
 	return unique, nil
 }
 
-func validOrigin(s string) bool {
+// normalizeOrigin valida s e a devolve na forma que os navegadores enviam:
+// esquema e host em minúsculas, sem a porta padrão do esquema.
+func normalizeOrigin(s string) (string, bool) {
+	if strings.HasSuffix(s, "#") {
+		return "", false
+	}
 	u, err := url.Parse(s)
 	if err != nil {
-		return false
+		return "", false
 	}
-	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil &&
-		u.Path == "" && u.RawQuery == "" && u.Fragment == "" && u.Opaque == ""
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil ||
+		u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
+		return "", false
+	}
+	host := strings.ToLower(u.Host)
+	host = strings.TrimSuffix(host, map[string]string{"http": ":80", "https": ":443"}[u.Scheme])
+	return u.Scheme + "://" + host, true
 }
 
 func withDefault(v, def string) string {

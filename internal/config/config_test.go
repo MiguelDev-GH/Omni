@@ -98,7 +98,14 @@ func TestLoadOrigins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, c.AllowedOrigins, 3)
 
-	for _, bad := range []string{"localhost:9999", "http://localhost:9999/painel", "ftp://x.com", "http://u:s@x.com", "http://"} {
+	c, err = load(map[string]string{"OMNI_ORIGENS": "HTTP://LocalHost:9999,https://omni.exemplo.com:443,http://x.com:80,http://x.com,http://localhost:9999"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"http://localhost:9999", "https://omni.exemplo.com", "http://x.com"}, c.AllowedOrigins[3:])
+
+	_, err = load(map[string]string{"OMNI_ORIGENS": "http://x.com,"})
+	assert.ErrorContains(t, err, `""`)
+
+	for _, bad := range []string{"localhost:9999", "http://localhost:9999/painel", "ftp://x.com", "http://u:s@x.com", "http://", "http://x.com?", "http://x.com#"} {
 		_, err := load(map[string]string{"OMNI_ORIGENS": bad})
 		assert.ErrorIs(t, err, ErrOrigemInvalida, bad)
 		assert.ErrorContains(t, err, bad)
