@@ -5,14 +5,24 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"strings"
+	"time"
 )
 
-const minTokenLen = 32
+const (
+	minTokenLen         = 32
+	defaultPollInterval = "30s"
+	minPollInterval     = time.Second
+)
 
 var (
 	ErrTokenAusente   = errors.New("OMNI_TOKEN não definido")
 	ErrTokenCurto     = fmt.Errorf("OMNI_TOKEN precisa ter no mínimo %d caracteres", minTokenLen)
 	ErrEnderecoRemoto = errors.New("endereço fora do loopback; defina OMNI_PERMITIR_REMOTO=1 para permitir")
+
+	ErrIntervaloInvalido = errors.New("OMNI_INTERVALO_POLLER inválido; use uma duração de no mínimo 1s, como 30s")
+	ErrOrigemInvalida    = errors.New("origem inválida em OMNI_ORIGENS; use esquema http ou https, host e porta opcional")
 )
 
 type Config struct {
@@ -20,6 +30,9 @@ type Config struct {
 	DBPath      string
 	Token       string
 	AllowRemote bool
+
+	PollInterval   time.Duration
+	AllowedOrigins []string
 }
 
 // Load monta a Config usando getenv (normalmente os.Getenv).
@@ -39,7 +52,69 @@ func Load(getenv func(string) string) (Config, error) {
 	if !c.AllowRemote && !isLoopback(c.Addr) {
 		return Config{}, fmt.Errorf("%w: %s", ErrEnderecoRemoto, c.Addr)
 	}
+	interval, err := parsePollInterval(withDefault(getenv("OMNI_INTERVALO_POLLER"), defaultPollInterval))
+	if err != nil {
+		return Config{}, err
+	}
+	c.PollInterval = interval
+	origins, err := buildOrigins(c.Addr, getenv("OMNI_DEV") == "1", getenv("OMNI_ORIGENS"))
+	if err != nil {
+		return Config{}, err
+	}
+	c.AllowedOrigins = origins
 	return c, nil
+}
+
+func parsePollInterval(v string) (time.Duration, error) {
+	d, err := time.ParseDuration(v)
+	if err != nil || d < minPollInterval {
+		return 0, fmt.Errorf("%w: %s", ErrIntervaloInvalido, v)
+	}
+	return d, nil
+}
+
+// buildOrigins devolve as origens aceitas, sem repetição: loopback na porta
+// de addr, depois as do servidor de desenvolvimento e por fim as extras.
+func buildOrigins(addr string, dev bool, extra string) ([]string, error) {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrEnderecoRemoto, addr)
+	}
+	origins := []string{
+		"http://127.0.0.1:" + port,
+		"http://localhost:" + port,
+		"http://[::1]:" + port,
+	}
+	if dev {
+		origins = append(origins, "http://localhost:5173", "http://127.0.0.1:5173")
+	}
+	if strings.TrimSpace(extra) != "" {
+		for _, item := range strings.Split(extra, ",") {
+			item = strings.TrimSpace(item)
+			if !validOrigin(item) {
+				return nil, fmt.Errorf("%w: %s", ErrOrigemInvalida, item)
+			}
+			origins = append(origins, item)
+		}
+	}
+	seen := make(map[string]bool, len(origins))
+	unique := origins[:0]
+	for _, o := range origins {
+		if !seen[o] {
+			seen[o] = true
+			unique = append(unique, o)
+		}
+	}
+	return unique, nil
+}
+
+func validOrigin(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil &&
+		u.Path == "" && u.RawQuery == "" && u.Fragment == "" && u.Opaque == ""
 }
 
 func withDefault(v, def string) string {

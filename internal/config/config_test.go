@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,8 @@ const tok = "0123456789abcdef0123456789abcdef" // 32 caracteres
 func TestLoadDefaults(t *testing.T) {
 	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
 	require.NoError(t, err)
-	assert.Equal(t, Config{Addr: "127.0.0.1:8080", DBPath: "omni.db", Token: tok}, c)
+	assert.Equal(t, Config{Addr: "127.0.0.1:8080", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second,
+		AllowedOrigins: []string{"http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"}}, c)
 }
 
 func TestLoadReadsOverrides(t *testing.T) {
@@ -46,6 +48,7 @@ func TestLoadAddrRules(t *testing.T) {
 		{":8080", "", false},
 		{"192.168.0.10:8080", "", false},
 		{"sem-porta", "", false},
+		{"sem-porta", "1", false},
 		{"0.0.0.0:8080", "1", true},
 	}
 	for _, c := range cases {
@@ -56,5 +59,48 @@ func TestLoadAddrRules(t *testing.T) {
 		} else {
 			assert.ErrorIs(t, err, ErrEnderecoRemoto, c.addr)
 		}
+	}
+}
+
+func TestLoadPollInterval(t *testing.T) {
+	ok := map[string]time.Duration{"5s": 5 * time.Second, "1s": time.Second}
+	for v, want := range ok {
+		c, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_INTERVALO_POLLER": v}))
+		require.NoError(t, err, v)
+		assert.Equal(t, want, c.PollInterval, v)
+	}
+	for _, v := range []string{"500ms", "0", "-1s", "abc"} {
+		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_INTERVALO_POLLER": v}))
+		assert.ErrorIs(t, err, ErrIntervaloInvalido, v)
+		assert.ErrorContains(t, err, v)
+	}
+}
+
+func TestLoadOrigins(t *testing.T) {
+	load := func(m map[string]string) (Config, error) {
+		m["OMNI_TOKEN"] = tok
+		return Load(env(m))
+	}
+
+	c, err := load(map[string]string{"OMNI_ADDR": "127.0.0.1:9000"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"http://127.0.0.1:9000", "http://localhost:9000", "http://[::1]:9000"}, c.AllowedOrigins)
+
+	c, err = load(map[string]string{"OMNI_DEV": "1"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"http://localhost:5173", "http://127.0.0.1:5173"}, c.AllowedOrigins[3:])
+
+	c, err = load(map[string]string{"OMNI_ORIGENS": " http://localhost:9999 ,https://omni.exemplo.com"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"http://localhost:9999", "https://omni.exemplo.com"}, c.AllowedOrigins[3:])
+
+	c, err = load(map[string]string{"OMNI_ORIGENS": "http://localhost:8080"})
+	require.NoError(t, err)
+	assert.Len(t, c.AllowedOrigins, 3)
+
+	for _, bad := range []string{"localhost:9999", "http://localhost:9999/painel", "ftp://x.com", "http://u:s@x.com", "http://"} {
+		_, err := load(map[string]string{"OMNI_ORIGENS": bad})
+		assert.ErrorIs(t, err, ErrOrigemInvalida, bad)
+		assert.ErrorContains(t, err, bad)
 	}
 }
