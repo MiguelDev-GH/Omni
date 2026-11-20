@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
-import useWebSocket from "react-use-websocket";
+// O índice do pacote é CJS com "default" em getter, que o build do Vite não
+// resolve; o módulo interno exporta a função com nome.
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { ApiError, apiFetch } from "../api/client";
 import { useAppStore } from "../store/app";
 import { handleEvent } from "./events";
