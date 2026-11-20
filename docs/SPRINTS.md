@@ -47,6 +47,11 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 
 **Branch:** `feat/poller-e-websocket` · **Labels:** `funcionalidade`, `motor`
 
+**Pendências da Sprint 2:**
+
+- O histórico de verificações devolve no máximo 5000 resultados somando todas as portas, o que cobre menos de 24 h com intervalos curtos. Decidir limite por porta, amostragem ou sinal de truncamento antes dos gráficos da Sprint 3.
+- Retenção configurável da tabela `check_results`.
+
 ### Sprint 3: Frontend base
 
 **Ao final:** abrir `http://127.0.0.1:8080` mostra a interface do Omni, embutida no próprio binário.

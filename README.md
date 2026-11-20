@@ -123,7 +123,7 @@ graph TD
 - **Cada cliente tem um canal com buffer próprio.** Se o cliente ficar lento, mensagens antigas são descartadas em vez de travar o hub.
 - **Pacotes são enviados em lotes** (por exemplo, a cada 500 ms), nunca um a um.
 
-**Conexão:** o cliente pede um ticket de uso único em `POST /api/ws/ticket` (com o token da API, válido por 30 s) e abre a conexão em `GET /ws?ticket=<ticket>`:
+**Conexão:** o cliente pede um ticket em `POST /api/ws/ticket`, com o token da API, e abre a conexão em `GET /ws?ticket=<ticket>`. O ticket vale por 30 s e só pode ser usado uma vez:
 
 ```bash
 curl -s -X POST -H "Authorization: Bearer $OMNI_TOKEN" 127.0.0.1:8080/api/ws/ticket
@@ -139,7 +139,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "METRICAS_SISTEMA", "dados": { "cpu": 10.9, "memoria": 50.2, "disco": 4.7, "hora": "2026-11-20T17:31:49Z" } }
 ```
 
-- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco.
+- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
 - `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
@@ -242,7 +242,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
   ssh -L 8080:127.0.0.1:8080 usuario@servidor
   ```
 - **Autenticação obrigatória** por token, mesmo em acesso local.
-- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente de 8080 exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`).
+- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente de 8080 exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`). Com `OMNI_DEV=1`, as origens do Vite (porta 5173) também são liberadas.
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
 - **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto.
