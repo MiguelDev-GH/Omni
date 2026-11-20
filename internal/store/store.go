@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,7 +32,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 }
 
 func open(ctx context.Context, path string) (*Store, error) {
-	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
+	// O caminho é escapado para que '?', '#' e '%' façam parte do nome do arquivo.
+	dsn := "file:" + (&url.URL{Path: path}).EscapedPath() +
+		"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -45,7 +48,26 @@ func open(ctx context.Context, path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := checkWritable(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return &Store{db: db}, nil
+}
+
+// checkWritable falha já na abertura se o arquivo existir sem permissão de escrita.
+func checkWritable(ctx context.Context, db *sql.DB) error {
+	var version int
+	if err := db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
+		return err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.ExecContext(ctx, fmt.Sprintf("PRAGMA user_version = %d", version))
+	return err
 }
 
 func (s *Store) Close() error { return s.db.Close() }

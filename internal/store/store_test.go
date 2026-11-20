@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -45,6 +46,31 @@ func TestOpenIsIdempotent(t *testing.T) {
 	var version int
 	require.NoError(t, s.db.QueryRow("PRAGMA user_version").Scan(&version))
 	assert.Equal(t, 1, version)
+}
+
+func TestOpenUsesPathWithSpecialCharsVerbatim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "a?b#c%20d.db")
+	s, err := Open(context.Background(), path)
+	require.NoError(t, err)
+	defer func() { _ = s.Close() }()
+
+	assert.FileExists(t, path)
+	var mode string
+	require.NoError(t, s.db.QueryRow("PRAGMA journal_mode").Scan(&mode))
+	assert.Equal(t, "wal", mode)
+}
+
+func TestOpenFailsOnReadOnlyFile(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "omni.db")
+	s, err := Open(ctx, path)
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+	require.NoError(t, os.Chmod(path, 0o444))
+
+	_, err = Open(ctx, path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), path)
 }
 
 func TestOpenFailsOnMissingDir(t *testing.T) {
