@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Abrir `http://127.0.0.1:8080` mostra a interface do Omni, embutida no próprio binário: tela de token, barra superior com seletor de alvo e estado dos motores, barra lateral com as seções, página de Alvos funcionando e alertas de queda e retorno em tempo real.
+**Goal:** Abrir `http://127.0.0.1:8080` mostra a interface do Omni, embutida no próprio binário: tela de token, barra superior com seletor de alvo e estado dos motores, barra lateral com as seções, página de Alvos funcionando (com sugestões dos serviços que já escutam portas na máquina) e alertas de queda e retorno em tempo real.
 
 **Architecture:** Um projeto React + TypeScript em `web/` (Vite, Tailwind v4, Zustand, React Router, TanStack Table, `react-use-websocket`), compilado para `web/dist/` e copiado pelo `Makefile` para `internal/web/static/`, de onde o pacote Go novo `internal/web` serve os arquivos com `go:embed`. O `api.Server` passa a autenticar só o prefixo `/api/` e entrega o resto ao frontend, que tem fallback para `index.html` (rotas do React) e cabeçalhos de segurança próprios. No navegador, um store Zustand único guarda token, alvos, estado dos motores, último status de cada porta, métricas do sistema e toasts; o hook `useOmniSocket` pede um ticket novo a cada (re)conexão e despacha os eventos para esse store.
 
 **Tech Stack:** Go 1.24 (sem dependências Go novas), Node 24 LTS no CI, versões npm exatas na seção abaixo.
 
-**Spec:** `docs/superpowers/plans/2026-11-18-implementacao-basica.md` (seção "Sprint 3"), `docs/SPRINTS.md` (seção "Sprint 3"), `README.md` (seções "Interface (frontend)", "Comunicação em tempo real" e "Segurança da própria plataforma"). Convenções: `.claude/skills/convencoes-omni/SKILL.md`. Este documento expande a Sprint 3 com o código real das Sprints 1 e 2 à vista; onde divergir do plano básico, vale este. Divergências deliberadas: o fallback do frontend recebe o `fs.FS` por parâmetro (`web.Handler(fsys)`) para ser testável sem build; o `Makefile` entra na Task 2, junto com o projeto que ele compila; a ordem das tarefas começa pelo backend, que é o único bloqueio real para servir a interface.
+**Spec:** `docs/superpowers/plans/2026-11-18-implementacao-basica.md` (seção "Sprint 3"), `docs/SPRINTS.md` (seção "Sprint 3"), `README.md` (seções "Interface (frontend)", "Comunicação em tempo real" e "Segurança da própria plataforma"). Convenções: `.claude/skills/convencoes-omni/SKILL.md`. Este documento expande a Sprint 3 com o código real das Sprints 1 e 2 à vista; onde divergir do plano básico, vale este. A Task 7 (descoberta de serviços) foi acrescentada depois do plano básico, a pedido do dono do projeto, e não tem equivalente lá. Divergências deliberadas: o fallback do frontend recebe o `fs.FS` por parâmetro (`web.Handler(fsys)`) para ser testável sem build; o `Makefile` entra na Task 2, junto com o projeto que ele compila; a ordem das tarefas começa pelo backend, que é o único bloqueio real para servir a interface.
 
 ## Global Constraints
 
@@ -60,6 +60,10 @@
 | `web/src/pages/TokenPage.tsx`, `TargetsPage.tsx`, `NotFoundPage.tsx` | Páginas |
 | `web/src/realtime/events.ts` | `handleEvent`: evento do WebSocket → store |
 | `web/src/realtime/useOmniSocket.ts` | Ticket, URL, conexão e reconexão |
+| `internal/discovery/discovery.go` | `Listener`, `Suggestion`, `SystemListeners` (gopsutil) e `Suggest` (heurística pura) |
+| `internal/api/discovery.go` | `GET /api/descoberta` |
+| `web/src/api/discovery.ts` | Tipo `Suggestion` e `listSuggestions` |
+| `web/src/components/DiscoveredServices.tsx` | Lista "Detectado nesta máquina" no formulário de novo alvo |
 
 ---
 
@@ -425,3 +429,111 @@ git commit -m "docs: documenta como rodar a interface e marca a sprint 3 em anda
 ```
 
 Abra o PR `feat(frontend): adiciona interface base embutida no binário` contra a `main`, com as labels `funcionalidade`, `visual` e `motor`, e na descrição o resultado real do `make check` e da verificação no navegador.
+
+---
+
+### Task 7: Descoberta de serviços na máquina
+
+Ao cadastrar um alvo, o formulário mostra os serviços que já escutam portas TCP nesta máquina, para preencher host e portas com um clique. A lista sai dos sockets em estado LISTEN (`/proc/net/tcp*` cruzado com `/proc/<pid>/fd`, via `gopsutil`) e de uma heurística que separa aplicação de banco e esconde serviços do sistema.
+
+**Files:**
+- Create: `internal/discovery/discovery.go`, `internal/api/discovery.go`, `web/src/api/discovery.ts`, `web/src/components/DiscoveredServices.tsx`
+- Modify: `cmd/omni/run.go`, `web/src/components/TargetForm.tsx`, `README.md`
+- Test: `internal/discovery/discovery_test.go`, `internal/api/discovery_test.go`, `cmd/omni/run_test.go`, `web/src/components/DiscoveredServices.test.tsx`
+
+**Interfaces:**
+- Consumes: `TargetForm` e `TargetInput` (Task 4); `apiFetch` (Task 3); `api.Server.Handle` (Sprint 2).
+- Produces:
+  - Em `internal/discovery`:
+    ```go
+    type Listener struct {
+        Address string // IP local do socket, ex.: "127.0.0.1", "0.0.0.0", "::"
+        Port    int
+        PID     int32  // 0 quando o processo não é visível
+        Process string // nome do processo (/proc/<pid>/comm); "" quando não é visível
+    }
+    type Suggestion struct {
+        Process string `json:"processo,omitempty"`
+        PID     int32  `json:"pid,omitempty"`
+        Host    string `json:"host"`
+        Kind    string `json:"tipo"`   // "app" ou "banco"
+        Ports   []int  `json:"portas"` // em ordem crescente
+    }
+    func SystemListeners(ctx context.Context) ([]Listener, error)
+    func Suggest(ls []Listener, ownPort int) []Suggestion
+    ```
+    - `SystemListeners`: `gopsutil/v4/net.ConnectionsWithContext(ctx, "tcp")` (IPv4 e IPv6), só `Status == "LISTEN"`; nome por `process.NewProcessWithContext(ctx, pid)` e `NameWithContext`. Erro ao ler o nome (processo de outro usuário, sem root) deixa `Process` vazio e `PID` zerado, sem falhar a chamada. Nunca lê a linha de comando.
+    - `Suggest`, nesta ordem:
+      1. Descarta a porta `ownPort` e os processos `sshd`, `systemd-resolve`, `systemd-resolved`, `cupsd`, `avahi-daemon`, `chronyd`, `rpcbind`, `dnsmasq`, `exim4`, `master` (Postfix).
+      2. Une a mesma porta escutando em IPv4 e IPv6 numa só.
+      3. `Host`: `127.0.0.1` quando o endereço é `0.0.0.0`, `::` ou `127.0.0.0/8`; `::1` quando é `::1`; senão o próprio IP.
+      4. Agrupa por `(PID, Host)` quando o PID é conhecido; PID 0 vira uma sugestão por porta.
+      5. `Kind` é `"banco"` quando o processo é `postgres`, `mysqld`, `mariadbd`, `redis-server` ou `mongod`, ou, sem nome, quando a porta é 5432, 3306, 6379 ou 27017; senão `"app"`.
+      6. Ordena por `Kind` (`app` antes de `banco`) e depois pela menor porta. Sem listeners, devolve `[]Suggestion{}` (nunca `nil`).
+  - Em `internal/api`: `func DiscoveryHandler(list func(context.Context) ([]discovery.Listener, error), ownPort int) http.Handler` responde `GET /api/descoberta` com `Suggest(...)` em JSON; erro de `list` → 500 `{"erro":"não foi possível listar os serviços"}`, com o erro original só no log.
+  - `run.go`: `srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, ln.Addr().(*net.TCPAddr).Port))`.
+  - Em `web/src/api/discovery.ts`: `type Suggestion = { processo?: string; pid?: number; host: string; tipo: "app" | "banco"; portas: number[] }` e `listSuggestions(): Promise<Suggestion[]>`.
+  - `DiscoveredServices` (`props: { targets: Target[]; onPick: (s: Suggestion) => void }`): pede `listSuggestions` ao montar; esconde sugestões cujas portas já estão todas cadastradas num alvo com o mesmo host. Título "Detectado nesta máquina"; um botão por sugestão com o texto `<processo ou "Processo desconhecido"> · <portas separadas por ", ">` e o selo "banco" quando `tipo === "banco"`. Carregando: "Procurando serviços…"; vazio: "Nenhum serviço novo encontrado."; erro: "Não foi possível listar os serviços desta máquina." (o formulário continua utilizável).
+  - `TargetForm`, só no modo de criação, renderiza `DiscoveredServices` acima dos campos. Clique numa sugestão `app`: preenche Host com `host`, Portas da aplicação com `portas` e Nome com `processo` quando o Nome está vazio. Clique numa sugestão `banco`: preenche só Porta do banco com a primeira porta.
+  - `README.md`: no passo 1 de "Fluxo de funcionamento", citar as sugestões; em "Segurança da própria plataforma", dizer que a descoberta não expõe a linha de comando dos processos.
+
+**Review Focus desta task:** Omni rodando sem root numa máquina onde postgres e nginx pertencem a outros usuários: as portas aparecem como "Processo desconhecido" (postgres ainda sai como `banco` pela porta 5432), e a rota nunca devolve 500 por falta de permissão. Teste `TestSuggestUnknownProcess`.
+
+- [ ] **Step 1: Escrever os testes Go que falham**
+
+`internal/discovery/discovery_test.go` (tabela sobre `Suggest`, sem tocar no sistema):
+- `TestSuggestGroupsByProcess`: `node` (PID 10) em `0.0.0.0:3000` e `127.0.0.1:9229` → uma sugestão `{Process:"node", PID:10, Host:"127.0.0.1", Kind:"app", Ports:[3000,9229]}`.
+- `TestSuggestMergesIPv4AndIPv6`: `python` (PID 11) em `0.0.0.0:8000` e `:::8000` → uma sugestão com `Ports:[8000]`.
+- `TestSuggestDetectsDatabase`: `postgres` (PID 12) em `127.0.0.1:5432` → `Kind:"banco"`.
+- `TestSuggestUnknownProcess`: PID 0 em `127.0.0.1:5432` e em `0.0.0.0:80` → duas sugestões, `banco` (5432) e `app` (80), ambas com `Process` vazio.
+- `TestSuggestSkipsSystemAndSelf`: `sshd` em 22, `systemd-resolved` em `127.0.0.53:53` e qualquer processo na `ownPort` 8080 → `[]Suggestion{}` (não `nil`).
+- `TestSuggestKeepsSpecificAddress`: `java` em `192.168.0.10:8443` → `Host:"192.168.0.10"`; `deno` em `::1:4000` → `Host:"::1"`.
+- `TestSuggestOrder`: um `banco` em 3306 e apps em 5000 e 3000 → ordem 3000, 5000, 3306.
+- `TestSystemListenersRuns`: abre um `net.Listen("tcp", "127.0.0.1:0")` no próprio teste e confere que `SystemListeners` devolve essa porta com o `PID` de `os.Getpid()`.
+
+`internal/api/discovery_test.go`:
+- `TestDiscoveryReturnsSuggestions`: `list` falso com `node` em 3000 → 200, JSON `[{"processo":"node","pid":10,"host":"127.0.0.1","tipo":"app","portas":[3000]}]`.
+- `TestDiscoveryEmptyIsArray`: `list` vazio → corpo `[]`.
+- `TestDiscoveryError`: `list` com erro → 500 `{"erro":"não foi possível listar os serviços"}`.
+
+`cmd/omni/run_test.go`:
+- `TestRunServesDiscovery`: `GET /api/descoberta` sem token → 401; com token → 200 e a porta do próprio `run` fora da lista.
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `go test ./internal/discovery/ ./internal/api/ ./cmd/omni/`
+Expected: FAIL (pacote `discovery` e `DiscoveryHandler` não existem).
+
+- [ ] **Step 3: Implementar `internal/discovery`, `DiscoveryHandler` e a rota em `run.go`**
+
+- [ ] **Step 4: Escrever os testes do frontend que falham**
+
+`DiscoveredServices.test.tsx` (`fetch` simulado):
+- `lists suggestions`: `[{processo:"node",pid:10,host:"127.0.0.1",tipo:"app",portas:[3000,9229]}, {host:"127.0.0.1",tipo:"banco",portas:[5432]}]` → botões "node · 3000, 9229" e "Processo desconhecido · 5432", este com o selo "banco".
+- `hides registered services`: com o alvo `{host:"127.0.0.1", portas_app:[3000, 9229]}` cadastrado, o botão do `node` não aparece.
+- `shows empty and error states`: `[]` → "Nenhum serviço novo encontrado."; 500 → "Não foi possível listar os serviços desta máquina.".
+- `fills form from app suggestion` (renderizando `TargetForm` em modo de criação): clicar em "node · 3000, 9229" → Nome `node`, Host `127.0.0.1`, Portas da aplicação `3000, 9229`.
+- `keeps typed name`: com Nome já digitado `minha api`, o clique não troca o Nome.
+- `fills database port`: clicar na sugestão `banco` → Porta do banco `5432` e Portas da aplicação intacta.
+- `edit mode has no suggestions`: `TargetForm` com `initial` não mostra "Detectado nesta máquina" e não chama `/api/descoberta`.
+
+`TargetsPage.test.tsx`: o `backend` dos testes passa a responder `/api/descoberta` com `[]`, para os testes existentes continuarem contando só as chamadas de `/api/alvos`.
+
+- [ ] **Step 5: Rodar e ver falhar**
+
+Run: `cd web && npm test`
+Expected: FAIL nos testes novos.
+
+- [ ] **Step 6: Implementar `discovery.ts`, `DiscoveredServices` e a mudança no `TargetForm`; atualizar o README**
+
+- [ ] **Step 7: Verificar**
+
+Run: `make check && make build`, depois subir o `./omni` com `python3 -m http.server 3000 --bind 127.0.0.1` rodando e abrir "Novo alvo".
+Expected: `make check` passa; a lista mostra `python3 · 3000` (ou o nome do processo que o sistema der) e não mostra a porta do próprio Omni; clicar preenche Nome, Host e Portas; depois de salvar, ao abrir "Novo alvo" de novo, a sugestão some.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add internal/discovery internal/api cmd/omni web/src README.md
+git commit -m "feat(frontend): sugere serviços da máquina ao cadastrar alvo"
+```
