@@ -261,3 +261,29 @@ func TestRunServesFrontend(t *testing.T) {
 	code, _ = get(t, base+"/api/alvos", false)
 	assert.Equal(t, http.StatusUnauthorized, code)
 }
+
+func TestRunServesDiscovery(t *testing.T) {
+	_, base, _ := startRun(t, config.Config{DBPath: filepath.Join(t.TempDir(), "omni.db"), Token: tok})
+	code, _ := get(t, base+"/api/descoberta", false)
+	assert.Equal(t, http.StatusUnauthorized, code)
+
+	code, body := get(t, base+"/api/descoberta", true)
+	require.Equal(t, http.StatusOK, code, body)
+	var got []struct {
+		Ports []int `json:"portas"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &got))
+	u, err := url.Parse(base)
+	require.NoError(t, err)
+	for _, s := range got {
+		assert.NotContains(t, s.Ports, mustPort(t, u.Port()))
+	}
+}
+
+func mustPort(t *testing.T, s string) int {
+	t.Helper()
+	var p int
+	_, err := fmt.Sscan(s, &p)
+	require.NoError(t, err)
+	return p
+}

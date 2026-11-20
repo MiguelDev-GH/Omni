@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
+import type { Suggestion } from "../api/discovery";
 import { createTarget, parsePorts, updateTarget, type Target, type TargetInput } from "../api/targets";
+import { useAppStore } from "../store/app";
+import DiscoveredServices from "./DiscoveredServices";
 
 type Field = "nome" | "host" | "portas_app" | "porta_banco" | "dominio";
 
@@ -17,6 +20,21 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const targets = useAppStore((s) => s.targets);
+
+  // pick preenche o formulário a partir de um serviço detectado na máquina.
+  function pick(s: Suggestion) {
+    setValues((v) =>
+      s.tipo === "banco"
+        ? { ...v, porta_banco: String(s.portas[0] ?? "") }
+        : {
+            ...v,
+            nome: v.nome.trim() === "" && s.processo ? s.processo : v.nome,
+            host: s.host,
+            portas_app: s.portas.join(", "),
+          },
+    );
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -92,6 +110,7 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
           {formError}
         </p>
       )}
+      {!initial && <DiscoveredServices targets={targets} onPick={pick} />}
       <div className="grid gap-4 sm:grid-cols-2">
         {input("nome", "Nome")}
         {input("host", "Host")}
