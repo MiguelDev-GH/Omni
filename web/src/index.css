@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fundo: var(--color-zinc-950);
+  --color-superficie: var(--color-zinc-900);
+  --color-borda: var(--color-zinc-800);
+  --color-texto: var(--color-zinc-100);
+  --color-suave: var(--color-zinc-400);
+  --color-destaque: var(--color-emerald-500);
+  --color-erro: var(--color-red-500);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-fundo text-texto antialiased;
+}
