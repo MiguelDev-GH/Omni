@@ -9,8 +9,8 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | Sprint | Fase | Entrega | Status |
 |---|---|---|---|
 | [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | ✅ Concluída |
-| [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | 🚧 Em andamento |
-| [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ⏳ A fazer |
+| [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ✅ Concluída |
+| [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | 🚧 Em andamento |
 | [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ⏳ A fazer |
 | [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ⏳ A fazer |
 | [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ⏳ A fazer |
@@ -49,7 +49,7 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 
 **Pendências da Sprint 2:**
 
-- O histórico de verificações devolve no máximo 5000 resultados somando todas as portas, o que cobre menos de 24 h com intervalos curtos. Decidir limite por porta, amostragem ou sinal de truncamento antes dos gráficos da Sprint 3.
+- O histórico de verificações devolve no máximo 5000 resultados somando todas as portas, o que cobre menos de 24 h com intervalos curtos. Decidir limite por porta, amostragem ou sinal de truncamento antes dos gráficos da Sprint 4.
 - Retenção configurável da tabela `check_results`.
 
 ### Sprint 3: Frontend base

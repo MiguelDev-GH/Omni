@@ -6,7 +6,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
 
-> **Status:** em implementação. A Sprint 1 (núcleo do backend) está concluída e a Sprint 2 (Poller e WebSocket) está em andamento; veja [docs/SPRINTS.md](docs/SPRINTS.md).
+> **Status:** em implementação. As Sprints 1 (núcleo do backend) e 2 (Poller e WebSocket) estão concluídas e a Sprint 3 (frontend base) está em andamento; veja [docs/SPRINTS.md](docs/SPRINTS.md).
 
 ---
 
@@ -145,6 +145,16 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
 
 ## Interface (frontend)
+
+**Como rodar:** `make build` compila a interface (em `web/`) e gera o binário `./omni` com ela embutida; basta abrir `http://127.0.0.1:8080` e informar o token. Para desenvolver a interface com recarga automática, rode o backend num terminal e o Vite noutro, e abra `http://localhost:5173`:
+
+```bash
+OMNI_DEV=1 OMNI_TOKEN=<token> go run ./cmd/omni
+```
+
+```bash
+cd web && npm run dev
+```
 
 **Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker) e notificações.
 
