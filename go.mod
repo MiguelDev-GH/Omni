@@ -3,6 +3,7 @@ module github.com/MiguelDev-GH/omni
 go 1.24.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
 	github.com/stretchr/testify v1.12.1
 	modernc.org/sqlite v1.46.1
 )
