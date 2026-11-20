@@ -2,6 +2,7 @@ package poller
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -91,7 +92,8 @@ func (s *Scheduler) Run(ctx context.Context) {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 	for {
-		if err := s.RunOnce(ctx); err != nil {
+		if err := s.RunOnce(ctx); err != nil && !errors.Is(err, context.Canceled) &&
+			!errors.Is(err, context.DeadlineExceeded) {
 			slog.Error("rodada do poller", "erro", err)
 		}
 		select {
@@ -102,8 +104,9 @@ func (s *Scheduler) Run(ctx context.Context) {
 	}
 }
 
-// RunOnce verifica todas as portas de todos os alvos. Só devolve erro se não
-// conseguir listar os alvos.
+// RunOnce verifica todas as portas de todos os alvos. Devolve erro se não
+// conseguir listar os alvos ou se ctx for encerrado durante a rodada; neste
+// caso a rodada é descartada.
 func (s *Scheduler) RunOnce(ctx context.Context) error {
 	targets, err := s.store.ListTargets(ctx)
 	if err != nil {
@@ -121,6 +124,11 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 	}
 
 	results := s.runChecks(ctx, checks)
+	// Uma rodada interrompida (desligamento) tem resultados falsos de queda:
+	// nada é gravado, publicado ou guardado como estado.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	seen := make(map[portKey]struct{}, len(checks))
 	for i, c := range checks {

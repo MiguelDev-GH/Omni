@@ -257,3 +257,44 @@ func TestRunStopsOnCancel(t *testing.T) {
 		t.Fatal("Run não retornou após o cancelamento")
 	}
 }
+
+func TestRunOnceDiscardsRoundWhenCanceled(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enterOnce sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		enterOnce.Do(func() { close(entered) })
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(release) })
+	_, port := hostPort(t, srv.URL)
+
+	st := &fakeStore{targets: []target.Target{{ID: 1, Name: "api", Host: "127.0.0.1", AppPorts: []int{port}}}}
+	pub := &fakePub{}
+	s := NewScheduler(st, pub, time.Hour)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() { errCh <- s.RunOnce(ctx) }()
+
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("o handler não foi chamado")
+	}
+	cancel()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("RunOnce não retornou após o cancelamento")
+	}
+	assert.Empty(t, st.stored())
+	pub.mu.Lock()
+	defer pub.mu.Unlock()
+	assert.Empty(t, pub.events)
+}
