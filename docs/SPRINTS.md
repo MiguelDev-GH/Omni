@@ -59,6 +59,7 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Projeto React + TypeScript (Vite, Tailwind) com lint, typecheck e testes no CI.
 - Tela de token, barra superior com seletor de alvo e estado dos motores, barra lateral com as seções Monitoramento, Tráfego, Arsenal e Relatórios.
 - Página de Alvos com tabela e formulário.
+- Descoberta de serviços: ao cadastrar um alvo, o formulário sugere os processos que já escutam portas TCP na máquina (aplicações e bancos), sem expor a linha de comando deles; um clique preenche host e portas.
 - Alertas em tempo real (toasts) pela conexão WebSocket.
 - `make build` gera um binário único com o frontend embutido.
 

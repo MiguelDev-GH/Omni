@@ -475,7 +475,17 @@ Entrega: abrir `http://127.0.0.1:8080` mostra a interface: tela de token, barra 
 
 **Testes:** `GET /` → 200 com HTML; `GET /alvos` → mesmo HTML (fallback); `GET /api/saude` continua respondendo JSON.
 
-PR `feat(frontend): adiciona interface base embutida no binário`, labels `funcionalidade` e `visual`.
+### Tarefa 3.6: Descoberta de serviços na máquina
+
+**Files:** Create `internal/discovery/discovery.go`, `internal/api/discovery.go`, `web/src/api/discovery.ts`, `web/src/components/DiscoveredServices.tsx`; Test `internal/discovery/discovery_test.go`, `internal/api/discovery_test.go`, `web/src/components/DiscoveredServices.test.tsx`; Modify `cmd/omni/run.go`, `web/src/components/TargetForm.tsx`
+
+**Interfaces:**
+- Produces: `discovery.SystemListeners(ctx)` (sockets TCP em LISTEN via `gopsutil`, com nome do processo quando visível), `discovery.Suggest(listeners, ownPort) []Suggestion` (agrupa por processo, separa `app` de `banco`, esconde serviços do sistema e a porta do próprio Omni) e a rota `GET /api/descoberta`, atrás do token. A linha de comando dos processos nunca é lida nem devolvida.
+- No formulário de novo alvo, a lista "Detectado nesta máquina" preenche host e portas com um clique.
+
+**Testes:** heurística de `Suggest` por tabela (agrupamento, IPv4 e IPv6 na mesma porta, banco por nome ou por porta, processo desconhecido, serviços do sistema); rota com resposta, lista vazia e erro; formulário preenchido a partir de uma sugestão. Detalhes na Task 7 de `2026-11-20-sprint-3-frontend-base.md`.
+
+PR `feat(frontend): adiciona interface base embutida no binário`, labels `funcionalidade`, `visual` e `motor`.
 
 ---
 

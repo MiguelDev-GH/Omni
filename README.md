@@ -109,7 +109,7 @@ graph TD
 
 ## Fluxo de funcionamento
 
-1. **Cadastro do alvo:** o usuário informa as portas da aplicação, a porta do banco e o domínio.
+1. **Cadastro do alvo:** o usuário informa as portas da aplicação, a porta do banco e o domínio. O formulário sugere os serviços que já escutam portas TCP na máquina (aplicações e bancos, sem os serviços do sistema), e um clique preenche host e portas.
 2. **Captura passiva:** o Sniffer aplica um filtro BPF nessas portas. A partir do tráfego gera métricas de requisições, status HTTP, latência, consultas ao banco, banda e protocolos.
 3. **Testes ativos:** o Poller verifica periodicamente se a aplicação está no ar e respondendo bem, e coleta métricas do sistema.
 4. **Agregação:** a cada segundo, o Agregador salva os agregados no SQLite e envia as atualizações em lote pelo WebSocket, e os gráficos se atualizam.
@@ -253,6 +253,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
   ```
 - **Autenticação obrigatória** por token, mesmo em acesso local.
 - **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente de 8080 exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`). Com `OMNI_DEV=1`, as origens do Vite (porta 5173) também são liberadas.
+- **Descoberta de serviços sem segredos:** `GET /api/descoberta` exige o token e devolve só nome do processo, PID, host e portas, nunca a linha de comando, que costuma conter senhas. Sem root, processos de outros usuários aparecem sem nome.
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
 - **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto.

@@ -24,6 +24,7 @@ function renderPage() {
 function backend(list: unknown[], other: (c: FetchCall) => Response = () => json(500, { erro: "inesperado" })) {
   return mockFetch((c) => {
     if (c.url === "/api/ws/ticket") return json(200, { ticket: "t" });
+    if (c.url === "/api/descoberta") return json(200, []);
     return c.method === "GET" && c.url === "/api/alvos" ? json(200, list) : other(c);
   });
 }
@@ -63,7 +64,7 @@ test("creates target with parsed ports", async () => {
   const post = calls.find((c) => c.method === "POST" && c.url === "/api/alvos")!;
   expect(post.url).toBe("/api/alvos");
   expect(post.body).toBe('{"nome":"api","host":"127.0.0.1","portas_app":[3000,8080]}');
-  await waitFor(() => expect(calls.filter((c) => c.method === "GET")).toHaveLength(2));
+  await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.url === "/api/alvos")).toHaveLength(2));
 });
 
 test("shows server error under field", async () => {
