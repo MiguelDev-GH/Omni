@@ -15,6 +15,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/store"
 	"github.com/MiguelDev-GH/omni/internal/sysmetrics"
+	"github.com/MiguelDev-GH/omni/internal/web"
 	"github.com/MiguelDev-GH/omni/internal/ws"
 )
 
@@ -42,6 +43,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("POST /api/ws/ticket", ws.TicketHandler(tickets))
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
+	srv.HandleFrontend(web.Handler(web.Assets()))
 
 	// Os defers rodam ao contrário: hub.Close (também quando Serve falha, pois
 	// RegisterOnShutdown só roda no Shutdown), depois o fim das goroutines de

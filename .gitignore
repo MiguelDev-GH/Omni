@@ -4,3 +4,5 @@
 web/node_modules/
 web/dist/
 *.pcap
+internal/web/static/*
+!internal/web/static/placeholder.html

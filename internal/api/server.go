@@ -16,7 +16,8 @@ type TargetStore interface {
 	DeleteTarget(ctx context.Context, id int64) error
 }
 
-// Server roteia /api/saude sem autenticação e todo o resto atrás do token.
+// Server roteia /api/saude sem autenticação, o resto de /api/ atrás do token
+// e os demais caminhos para o frontend, quando registrado.
 type Server struct {
 	outer   *http.ServeMux
 	private *http.ServeMux
@@ -29,7 +30,7 @@ func NewServer(ts TargetStore, token string) *Server {
 	s.outer.HandleFunc("GET /api/saude", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	s.outer.Handle("/", requireToken(token, s.private))
+	s.outer.Handle("/api/", requireToken(token, s.private))
 
 	s.private.HandleFunc("GET /api/alvos", s.listTargets)
 	s.private.HandleFunc("POST /api/alvos", s.createTarget)
@@ -46,3 +47,6 @@ func (s *Server) Handle(pattern string, h http.Handler) { s.private.Handle(patte
 
 // HandlePublic registra uma rota sem o token da API; o handler cuida da própria autorização.
 func (s *Server) HandlePublic(pattern string, h http.Handler) { s.outer.Handle(pattern, h) }
+
+// HandleFrontend serve h em todos os caminhos fora de /api/ sem rota própria.
+func (s *Server) HandleFrontend(h http.Handler) { s.outer.Handle("/", h) }
