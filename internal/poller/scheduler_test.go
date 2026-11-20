@@ -97,6 +97,7 @@ func closedPort(t *testing.T) int {
 
 func TestRunOnceEmitsDownOnlyOnTransition(t *testing.T) {
 	srv, port := newUpServer(t)
+	t.Cleanup(srv.Close)
 	st := &fakeStore{targets: []target.Target{{ID: 1, Name: "api", Host: "127.0.0.1", AppPorts: []int{port}}}}
 	pub := &fakePub{}
 	s := NewScheduler(st, pub, time.Hour)
@@ -152,7 +153,9 @@ func TestRunOnceAlertsWhenFirstSeenDown(t *testing.T) {
 
 	downs := pub.ofType("ALERTA_QUEDA")
 	require.Len(t, downs, 1)
-	assert.Equal(t, port, downs[0].Data.(DownAlert).Port)
+	down, ok := downs[0].Data.(DownAlert)
+	require.True(t, ok)
+	assert.Equal(t, port, down.Port)
 }
 
 func TestRunOncePublishesStatusAndStores(t *testing.T) {
@@ -206,7 +209,9 @@ func TestRunOnceContinuesAfterInsertError(t *testing.T) {
 	assert.Equal(t, int64(2), stored[0].TargetID)
 	statuses := pub.ofType("STATUS_ALVOS")
 	require.Len(t, statuses, 1)
-	results := statuses[0].Data.(StatusData).Results
+	data, ok := statuses[0].Data.(StatusData)
+	require.True(t, ok)
+	results := data.Results
 	require.Len(t, results, 2)
 	assert.Equal(t, int64(1), results[0].TargetID)
 	assert.Equal(t, int64(2), results[1].TargetID)
@@ -297,4 +302,49 @@ func TestRunOnceDiscardsRoundWhenCanceled(t *testing.T) {
 	pub.mu.Lock()
 	defer pub.mu.Unlock()
 	assert.Empty(t, pub.events)
+}
+
+func TestRunOnceSeparatesStateByKind(t *testing.T) {
+	// Aceita TCP e fecha a conexão logo em seguida: CheckTCP vê no ar e
+	// CheckHTTP vê fora do ar.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+	port := ln.Addr().(*net.TCPAddr).Port
+
+	st := &fakeStore{targets: []target.Target{{
+		ID: 4, Name: "mesma", Host: "127.0.0.1", AppPorts: []int{port}, DBPort: port,
+	}}}
+	pub := &fakePub{}
+	s := NewScheduler(st, pub, time.Hour)
+	ctx := context.Background()
+
+	require.NoError(t, s.RunOnce(ctx))
+	downs := pub.ofType("ALERTA_QUEDA")
+	require.Len(t, downs, 1)
+	down, ok := downs[0].Data.(DownAlert)
+	require.True(t, ok)
+	assert.Equal(t, port, down.Port)
+	statuses := pub.ofType("STATUS_ALVOS")
+	require.Len(t, statuses, 1)
+	data, ok := statuses[0].Data.(StatusData)
+	require.True(t, ok)
+	require.Len(t, data.Results, 2)
+	assert.Equal(t, "http", data.Results[0].Kind)
+	assert.False(t, data.Results[0].Up)
+	assert.Equal(t, "tcp", data.Results[1].Kind)
+	assert.True(t, data.Results[1].Up)
+
+	require.NoError(t, s.RunOnce(ctx))
+	assert.Len(t, pub.ofType("ALERTA_QUEDA"), 1)
+	assert.Empty(t, pub.ofType("SERVICO_RESTAURADO"))
 }

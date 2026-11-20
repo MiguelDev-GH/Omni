@@ -53,9 +53,12 @@ type RestoredAlert struct {
 	At       time.Time `json:"hora"`
 }
 
+// portKey identifica o estado de uma verificação. Kind separa as verificações
+// http e tcp quando porta_banco coincide com uma porta de app.
 type portKey struct {
 	TargetID int64
 	Port     int
+	Kind     string
 }
 
 type check struct {
@@ -136,7 +139,7 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 		if err := s.store.InsertCheckResult(ctx, r); err != nil {
 			slog.Error("gravar verificação", "alvo_id", r.TargetID, "porta", r.Port, "erro", err)
 		}
-		key := portKey{TargetID: c.target.ID, Port: c.port}
+		key := portKey{TargetID: c.target.ID, Port: c.port, Kind: r.Kind}
 		seen[key] = struct{}{}
 		s.transition(key, c.target.Name, r)
 	}
