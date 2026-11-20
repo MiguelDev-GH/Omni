@@ -22,6 +22,7 @@ export default function Topbar() {
   const targets = useAppStore((s) => s.targets);
   const selected = useAppStore((s) => s.selectedTargetId);
   const selectTarget = useAppStore((s) => s.selectTarget);
+  const system = useAppStore((s) => s.system);
 
   return (
     <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-borda bg-superficie px-4 py-3">
@@ -53,6 +54,11 @@ export default function Topbar() {
           </li>
         ))}
       </ul>
+      {system && (
+        <p className="text-xs text-suave tabular-nums">
+          CPU {Math.round(system.cpu)}% · Memória {Math.round(system.memoria)}% · Disco {Math.round(system.disco)}%
+        </p>
+      )}
       <button
         type="button"
         onClick={() => clearToken(false)}

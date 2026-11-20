@@ -4,12 +4,14 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test, vi } from "vitest";
 import Layout from "../components/Layout";
 import { useAppStore } from "../store/app";
+import { installFakeWebSocket } from "../test/fakeSocket";
 import { json, mockFetch, type FetchCall } from "../test/fetch";
 import TargetsPage from "./TargetsPage";
 
 const api = { id: 1, nome: "api", host: "127.0.0.1", portas_app: [3000, 8080] };
 
 function renderPage() {
+  installFakeWebSocket();
   useAppStore.setState({ token: "t" });
   const router = createMemoryRouter(
     [{ element: <Layout />, children: [{ path: "/alvos", element: <TargetsPage /> }] }],
@@ -18,9 +20,12 @@ function renderPage() {
   return render(<RouterProvider router={router} />);
 }
 
-// backend devolve a lista atual em GET e delega o resto a other.
+// backend devolve a lista atual em GET, um ticket para o WebSocket e delega o resto a other.
 function backend(list: unknown[], other: (c: FetchCall) => Response = () => json(500, { erro: "inesperado" })) {
-  return mockFetch((c) => (c.method === "GET" && c.url === "/api/alvos" ? json(200, list) : other(c)));
+  return mockFetch((c) => {
+    if (c.url === "/api/ws/ticket") return json(200, { ticket: "t" });
+    return c.method === "GET" && c.url === "/api/alvos" ? json(200, list) : other(c);
+  });
 }
 
 test("lists targets", async () => {
@@ -54,8 +59,8 @@ test("creates target with parsed ports", async () => {
   const calls = backend([], (c) => json(201, { ...JSON.parse(c.body ?? "{}"), id: 1 }));
   renderPage();
   await fillNew({ nome: "api", host: "127.0.0.1", portas: "3000 8080" });
-  await waitFor(() => expect(calls.filter((c) => c.method === "POST")).toHaveLength(1));
-  const post = calls.find((c) => c.method === "POST")!;
+  await waitFor(() => expect(calls.filter((c) => c.method === "POST" && c.url === "/api/alvos")).toHaveLength(1));
+  const post = calls.find((c) => c.method === "POST" && c.url === "/api/alvos")!;
   expect(post.url).toBe("/api/alvos");
   expect(post.body).toBe('{"nome":"api","host":"127.0.0.1","portas_app":[3000,8080]}');
   await waitFor(() => expect(calls.filter((c) => c.method === "GET")).toHaveLength(2));
@@ -81,7 +86,7 @@ test("rejects non-numeric ports locally", async () => {
   renderPage();
   await fillNew({ nome: "api", host: "127.0.0.1", portas: "abc" });
   expect(await screen.findByText("Use só números separados por vírgula.")).toBeInTheDocument();
-  expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
+  expect(calls.filter((c) => c.method === "POST" && c.url === "/api/alvos")).toHaveLength(0);
 });
 
 test("edits target", async () => {
@@ -114,4 +119,29 @@ test("delete asks confirmation", async () => {
   confirm.mockReturnValue(true);
   await user.click(screen.getByRole("button", { name: "Excluir api" }));
   await waitFor(() => expect(calls.find((c) => c.method === "DELETE")?.url).toBe("/api/alvos/1"));
+});
+
+test("shows port state", async () => {
+  backend([api, { ...api, id: 2, nome: "web", portas_app: [4000] }]);
+  useAppStore.setState({
+    targetStatus: {
+      "1:3000": { alvo_id: 1, porta: 3000, tipo: "http", no_ar: false, latencia_ms: 1, hora: "2026-11-20T17:31:46Z" },
+      "1:8080": { alvo_id: 1, porta: 8080, tipo: "http", no_ar: true, latencia_ms: 1, hora: "2026-11-20T17:31:46Z" },
+    },
+  });
+  renderPage();
+  const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
+  expect(within(row).getByText("Fora do ar (porta 3000)")).toBeInTheDocument();
+  const web = screen.getByRole("cell", { name: "web" }).closest("tr")!;
+  expect(within(web).getByText("Aguardando")).toBeInTheDocument();
+});
+
+test("shows all ports up", async () => {
+  backend([{ ...api, portas_app: [3000] }]);
+  useAppStore.setState({
+    targetStatus: { "1:3000": { alvo_id: 1, porta: 3000, tipo: "http", no_ar: true, latencia_ms: 1, hora: "2026-11-20T17:31:46Z" } },
+  });
+  renderPage();
+  const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
+  expect(within(row).getByText("No ar")).toBeInTheDocument();
 });

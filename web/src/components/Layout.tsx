@@ -1,8 +1,11 @@
 import { Outlet } from "react-router";
+import { useOmniSocket } from "../realtime/useOmniSocket";
 import Sidebar from "./Sidebar";
+import Toasts from "./Toasts";
 import Topbar from "./Topbar";
 
 export default function Layout() {
+  useOmniSocket();
   return (
     <div className="flex min-h-screen flex-col">
       <Topbar />
@@ -14,6 +17,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <Toasts />
     </div>
   );
 }
