@@ -8,8 +8,8 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 
 | Sprint | Fase | Entrega | Status |
 |---|---|---|---|
-| [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | 🚧 Em andamento |
-| [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ⏳ A fazer |
+| [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | ✅ Concluída |
+| [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | 🚧 Em andamento |
 | [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ⏳ A fazer |
 | [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ⏳ A fazer |
 | [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ⏳ A fazer |
