@@ -24,10 +24,14 @@ type Result struct {
 }
 
 // NewHTTPClient cria o cliente das verificações HTTP: com o timeout dado e
-// sem seguir redirecionamentos.
+// sem seguir redirecionamentos nem usar o proxy do ambiente (um proxy
+// responderia 502 por um alvo fora do ar, que seria dado como no ar).
 func NewHTTPClient(timeout time.Duration) *http.Client {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.Proxy = nil
 	return &http.Client{
-		Timeout: timeout,
+		Timeout:   timeout,
+		Transport: t,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

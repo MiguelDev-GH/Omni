@@ -144,3 +144,11 @@ func TestCheckTCP(t *testing.T) {
 	assert.False(t, res.Up)
 	assert.NotEmpty(t, res.Err)
 }
+
+func TestNewHTTPClientIgnoresProxy(t *testing.T) {
+	c := NewHTTPClient(time.Second)
+
+	tr, ok := c.Transport.(*http.Transport)
+	require.True(t, ok, "o cliente precisa de um transporte próprio")
+	assert.Nil(t, tr.Proxy)
+}
