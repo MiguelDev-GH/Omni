@@ -1,0 +1,6 @@
+/omni
+*.db
+*.db-*
+web/node_modules/
+web/dist/
+*.pcap
