@@ -243,3 +243,21 @@ func TestWebSocketRequiresTicket(t *testing.T) {
 	cancel()
 	assert.NoError(t, waitDone(t, done))
 }
+
+func TestRunServesFrontend(t *testing.T) {
+	_, base, _ := startRun(t, config.Config{DBPath: filepath.Join(t.TempDir(), "omni.db"), Token: tok})
+	code, _ := get(t, base+"/api/saude", false)
+	require.Equal(t, http.StatusOK, code)
+
+	resp, err := http.Get(base + "/")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, resp.Header.Get("Content-Type"), "text/html")
+
+	code, body := get(t, base+"/api/saude", false)
+	assert.Equal(t, http.StatusOK, code)
+	assert.JSONEq(t, `{"status":"ok"}`, body)
+	code, _ = get(t, base+"/api/alvos", false)
+	assert.Equal(t, http.StatusUnauthorized, code)
+}

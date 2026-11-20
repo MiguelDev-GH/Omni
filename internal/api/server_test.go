@@ -210,3 +210,20 @@ func TestHandlePublicSkipsAuth(t *testing.T) {
 	}))
 	assert.Equal(t, http.StatusOK, do(t, srv, "GET", "/ws", "", false).Code)
 }
+
+func TestFrontendIsPublic(t *testing.T) {
+	srv := newTestServer(t)
+	srv.HandleFrontend(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("spa"))
+	}))
+	for _, p := range []string{"/", "/alvos"} {
+		rec := do(t, srv, "GET", p, "", false)
+		assert.Equal(t, http.StatusOK, rec.Code, p)
+		assert.Equal(t, "spa", rec.Body.String(), p)
+	}
+	assert.Equal(t, http.StatusUnauthorized, do(t, srv, "GET", "/api/alvos", "", false).Code)
+}
+
+func TestRootWithoutFrontendIs404(t *testing.T) {
+	assert.Equal(t, http.StatusNotFound, do(t, newTestServer(t), "GET", "/", "", false).Code)
+}
