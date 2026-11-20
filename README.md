@@ -6,7 +6,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
 
-> **Status:** em fase de especificação. Ainda não há código implementado.
+> **Status:** em implementação. A Sprint 1 (núcleo do backend) está em andamento; veja [docs/SPRINTS.md](docs/SPRINTS.md).
 
 ---
 
