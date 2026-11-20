@@ -12,6 +12,7 @@ import (
 
 	"github.com/MiguelDev-GH/omni/internal/api"
 	"github.com/MiguelDev-GH/omni/internal/config"
+	"github.com/MiguelDev-GH/omni/internal/discovery"
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/store"
 	"github.com/MiguelDev-GH/omni/internal/sysmetrics"
@@ -42,6 +43,9 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv := api.NewServer(st, cfg.Token)
 	srv.Handle("POST /api/ws/ticket", ws.TicketHandler(tickets))
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
+	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
+		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
+	}
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
 	srv.HandleFrontend(web.Handler(web.Assets()))
 
