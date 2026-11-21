@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MiguelDev-GH/omni/internal/alerts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,4 +123,22 @@ func TestLoadInterface(t *testing.T) {
 		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_INTERFACE": bad}))
 		assert.ErrorIs(t, err, ErrInterfaceInvalida, bad)
 	}
+}
+
+func TestLoadMail(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
+	require.NoError(t, err)
+	assert.False(t, c.Mail.Enabled())
+
+	c, err = Load(env(map[string]string{
+		"OMNI_TOKEN": tok, "OMNI_SMTP_HOST": "127.0.0.1", "OMNI_SMTP_PORTA": "1025",
+		"OMNI_SMTP_REMETENTE": "omni@exemplo.com", "OMNI_ALERTA_EMAILS": "ana@exemplo.com",
+	}))
+	require.NoError(t, err)
+	assert.True(t, c.Mail.Enabled())
+	assert.Equal(t, 1025, c.Mail.Port)
+	assert.Equal(t, []string{"ana@exemplo.com"}, c.Mail.To)
+
+	_, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_ALERTA_EMAILS": "ana@exemplo.com"}))
+	assert.ErrorIs(t, err, alerts.ErrSMTPSemHost)
 }

@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/MiguelDev-GH/omni/internal/alerts"
 )
 
 const (
@@ -42,6 +45,9 @@ type Config struct {
 
 	// Interface é onde o sniffer captura; "any" cobre todas, inclusive o loopback.
 	Interface string
+
+	// Mail configura o envio de alertas por e-mail; desligado sem OMNI_SMTP_HOST.
+	Mail alerts.MailConfig
 }
 
 // Load monta a Config usando getenv (normalmente os.Getenv).
@@ -75,6 +81,11 @@ func Load(getenv func(string) string) (Config, error) {
 	if !interfaceRe.MatchString(c.Interface) {
 		return Config{}, fmt.Errorf("%w: %q", ErrInterfaceInvalida, c.Interface)
 	}
+	mail, err := alerts.MailConfigFromEnv(getenv, os.ReadFile)
+	if err != nil {
+		return Config{}, err
+	}
+	c.Mail = mail
 	return c, nil
 }
 
