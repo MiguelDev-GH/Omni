@@ -33,6 +33,13 @@ const (
 	minDBQueries    = 20
 )
 
+// A taxa de falhas das sondas DNS e SMTP é calculada sobre as últimas
+// probeWindow verificações de cada porta, e só depois de probeMinSamples.
+const (
+	probeWindow     = 10
+	probeMinSamples = 5
+)
+
 // TargetLister é o que o Watcher precisa do armazenamento para dar nome
 // aos recursos.
 type TargetLister interface {
@@ -56,6 +63,8 @@ type Watcher struct {
 
 	names   map[int64]string
 	namesAt time.Time
+	// probes guarda, por recurso, se cada uma das últimas verificações falhou.
+	probes map[string][]bool
 }
 
 // NewWatcher cria um Watcher. Chame Run para começar a processar.
@@ -65,6 +74,7 @@ func NewWatcher(e *Engine, tl TargetLister) *Watcher {
 		targets: tl,
 		events:  make(chan rawEvent, watchBuffer),
 		names:   map[int64]string{},
+		probes:  map[string][]bool{},
 	}
 }
 
@@ -112,6 +122,9 @@ type (
 			LatencyMS  float64   `json:"latencia_ms"`
 			Err        string    `json:"erro"`
 			At         time.Time `json:"hora"`
+			Degraded   bool      `json:"degradado"`
+			Detail     string    `json:"detalhe"`
+			StartTLS   *bool     `json:"starttls"`
 		} `json:"resultados"`
 	}
 	httpEvent struct {
@@ -150,23 +163,43 @@ func (w *Watcher) handle(ctx context.Context, ev rawEvent, now time.Time) {
 			if at.IsZero() {
 				at = now
 			}
-			service := ServiceWeb
-			if r.Kind == "tcp" {
+			service, latencyRule := ServiceWeb, RuleProbeLatency
+			switch r.Kind {
+			case "tcp":
 				service = ServiceDB
+			case "dns":
+				service, latencyRule = ServiceDNS, RuleDNSLatency
+			case "smtp":
+				service, latencyRule = ServiceSMTP, RuleSMTPLatency
 			}
 			subject := w.subject(r.TargetID, r.Port)
 			value, detail := float64(AvailabilityUp), ""
 			switch {
 			case !r.Up:
 				value, detail = AvailabilityDown, r.Err
-			case r.StatusCode >= 500:
+			case r.Degraded:
+				value, detail = AvailabilityDegraded, r.Detail
+			case r.Kind == "http" && r.StatusCode >= 500:
 				value, detail = AvailabilityDegraded, "HTTP "+strconv.Itoa(r.StatusCode)
 			}
 			w.engine.Observe(Sample{Rule: RuleAvailability, Service: service, Subject: subject,
 				Value: value, Detail: detail, At: at})
 			if r.Up {
-				w.engine.Observe(Sample{Rule: RuleProbeLatency, Service: service, Subject: subject,
+				w.engine.Observe(Sample{Rule: latencyRule, Service: service, Subject: subject,
 					Value: r.LatencyMS, At: at})
+			}
+			if service == ServiceDNS || service == ServiceSMTP {
+				if rate, n, ok := w.failureRate(subject, value != AvailabilityUp); ok {
+					w.engine.Observe(Sample{Rule: RuleProbeErrors, Service: service, Subject: subject, Value: rate,
+						Detail: fmt.Sprintf("%d de %d verificações recentes falharam", n, len(w.probes[subject])), At: at})
+				}
+			}
+			if r.StartTLS != nil {
+				v := 0.0
+				if !*r.StartTLS {
+					v = 1
+				}
+				w.engine.Observe(Sample{Rule: RuleSMTPNoTLS, Service: service, Subject: subject, Value: v, At: at})
 			}
 		}
 	case eventHTTP:
@@ -211,6 +244,27 @@ func (w *Watcher) handle(ctx context.Context, ev rawEvent, now time.Time) {
 	}
 }
 
+// failureRate registra a verificação mais recente de subject e devolve a
+// porcentagem de falhas na janela e quantas falharam. ok é falso enquanto
+// a janela tem menos de probeMinSamples verificações.
+func (w *Watcher) failureRate(subject string, failed bool) (float64, int, bool) {
+	win := append(w.probes[subject], failed)
+	if len(win) > probeWindow {
+		win = win[len(win)-probeWindow:]
+	}
+	w.probes[subject] = win
+	if len(win) < probeMinSamples {
+		return 0, 0, false
+	}
+	n := 0
+	for _, f := range win {
+		if f {
+			n++
+		}
+	}
+	return float64(n) / float64(len(win)) * 100, n, true
+}
+
 // subject monta "nome:porta", ou "alvo 3:porta" se o nome não for conhecido.
 func (w *Watcher) subject(id int64, port int) string {
 	name, ok := w.names[id]
@@ -239,8 +293,15 @@ func (w *Watcher) refreshNames(ctx context.Context, now time.Time) {
 		for _, p := range t.AppPorts {
 			current[t.Name+":"+strconv.Itoa(p)] = true
 		}
-		if t.DBPort != 0 {
-			current[t.Name+":"+strconv.Itoa(t.DBPort)] = true
+		for _, p := range []int{t.DBPort, t.DNSPort, t.SMTPPort} {
+			if p != 0 {
+				current[t.Name+":"+strconv.Itoa(p)] = true
+			}
+		}
+	}
+	for subject := range w.probes {
+		if !current[subject] {
+			delete(w.probes, subject)
 		}
 	}
 	w.names = names

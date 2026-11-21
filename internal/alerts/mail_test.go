@@ -296,3 +296,17 @@ func TestBareAddressAndFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestSMTPNoTLSBody(t *testing.T) {
+	m := NewMailer(testMailConfig(25))
+	a := Alert{Rule: RuleSMTPNoTLS, Service: ServiceSMTP, Name: "SMTP sem STARTTLS", Subject: "loja:1025",
+		Level: Yellow, Previous: Green, Value: 1, Threshold: 1, At: t0}
+	raw, err := m.buildMessage(a, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, body := decodeBody(t, string(raw))
+	if !strings.Contains(body, "não oferece STARTTLS") || strings.Contains(body, "Valor:") {
+		t.Errorf("corpo:\n%s", body)
+	}
+}
