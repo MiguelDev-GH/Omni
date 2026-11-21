@@ -101,3 +101,51 @@ test("METRICAS_BANCO stores the window", () => {
   send({ tipo: "METRICAS_BANCO", dados: { inicio: "2026-11-21T12:00:10Z" } });
   expect(useAppStore.getState().db).toHaveLength(1);
 });
+
+const alertEvent = (over: Record<string, unknown>) => ({
+  tipo: "ALERTA",
+  dados: {
+    id: 1,
+    regra: "http_p95",
+    servico: "web",
+    nome: "Latência p95 das requisições",
+    recurso: "",
+    nivel: "amarelo",
+    nivel_anterior: "verde",
+    valor: 1234.5,
+    limite: 1000,
+    unidade: "ms",
+    hora: "2026-11-21T12:00:00Z",
+    ...over,
+  },
+});
+
+test("ALERTA stores the alert and warns", () => {
+  send(alertEvent({}));
+  const st = useAppStore.getState();
+  expect(st.alertHistory).toHaveLength(1);
+  expect(st.alertStatus["http_p95|"]).toMatchObject({ nivel: "amarelo", valor: 1234.5 });
+  expect(st.toasts[0]).toMatchObject({ kind: "aviso", title: "Atenção: Latência p95 das requisições", body: "web: 1234.5 ms" });
+});
+
+test("ALERTA red is an error toast and green is ok", () => {
+  send(alertEvent({ id: 1, nivel: "vermelho" }));
+  send(alertEvent({ id: 2, nivel: "verde", nivel_anterior: "vermelho", valor: 10 }));
+  const st = useAppStore.getState();
+  expect(st.toasts.map((t) => t.kind)).toEqual(["erro", "ok"]);
+  expect(st.alertHistory.map((a) => a.id)).toEqual([2, 1]);
+  expect(st.alertStatus["http_p95|"]?.nivel).toBe("verde");
+});
+
+test("ALERTA for a port going down does not repeat the ALERTA_QUEDA toast", () => {
+  send(alertEvent({ regra: "disponibilidade", recurso: "loja:3000", nivel: "vermelho", valor: 2, unidade: "" }));
+  const st = useAppStore.getState();
+  expect(st.toasts).toHaveLength(0);
+  expect(st.alertStatus["disponibilidade|loja:3000"]?.nivel).toBe("vermelho");
+});
+
+test("ALERTA with bad data is ignored", () => {
+  send(alertEvent({ nivel: "roxo" }));
+  send({ tipo: "ALERTA", dados: { id: "1" } });
+  expect(useAppStore.getState().alertHistory).toHaveLength(0);
+});

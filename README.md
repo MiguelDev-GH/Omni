@@ -18,6 +18,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Fluxo de funcionamento](#fluxo-de-funcionamento)
 - [Comunicação em tempo real (WebSocket)](#comunicação-em-tempo-real-websocket)
 - [Interface (frontend)](#interface-frontend)
+- [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
 - [Requisitos de implantação](#requisitos-de-implantação)
 - [O que falta implementar, por camada](#o-que-falta-implementar-por-camada)
 - [Segurança da própria plataforma](#segurança-da-própria-plataforma)
@@ -158,6 +159,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 - `METRICAS_HTTP` sai a cada 10 s: o sniffer remonta os fluxos TCP das portas da aplicação (`gopacket/reassembly`, até 4 MiB em buffer por conexão, fluxos ociosos fechados em 2 min), pareia requisição e resposta (inclusive em pipeline e fora de ordem) e agrega contagem, classes de status e latência p50/p95 por rota normalizada (`/users/123` vira `/users/:id`). Cabeçalhos, query strings e corpos nunca são guardados, e o tráfego com User-Agent `Omni-` (Poller e Arsenal) fica fora. Rotas: `GET /api/requisicoes` (janelas, últimos 15 minutos) e `GET /api/requisicoes/rotas` (as 100 rotas de mais volume das últimas 24 h).
 - `METRICAS_BANCO` sai a cada 10 s com as consultas ao PostgreSQL na porta do banco dos alvos (consultas simples e Parse/Bind/Execute, com erros). O SQL é normalizado: literais viram `?`, comentários somem e listas viram `(?)`. Mensagens de senha nunca são lidas, e conexões com TLS são ignoradas. Rotas: `GET /api/consultas` e `GET /api/consultas/lentas?limite=` (padrão 20, as de maior p95 em 24 h). As métricas HTTP e de banco ficam 24 h no banco, como as de tráfego.
 - O Docker informa o estado no `ESTADO_MOTORES` a cada 5 s: `ativo` ou `indisponivel`.
+- `ALERTA` sai quando uma métrica muda de nível (verde, amarelo ou vermelho); veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
 - `SCAN_LOG` leva a saída da ferramenta em lotes a cada 500 ms (no máximo 20 000 linhas por ferramenta); `SCAN_CONCLUIDO` traz quantos achados são novos em relação à varredura anterior.
 
 ## Interface (frontend)
@@ -193,6 +195,65 @@ cd web && npm run dev
 O detalhe pacote a pacote fica **apenas no Inspetor de Tráfego**, que usa uma tabela virtualizada (TanStack Table) com botão de pausa. Colocá-lo na tela Geral travaria o navegador.
 
 As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo dele, uma tabela detalhada, por exemplo as consultas mais lentas das últimas 24 horas.
+
+## Alertas e notificação por e-mail
+
+O motor de alertas (`internal/alerts`) observa os mesmos eventos que o frontend recebe (`STATUS_ALVOS`, `METRICAS_HTTP`, `METRICAS_BANCO` e `METRICAS_SISTEMA`), compara cada métrica com dois limites e classifica o recurso em três níveis:
+
+| Nível | Significado | Ação |
+|---|---|---|
+| 🟢 Verde | Estado normal | Nenhuma; a volta ao verde gera um e-mail de normalização |
+| 🟡 Amarelo | Degradação que exige observação | E-mail |
+| 🔴 Vermelho | Serviço degradado ou indisponível | E-mail imediato |
+
+Um nível só muda depois que a condição se mantém pelo tempo da regra (coluna "Por"), para que um pico isolado não vire alerta. Queda de porta não espera: vira vermelho na primeira verificação que falha.
+
+| Regra | Serviço | Amarelo a partir de | Vermelho a partir de | Por |
+|---|---|---|---|---|
+| Disponibilidade (por porta) | Web / Banco | respondeu com 5xx | não respondeu | imediato |
+| Latência da verificação ativa | Web / Banco | 1000 ms | 3000 ms | 1 min |
+| Taxa de erros 5xx | Web | 10% | 25% | 30 s |
+| Latência p95 das requisições | Web | 1000 ms | 2500 ms | 30 s |
+| Taxa de erros nas consultas | Banco | 10% | 25% | 30 s |
+| Latência p95 das consultas | Banco | 500 ms | 2000 ms | 30 s |
+| Uso de CPU / memória / disco | Sistema | 80% / 85% / 85% | 95% | 1 min |
+
+As taxas e o p95 só contam com pelo menos 20 requisições ou consultas na janela de 10 s, para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
+
+```json
+{ "tipo": "ALERTA", "dados": { "id": 3, "regra": "http_p95", "servico": "web", "nome": "Latência p95 das requisições", "recurso": "", "nivel": "amarelo", "nivel_anterior": "verde", "valor": 1234.5, "limite": 1000, "unidade": "ms", "hora": "2026-11-21T20:10:00Z" } }
+```
+
+### Configurar o e-mail
+
+Sem `OMNI_SMTP_HOST` o envio fica desligado e o restante funciona normalmente.
+
+| Variável | Uso |
+|---|---|
+| `OMNI_SMTP_HOST` | Servidor SMTP. Liga o envio |
+| `OMNI_SMTP_PORTA` | Padrão 587 (STARTTLS). Na 465 o TLS começa já na conexão |
+| `OMNI_SMTP_USUARIO` | Usuário do SMTP (opcional) |
+| `OMNI_SMTP_SENHA` ou `OMNI_SMTP_SENHA_ARQUIVO` | Senha, ou caminho de um arquivo com ela (preferível: variáveis de ambiente ficam visíveis em `/proc/<pid>/environ`) |
+| `OMNI_SMTP_REMETENTE` | Endereço que envia; se vazio, usa o usuário quando ele é um e-mail |
+| `OMNI_ALERTA_EMAILS` | Destinatários, separados por vírgula |
+
+**Teste local sem conta de e-mail,** com o [Mailpit](https://mailpit.axllent.org/), que captura as mensagens e as mostra numa página:
+
+```bash
+docker run -d --name mailpit -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit
+OMNI_TOKEN=... OMNI_SMTP_HOST=127.0.0.1 OMNI_SMTP_PORTA=1025 \
+  OMNI_SMTP_REMETENTE=omni@localhost OMNI_ALERTA_EMAILS=equipe@exemplo.com ./omni
+# derrube a loja cobaia e abra http://127.0.0.1:8025
+```
+
+**Gmail:** `OMNI_SMTP_HOST=smtp.gmail.com`, porta 587, o seu endereço como usuário e uma [senha de app](https://support.google.com/accounts/answer/185833) (exige verificação em duas etapas) no lugar da senha da conta.
+
+**Proteções do envio:**
+
+- **TLS obrigatório para a senha.** Se o servidor não oferece STARTTLS, o Omni se recusa a autenticar, exceto em servidor local (`127.0.0.1`/`localhost`).
+- **Sem injeção de cabeçalho.** Quebras de linha são removidas dos campos que vêm do usuário (como o nome do alvo), e os endereços são validados na inicialização: um nome como `x\r\nBcc: alguem@exemplo.com` não cria cópias ocultas.
+- **Limite de 20 e-mails por minuto.** Um ataque que derruba o serviço não vira, de quebra, uma enxurrada de e-mails; o e-mail seguinte informa quantos alertas foram suprimidos.
+- **Envio fora do caminho crítico.** Os e-mails saem de uma fila numa goroutine própria: um SMTP lento ou fora do ar nunca atrasa o Poller, o sniffer ou o WebSocket.
 
 ## Requisitos de implantação
 

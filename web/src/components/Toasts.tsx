@@ -4,6 +4,12 @@ import { useAppStore, type Toast } from "../store/app";
 
 const TOAST_MS = 10_000;
 
+const toastStyle: Record<Toast["kind"], { border: string; title: string }> = {
+  erro: { border: "border-red-500/60", title: "text-erro" },
+  aviso: { border: "border-amber-500/60", title: "text-amber-400" },
+  ok: { border: "border-emerald-500/60", title: "text-destaque" },
+};
+
 function ToastItem({ toast }: { toast: Toast }) {
   const dismiss = useAppStore((s) => s.dismissToast);
 
@@ -13,15 +19,14 @@ function ToastItem({ toast }: { toast: Toast }) {
   }, [toast.id, dismiss]);
 
   const isError = toast.kind === "erro";
+  const style = toastStyle[toast.kind];
   return (
     <li
       role={isError ? "alert" : "status"}
-      className={`flex items-start gap-3 rounded-lg border bg-superficie p-3 shadow-lg ${
-        isError ? "border-red-500/60" : "border-emerald-500/60"
-      }`}
+      className={`flex items-start gap-3 rounded-lg border bg-superficie p-3 shadow-lg ${style.border}`}
     >
       <div className="min-w-0 flex-1">
-        <p className={`font-medium ${isError ? "text-erro" : "text-destaque"}`}>{toast.title}</p>
+        <p className={`font-medium ${style.title}`}>{toast.title}</p>
         <p className="text-sm break-words text-suave">{toast.body}</p>
         {toast.link && (
           <Link to={toast.link.to} onClick={() => dismiss(toast.id)} className="text-sm text-destaque underline">
