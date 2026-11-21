@@ -18,6 +18,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Fluxo de funcionamento](#fluxo-de-funcionamento)
 - [Comunicação em tempo real (WebSocket)](#comunicação-em-tempo-real-websocket)
 - [Interface (frontend)](#interface-frontend)
+- [Aplicação cobaia](#aplicação-cobaia)
 - [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
 - [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp)
 - [Requisitos de implantação](#requisitos-de-implantação)
@@ -196,6 +197,10 @@ cd web && npm run dev
 O detalhe pacote a pacote fica **apenas no Inspetor de Tráfego**, que usa uma tabela virtualizada (TanStack Table) com botão de pausa. Colocá-lo na tela Geral travaria o navegador.
 
 As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo dele, uma tabela detalhada, por exemplo as consultas mais lentas das últimas 24 horas.
+
+## Aplicação cobaia
+
+Para testar o Omni de ponta a ponta sem uma aplicação real, a pasta [subjects/](subjects/README.md) tem uma loja de exemplo (Go, PostgreSQL e Caddy com TLS) com gerador de carga, cadastro automático dos alvos e falhas de propósito para o Arsenal encontrar. Com o Omni no ar, `cd subjects/loja && OMNI_TOKEN=<token> make demo` sobe tudo.
 
 ## Alertas e notificação por e-mail
 

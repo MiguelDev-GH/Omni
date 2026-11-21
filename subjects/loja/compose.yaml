@@ -1,0 +1,31 @@
+# Serviços da loja cobaia. Todos usam a rede do host para que o tráfego
+# (proxy → app e app → banco) passe pela interface lo, onde o Omni captura.
+name: loja-cobaia
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    network_mode: host
+    command: ["postgres", "-p", "5433", "-c", "listen_addresses=127.0.0.1", "-c", "ssl=off"]
+    environment:
+      POSTGRES_USER: loja
+      POSTGRES_PASSWORD: loja-cobaia
+      POSTGRES_DB: loja
+    volumes:
+      - loja-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5433", "-U", "loja"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - loja-caddy:/data
+
+volumes:
+  loja-dados:
+  loja-caddy:
