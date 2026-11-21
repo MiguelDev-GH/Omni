@@ -304,12 +304,19 @@ func TestRunKeepsServingWithoutCapturePermission(t *testing.T) {
 	conn := dialWS(t, base)
 	require.NoError(t, conn.SetReadDeadline(time.Now().Add(7*time.Second)))
 	for {
+		// Outros eventos (como STATUS_ALVOS, com números) chegam antes; só o
+		// estado dos motores é decodificado.
 		var ev struct {
-			Type string            `json:"tipo"`
-			Data map[string]string `json:"dados"`
+			Type string          `json:"tipo"`
+			Data json.RawMessage `json:"dados"`
 		}
 		require.NoError(t, conn.ReadJSON(&ev))
-		if ev.Type == sniffer.EventEngines && ev.Data["sniffer"] == sniffer.StateNoPermission {
+		if ev.Type != sniffer.EventEngines {
+			continue
+		}
+		var engines map[string]string
+		require.NoError(t, json.Unmarshal(ev.Data, &engines))
+		if engines["sniffer"] == sniffer.StateNoPermission {
 			break
 		}
 	}
