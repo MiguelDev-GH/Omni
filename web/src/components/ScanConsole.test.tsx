@@ -28,6 +28,11 @@ test("keeps at most 5000 lines", () => {
   expect(lines.at(-1)).toBe("b19");
 });
 
+test("explains the missing output of a finished scan", () => {
+  render(<ScanConsole scanId={3} finished />);
+  expect(screen.getByRole("log")).toHaveTextContent("só aparece para varreduras acompanhadas nesta aba");
+});
+
 test("shows a placeholder without a scan", () => {
   render(<ScanConsole scanId={null} />);
   expect(screen.getByRole("log")).toHaveTextContent("Nenhuma varredura iniciada nesta sessão.");

@@ -81,8 +81,8 @@ export default function ArsenalPage() {
         </span>
       </div>
       <p className="text-sm text-suave">
-        As ferramentas rodam em containers Docker efêmeros na própria máquina, com 1 CPU e 512 MiB, só contra o
-        loopback e o host ou domínio do alvo. Por isso enxergam portas que um atacante externo não vê.
+        As ferramentas rodam em containers Docker efêmeros na própria máquina, com limite de CPU e memória, só contra
+        o loopback e o host ou domínio do alvo. Por isso enxergam portas que um atacante externo não vê.
       </p>
 
       {docker === "indisponivel" && (
@@ -153,7 +153,7 @@ export default function ArsenalPage() {
       </Card>
 
       <Card title={shown ? `Varredura #${shown.id} · ${statusLabels[shown.status]}` : "Saída ao vivo"}>
-        <ScanConsole scanId={shown?.id ?? null} />
+        <ScanConsole scanId={shown?.id ?? null} finished={shown?.status === "concluida" || shown?.status === "falhou"} />
         {shown?.status === "falhou" && shown.erro && <p className="mt-2 text-sm text-erro">{shown.erro}</p>}
       </Card>
 

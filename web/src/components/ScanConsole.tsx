@@ -5,7 +5,9 @@ const EMPTY: string[] = [];
 
 // ScanConsole mostra a saída ao vivo de uma varredura, rolando até a última
 // linha enquanto o usuário não sobe a rolagem.
-export default function ScanConsole({ scanId }: { scanId: number | null }) {
+// finished indica uma varredura já terminada, cuja saída pode não ter sido
+// acompanhada nesta sessão.
+export default function ScanConsole({ scanId, finished = false }: { scanId: number | null; finished?: boolean }) {
   const lines = useAppStore((s) => (scanId === null ? EMPTY : (s.scanLogs[scanId] ?? EMPTY)));
   const ref = useRef<HTMLPreElement>(null);
   const stick = useRef(true);
@@ -29,7 +31,9 @@ export default function ScanConsole({ scanId }: { scanId: number | null }) {
       {scanId === null
         ? "Nenhuma varredura iniciada nesta sessão."
         : lines.length === 0
-          ? "Aguardando a saída da ferramenta..."
+          ? finished
+            ? "A saída ao vivo só aparece para varreduras acompanhadas nesta aba."
+            : "Aguardando a saída da ferramenta..."
           : lines.join("\n")}
     </pre>
   );
