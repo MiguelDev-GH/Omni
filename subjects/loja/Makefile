@@ -1,4 +1,4 @@
-.PHONY: subir derrubar derrubar-tudo rodar teste
+.PHONY: subir derrubar derrubar-tudo rodar carga teste
 
 # subir inicia os serviços do compose e espera ficarem saudáveis.
 subir:
@@ -15,6 +15,10 @@ derrubar-tudo:
 # rodar sobe a API da loja em 127.0.0.1:3000.
 rodar:
 	go run ./cmd/loja
+
+# carga gera tráfego na loja; passe flags em ARGS, como ARGS="-duracao 10s".
+carga:
+	go run ./cmd/carga $(ARGS)
 
 # teste roda lint, vet e testes da loja cobaia.
 teste:
