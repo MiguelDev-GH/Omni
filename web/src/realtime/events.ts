@@ -1,3 +1,4 @@
+import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
 import { portKey, useAppStore, type EngineState, type PortStatus, type SystemMetrics } from "../store/app";
 
@@ -26,6 +27,10 @@ function isTrafficWindow(v: unknown): v is TrafficWindow {
     isObject(v.protocolos) &&
     Array.isArray(v.top_origens)
   );
+}
+
+function isHTTPWindow(v: unknown): v is HTTPWindow {
+  return isObject(v) && typeof v.inicio === "string" && typeof v.requisicoes === "number" && isObject(v.status);
 }
 
 const engineStates: EngineState[] = ["ativo", "inativo", "sem-permissao", "indisponivel"];
@@ -77,6 +82,9 @@ export function handleEvent(raw: string): void {
       break;
     case "METRICAS_TRAFEGO":
       if (isTrafficWindow(dados)) st.addTraffic([dados]);
+      break;
+    case "METRICAS_HTTP":
+      if (isHTTPWindow(dados)) st.addHTTP([dados]);
       break;
     case "ESTADO_MOTORES":
       if (isObject(dados) && isEngineState(dados.sniffer)) st.setEngine("sniffer", dados.sniffer);

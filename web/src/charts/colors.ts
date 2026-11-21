@@ -18,3 +18,15 @@ export const otherColor = "#71717a";
 export const protocolColor = (name: string) => protocolColors[name] ?? otherColor;
 
 export const chartInk = { axis: "#a1a1aa", grid: "#27272a", surface: "#18181b", series: "#3987e5" };
+
+// statusColors segue o significado da classe: sucesso, redirecionamento,
+// erro do cliente e erro do servidor.
+export const statusColors: Record<string, string> = {
+  "2xx": "#199e70",
+  "3xx": "#3987e5",
+  "4xx": "#c98500",
+  "5xx": "#e66767",
+};
+
+// queryColor é a cor da série de consultas ao banco, a mesma do PostgreSQL.
+export const queryColor = "#d95926";

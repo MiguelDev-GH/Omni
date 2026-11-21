@@ -2,27 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { listTraffic } from "../api/traffic";
 import BandwidthChart from "../charts/BandwidthChart";
+import CountChart from "../charts/CountChart";
 import ProtocolDonut from "../charts/ProtocolDonut";
+import StatusBars from "../charts/StatusBars";
+import { Card, Stat } from "../components/Card";
 import { bandwidthSeries, formatBytes, MAX_POINTS, protocolTotals, topSources } from "../lib/traffic";
 import { useAppStore } from "../store/app";
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-borda bg-superficie p-4">
-      <p className="text-xs text-suave">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-lg border border-borda bg-superficie p-4">
-      <h2 className="mb-3 text-sm font-medium text-suave">{title}</h2>
-      {children}
-    </section>
-  );
-}
+import { useHTTPHistory, useHTTPSeries } from "./RequestsPage";
 
 export default function OverviewPage() {
   const traffic = useAppStore((s) => s.traffic);
@@ -30,6 +16,8 @@ export default function OverviewPage() {
   const targets = useAppStore((s) => s.targets);
   const targetsLoaded = useAppStore((s) => s.targetsLoaded);
   const [loadError, setLoadError] = useState(false);
+  const httpError = useHTTPHistory();
+  const httpSeries = useHTTPSeries();
 
   // Carrega os últimos 15 minutos uma vez; os eventos ao vivo completam a série.
   useEffect(() => {
@@ -72,11 +60,21 @@ export default function OverviewPage() {
         </p>
       )}
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de tráfego.</p>}
+      {httpError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Banda agora" value={last ? `${formatBytes(last.bytes)}/s` : "—"} />
         <Stat label="Pacotes por segundo" value={last ? last.pacotes.toLocaleString("pt-BR") : "—"} />
         <Stat label="Total em 15 minutos" value={formatBytes(total)} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card title="Requisições na API">
+          <CountChart id="req-geral" points={httpSeries.requests} label="Requisições" empty="Sem requisições capturadas ainda." />
+        </Card>
+        <Card title="Status HTTP">
+          <StatusBars points={httpSeries.status} />
+        </Card>
       </div>
 
       <Card title="Banda nos últimos 15 minutos">

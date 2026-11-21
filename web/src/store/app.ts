@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Target } from "../api/targets";
+import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
+import { mergeL7 } from "../lib/l7";
 import { mergeWindows } from "../lib/traffic";
 import { readToken, removeToken, writeToken } from "../lib/session";
 
@@ -44,6 +46,8 @@ export type AppState = {
   setSystem: (m: SystemMetrics) => void;
   traffic: TrafficWindow[]; // cronológico, no máximo MAX_POINTS
   addTraffic: (list: TrafficWindow[]) => void;
+  http: HTTPWindow[]; // cronológico, no máximo L7_POINTS
+  addHTTP: (list: HTTPWindow[]) => void;
   toasts: Toast[];
   pushToast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: number) => void;
@@ -86,6 +90,8 @@ export const useAppStore = create<AppState>()((set) => ({
   setSystem: (m) => set({ system: m }),
   traffic: [],
   addTraffic: (list) => set((st) => ({ traffic: mergeWindows(st.traffic, list) })),
+  http: [],
+  addHTTP: (list) => set((st) => ({ http: mergeL7(st.http, list) })),
   toasts: [],
   pushToast: (t) => set((st) => ({ toasts: [...st.toasts, { ...t, id: nextToastId++ }].slice(-MAX_TOASTS) })),
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),

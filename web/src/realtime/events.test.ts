@@ -88,3 +88,10 @@ test("ESTADO_MOTORES sets sniffer state", () => {
   send({ tipo: "ESTADO_MOTORES", dados: { sniffer: "quebrado" } });
   expect(useAppStore.getState().engines.sniffer).toBe("sem-permissao");
 });
+
+test("METRICAS_HTTP stores the window and ignores malformed ones", () => {
+  send({ tipo: "METRICAS_HTTP", dados: { inicio: "2026-11-21T12:00:00Z", requisicoes: 3, status: { "2xx": 3 }, p50_ms: 1, p95_ms: 2, rotas: [] } });
+  send({ tipo: "METRICAS_HTTP", dados: { inicio: "2026-11-21T12:00:10Z", requisicoes: "3" } });
+  expect(useAppStore.getState().http).toHaveLength(1);
+  expect(useAppStore.getState().http[0]?.requisicoes).toBe(3);
+});
