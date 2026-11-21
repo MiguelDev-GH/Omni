@@ -1,20 +1,5 @@
-import { useAppStore, type EngineName, type EngineState } from "../store/app";
-
-const engineLabels: Record<EngineName, string> = { poller: "Poller", sniffer: "Sniffer", docker: "Docker" };
-
-const stateLabels: Record<EngineState, string> = {
-  ativo: "ativo",
-  inativo: "inativo",
-  "sem-permissao": "sem permissão",
-  indisponivel: "indisponível",
-};
-
-const stateColors: Record<EngineState, string> = {
-  ativo: "bg-emerald-500",
-  inativo: "bg-zinc-600",
-  "sem-permissao": "bg-amber-500",
-  indisponivel: "bg-red-500",
-};
+import { useAppStore } from "../store/app";
+import EngineBadge, { engineNames } from "./EngineBadge";
 
 export default function Topbar() {
   const engines = useAppStore((s) => s.engines);
@@ -47,10 +32,9 @@ export default function Topbar() {
         )}
       </select>
       <ul className="flex flex-wrap gap-3 text-xs text-suave">
-        {(Object.keys(engineLabels) as EngineName[]).map((name) => (
-          <li key={name} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={`size-2 rounded-full ${stateColors[engines[name]]}`} />
-            {engineLabels[name]}: {stateLabels[engines[name]]}
+        {engineNames.map((name) => (
+          <li key={name}>
+            <EngineBadge name={name} state={engines[name]} />
           </li>
         ))}
       </ul>

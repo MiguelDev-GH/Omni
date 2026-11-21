@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { Target } from "../api/targets";
+import type { TrafficWindow } from "../api/traffic";
+import { mergeWindows } from "../lib/traffic";
 import { readToken, removeToken, writeToken } from "../lib/session";
 
 export type EngineState = "ativo" | "inativo" | "sem-permissao" | "indisponivel";
@@ -40,6 +42,8 @@ export type AppState = {
   setPortStatus: (list: PortStatus[]) => void;
   system: SystemMetrics | null;
   setSystem: (m: SystemMetrics) => void;
+  traffic: TrafficWindow[]; // cronológico, no máximo MAX_POINTS
+  addTraffic: (list: TrafficWindow[]) => void;
   toasts: Toast[];
   pushToast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: number) => void;
@@ -58,7 +62,7 @@ export const useAppStore = create<AppState>()((set) => ({
     removeToken();
     set({ token: null, sessionExpired: expired });
   },
-  // Sniffer e Docker chegam nas Sprints 4 e 7.
+  // O sniffer informa o estado por ESTADO_MOTORES; o Docker chega na Sprint 7.
   engines: { poller: "indisponivel", sniffer: "inativo", docker: "inativo" },
   setEngine: (name, s) => set((st) => ({ engines: { ...st.engines, [name]: s } })),
   targets: [],
@@ -80,6 +84,8 @@ export const useAppStore = create<AppState>()((set) => ({
     }),
   system: null,
   setSystem: (m) => set({ system: m }),
+  traffic: [],
+  addTraffic: (list) => set((st) => ({ traffic: mergeWindows(st.traffic, list) })),
   toasts: [],
   pushToast: (t) => set((st) => ({ toasts: [...st.toasts, { ...t, id: nextToastId++ }].slice(-MAX_TOASTS) })),
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),

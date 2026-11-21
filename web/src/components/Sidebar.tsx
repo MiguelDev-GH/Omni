@@ -1,6 +1,11 @@
 import { NavLink } from "react-router";
 
-// Seções do README; os itens chegam nas próximas sprints.
+// Seções do README; os itens sem rota chegam nas próximas sprints.
+const routes: Record<string, string> = { Geral: "/geral" };
+
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  `block rounded px-2 py-1.5 ${isActive ? "bg-zinc-800 text-texto" : "text-suave hover:text-texto"}`;
+
 const sections = [
   { title: "Monitoramento", items: ["Geral", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
   { title: "Tráfego", items: ["Inspetor de pacotes", "Capturas"] },
@@ -11,12 +16,7 @@ const sections = [
 export default function Sidebar() {
   return (
     <nav aria-label="Seções" className="space-y-5 p-4 text-sm">
-      <NavLink
-        to="/alvos"
-        className={({ isActive }) =>
-          `block rounded px-2 py-1.5 ${isActive ? "bg-zinc-800 text-texto" : "text-suave hover:text-texto"}`
-        }
-      >
+      <NavLink to="/alvos" className={linkClass}>
         Alvos
       </NavLink>
       {sections.map((s) => (
@@ -25,10 +25,16 @@ export default function Sidebar() {
           <ul>
             {s.items.map((item) => (
               <li key={item}>
-                <span aria-disabled="true" className="flex items-center justify-between px-2 py-1 text-zinc-600">
-                  {item}
-                  <span className="text-[10px] tracking-wide uppercase">em breve</span>
-                </span>
+                {routes[item] ? (
+                  <NavLink to={routes[item]} className={linkClass}>
+                    {item}
+                  </NavLink>
+                ) : (
+                  <span aria-disabled="true" className="flex items-center justify-between px-2 py-1 text-zinc-600">
+                    {item}
+                    <span className="text-[10px] tracking-wide uppercase">em breve</span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

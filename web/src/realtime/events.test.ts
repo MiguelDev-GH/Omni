@@ -61,3 +61,30 @@ test("keeps at most five toasts", () => {
   expect(toasts).toHaveLength(5);
   expect(toasts[0]?.body).toContain("porta 3001");
 });
+
+const traffic = {
+  tipo: "METRICAS_TRAFEGO",
+  dados: {
+    inicio: "2026-11-21T12:00:00Z",
+    bytes: 1500,
+    pacotes: 3,
+    descartados: 0,
+    protocolos: { HTTP: 1500 },
+    top_origens: [{ ip: "10.0.0.1", bytes: 1500, pacotes: 3 }],
+  },
+};
+
+test("METRICAS_TRAFEGO appends window", () => {
+  send(traffic);
+  send({ tipo: "METRICAS_TRAFEGO", dados: { inicio: "x" } });
+  const list = useAppStore.getState().traffic;
+  expect(list).toHaveLength(1);
+  expect(list[0]?.bytes).toBe(1500);
+});
+
+test("ESTADO_MOTORES sets sniffer state", () => {
+  send({ tipo: "ESTADO_MOTORES", dados: { sniffer: "sem-permissao" } });
+  expect(useAppStore.getState().engines.sniffer).toBe("sem-permissao");
+  send({ tipo: "ESTADO_MOTORES", dados: { sniffer: "quebrado" } });
+  expect(useAppStore.getState().engines.sniffer).toBe("sem-permissao");
+});
