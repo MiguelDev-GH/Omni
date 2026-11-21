@@ -25,6 +25,26 @@ jobs:
       - name: go test
         run: go test -race ./...
 
+  subjects:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: subjects/loja
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: subjects/loja/go.mod
+          cache-dependency-path: subjects/loja/go.sum
+      - name: go vet
+        run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15.0
+          working-directory: subjects/loja
+      - name: go test
+        run: go test -race ./...
+
   web:
     runs-on: ubuntu-latest
     defaults:

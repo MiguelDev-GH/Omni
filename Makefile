@@ -19,3 +19,4 @@ check:
 	cd web && npm run lint
 	cd web && npm run typecheck
 	cd web && npm test
+	cd subjects/loja && $(MAKE) teste
