@@ -1,6 +1,6 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatBytes, type BandwidthPoint } from "../lib/traffic";
-import { chartInk } from "./colors";
+import { axisTick, chartInk, tooltipStyle } from "./colors";
 
 const clock = (t: number) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const clockSec = (t: number) => new Date(t).toLocaleTimeString("pt-BR");
@@ -16,35 +16,32 @@ export default function BandwidthChart({ points }: { points: BandwidthPoint[] })
         <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="banda" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={chartInk.series} stopOpacity={0.35} />
-              <stop offset="100%" stopColor={chartInk.series} stopOpacity={0.02} />
+              <stop offset="0%" stopColor={chartInk.series} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={chartInk.series} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke={chartInk.grid} vertical={false} />
+          <CartesianGrid stroke={chartInk.grid} strokeDasharray="1 5" vertical={false} />
           <XAxis
             dataKey="t"
             type="number"
             domain={["dataMin", "dataMax"]}
             scale="time"
             tickFormatter={clock}
-            stroke={chartInk.axis}
-            tick={{ fontSize: 12 }}
+            axisLine={false}
+            tick={axisTick}
             tickLine={false}
             minTickGap={48}
           />
           <YAxis
             tickFormatter={(v: number) => `${formatBytes(v)}/s`}
-            stroke={chartInk.axis}
-            tick={{ fontSize: 12 }}
-            tickLine={false}
             axisLine={false}
+            tick={axisTick}
+            tickLine={false}
             width={80}
           />
           <Tooltip
             cursor={{ stroke: chartInk.axis, strokeDasharray: "3 3" }}
-            contentStyle={{ background: chartInk.surface, border: `1px solid ${chartInk.grid}`, borderRadius: 6 }}
-            labelStyle={{ color: "#f4f4f5" }}
-            itemStyle={{ color: "#d4d4d8" }}
+            {...tooltipStyle}
             labelFormatter={(t) => clockSec(Number(t))}
             formatter={(v) => [`${formatBytes(Number(v))}/s`, "Banda"]}
           />
@@ -52,7 +49,7 @@ export default function BandwidthChart({ points }: { points: BandwidthPoint[] })
             type="monotone"
             dataKey="bytes"
             stroke={chartInk.series}
-            strokeWidth={2}
+            strokeWidth={1.75}
             fill="url(#banda)"
             isAnimationActive={false}
             dot={false}

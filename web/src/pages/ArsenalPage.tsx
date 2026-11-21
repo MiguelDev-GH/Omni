@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { listScans, listTools, scanFindings, startScan, type Finding, type Scan, type Tool } from "../api/scans";
-import { Card } from "../components/Card";
+import { Card, InternalBadge, Notice, PageHeader } from "../components/Card";
 import FindingsTable from "../components/FindingsTable";
 import ScanConsole from "../components/ScanConsole";
+import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 
 // statusLabels traduz o estado de uma varredura para a interface.
@@ -73,64 +74,55 @@ export default function ArsenalPage() {
   const running = shown?.status === "rodando" || shown?.status === "fila";
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Arsenal</h1>
-        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
-          Visão interna
-        </span>
-      </div>
-      <p className="text-sm text-suave">
+    <div className="space-y-8">
+      <PageHeader title="Arsenal" aside={<InternalBadge />}>
         As ferramentas rodam em containers Docker efêmeros na própria máquina, com limite de CPU e memória, só contra
         o loopback e o host ou domínio do alvo. Por isso enxergam portas que um atacante externo não vê.
-      </p>
+      </PageHeader>
 
       {docker === "indisponivel" && (
-        <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <Notice role="alert">
           Docker indisponível: inicie o Docker para usar o Arsenal. O resto do Omni continua funcionando.
-        </p>
+        </Notice>
       )}
 
-      <Card title="Nova varredura">
+      <Card title="Nova varredura" plane>
         {targets.length === 0 ? (
           <p className="text-sm text-suave">
-            <Link to="/alvos" className="text-destaque underline">
+            <Link to="/alvos" className="link">
               Cadastre um alvo
             </Link>{" "}
             para usar o Arsenal.
           </p>
         ) : (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
               <label htmlFor="alvo-arsenal" className="text-suave">
                 Alvo
               </label>
-              <select
+              <Select
                 id="alvo-arsenal"
-                value={selected ?? ""}
-                onChange={(e) => selectTarget(Number(e.target.value))}
-                className="rounded border border-borda bg-fundo px-2 py-1"
-              >
-                {targets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome} ({t.host})
-                  </option>
-                ))}
-              </select>
+                value={selected}
+                onChange={selectTarget}
+                options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
+              />
             </div>
-            <fieldset className="space-y-1.5">
-              <legend className="mb-1 text-sm text-suave">Ferramentas</legend>
+            <fieldset className="grid gap-1 sm:grid-cols-2">
+              <legend className="mb-2 text-sm text-suave">Ferramentas</legend>
               {tools.map((t) => (
-                <label key={t.nome} className="flex items-start gap-2 text-sm">
+                <label
+                  key={t.nome}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-xl px-3 py-2.5 text-sm hover:bg-elevado/70 has-checked:bg-elevado"
+                >
                   <input
                     type="checkbox"
                     checked={chosen.includes(t.nome)}
                     onChange={() => toggle(t.nome)}
-                    className="mt-1"
+                    className="mt-0.5 size-4"
                   />
                   <span>
-                    <span className="font-medium">{t.nome}</span>{" "}
-                    <span className="text-suave">— {t.descricao}</span>
+                    <span className="block font-mono font-medium">{t.nome}</span>
+                    <span className="block text-xs text-suave">{t.descricao}</span>
                   </span>
                 </label>
               ))}
@@ -139,7 +131,7 @@ export default function ArsenalPage() {
               type="button"
               onClick={() => void start()}
               disabled={busy || chosen.length === 0 || selected === null}
-              className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="botao"
             >
               {busy ? "Iniciando..." : "Iniciar varredura"}
             </button>
@@ -157,7 +149,7 @@ export default function ArsenalPage() {
         {shown?.status === "falhou" && shown.erro && <p className="mt-2 text-sm text-erro">{shown.erro}</p>}
       </Card>
 
-      <Card title="Achados (visão interna)">
+      <Card title="Achados (visão interna)" plane>
         {running ? (
           <p className="text-sm text-suave">A varredura ainda está rodando.</p>
         ) : found === null ? (
@@ -165,7 +157,7 @@ export default function ArsenalPage() {
         ) : (
           <>
             <FindingsTable list={found} label="Achados" />
-            <Link to={`/relatorios?varredura=${shown?.id}`} className="mt-3 inline-block text-sm text-destaque underline">
+            <Link to={`/relatorios?varredura=${shown?.id}`} className="link mt-4 inline-block text-sm">
               Comparar com a varredura anterior
             </Link>
           </>
@@ -173,20 +165,20 @@ export default function ArsenalPage() {
       </Card>
 
       {scans.length > 0 && (
-        <Card title="Varreduras deste alvo">
-          <ul className="divide-y divide-borda text-sm">
+        <Card title="Varreduras deste alvo" plane>
+          <ul className="-mx-2 space-y-px text-sm">
             {scans.slice(0, 10).map((s) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => setCurrent(s.id)}
                   aria-current={s.id === shown?.id}
-                  className="flex w-full flex-wrap justify-between gap-2 py-1.5 text-left hover:text-texto aria-[current=true]:text-destaque"
+                  className="flex w-full flex-wrap justify-between gap-2 rounded-lg px-2 py-2 text-left hover:bg-elevado/70 aria-[current=true]:bg-elevado aria-[current=true]:text-destaque-forte"
                 >
                   <span>
                     #{s.id} · {s.ferramentas.join(", ")}
                   </span>
-                  <span className="text-suave">
+                  <span className="font-mono text-xs text-suave">
                     {statusLabels[s.status]} · {when(s.criada_em)}
                   </span>
                 </button>

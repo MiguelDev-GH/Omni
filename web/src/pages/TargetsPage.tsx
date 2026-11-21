@@ -1,6 +1,7 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 import { deleteTarget, loadTargets, targetPorts, type Target } from "../api/targets";
+import { PageHeader } from "../components/Card";
 import TargetForm from "../components/TargetForm";
 import { portKey, useAppStore, type PortStatus } from "../store/app";
 
@@ -22,16 +23,16 @@ function dnsSmtp(t: Target): string {
 }
 
 // targetState resume o último status das portas do alvo.
-function targetState(t: Target, status: Record<string, PortStatus>): { text: string; color: string } {
+function targetState(t: Target, status: Record<string, PortStatus>): { text: string; color: string; dot: string } {
   const known = targetPorts(t)
     .map((p) => status[portKey(t.id, p)])
     .filter((s) => s !== undefined);
-  if (known.length === 0) return { text: "Aguardando", color: "text-suave" };
+  if (known.length === 0) return { text: "Aguardando", color: "text-suave", dot: "bg-apagado" };
   const down = known.filter((s) => !s.no_ar).map((s) => s.porta);
-  if (down.length > 0) return { text: `Fora do ar (porta ${down.join(", ")})`, color: "text-erro" };
+  if (down.length > 0) return { text: `Fora do ar (porta ${down.join(", ")})`, color: "text-erro", dot: "bg-erro animate-pulso" };
   const degraded = known.filter((s) => s.degradado).map((s) => s.porta);
-  if (degraded.length > 0) return { text: `Com erro (porta ${degraded.join(", ")})`, color: "text-amber-400" };
-  return { text: "No ar", color: "text-destaque" };
+  if (degraded.length > 0) return { text: `Com erro (porta ${degraded.join(", ")})`, color: "text-aviso", dot: "bg-aviso" };
+  return { text: "No ar", color: "text-destaque-forte", dot: "bg-destaque" };
 }
 
 type Editing = { mode: "novo" } | { mode: "editar"; target: Target } | null;
@@ -73,19 +74,17 @@ export default function TargetsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold">Alvos</h1>
-        {editing === null && (
-          <button
-            type="button"
-            onClick={() => setEditing({ mode: "novo" })}
-            className="rounded bg-destaque px-3 py-1.5 font-medium text-zinc-950"
-          >
-            Novo alvo
-          </button>
-        )}
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Alvos"
+        aside={
+          editing === null && (
+            <button type="button" onClick={() => setEditing({ mode: "novo" })} className="botao">
+              Novo alvo
+            </button>
+          )
+        }
+      />
 
       {editing && (
         <TargetForm
@@ -99,22 +98,22 @@ export default function TargetsPage() {
       {loadError && <p className="text-sm text-erro">{loadError}</p>}
 
       {loaded && targets.length === 0 ? (
-        <p className="text-suave">Nenhum alvo cadastrado. Cadastre o primeiro para começar o monitoramento.</p>
+        <p className="rounded-2xl bg-superficie/80 px-5 py-8 text-center text-suave">Nenhum alvo cadastrado. Cadastre o primeiro para começar o monitoramento.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-borda">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-superficie text-suave">
+        <div className="overflow-x-auto rounded-2xl bg-superficie/80 px-5 pt-4 pb-2">
+          <table className="tabela">
+            <thead>
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((h) => (
-                    <th key={h.id} scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+                    <th key={h.id} scope="col" className="pr-4 whitespace-nowrap">
                       <table.FlexRender header={h} />
                     </th>
                   ))}
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  <th scope="col" className="pr-4">
                     Estado
                   </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
+                  <th scope="col" className="text-right">
                     Ações
                   </th>
                 </tr>
@@ -122,22 +121,25 @@ export default function TargetsPage() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-t border-borda">
+                <tr key={row.id}>
                   {row.getAllCells().map((cell) => (
-                    <td key={cell.id} className="max-w-64 truncate px-3 py-2">
+                    <td key={cell.id} className="max-w-64 truncate py-2.5 pr-4">
                       <table.FlexRender cell={cell} />
                     </td>
                   ))}
-                  <td className={`px-3 py-2 whitespace-nowrap ${targetState(row.original, status).color}`}>
-                    {targetState(row.original, status).text}
+                  <td className={`pr-4 whitespace-nowrap ${targetState(row.original, status).color}`}>
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden="true" className={`size-1.5 rounded-full ${targetState(row.original, status).dot}`} />
+                      {targetState(row.original, status).text}
+                    </span>
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-3">
+                  <td>
+                    <div className="flex justify-end gap-1">
                       <button
                         type="button"
                         aria-label={`Editar ${row.original.nome}`}
                         onClick={() => setEditing({ mode: "editar", target: row.original })}
-                        className="text-suave hover:text-texto"
+                        className="botao-leve px-2 py-1"
                       >
                         Editar
                       </button>
@@ -145,7 +147,7 @@ export default function TargetsPage() {
                         type="button"
                         aria-label={`Excluir ${row.original.nome}`}
                         onClick={() => void remove(row.original)}
-                        className="text-erro hover:underline"
+                        className="botao-leve px-2 py-1 text-erro hover:bg-erro/10 hover:text-erro"
                       >
                         Excluir
                       </button>

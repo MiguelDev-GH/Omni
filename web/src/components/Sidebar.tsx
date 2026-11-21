@@ -14,8 +14,23 @@ const routes: Record<string, string> = {
   "Comparação entre scans": "/relatorios",
 };
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `block rounded px-2 py-1.5 ${isActive ? "bg-zinc-800 text-texto" : "text-suave hover:text-texto"}`;
+// Só o primeiro item de cada rota acende como ativo, para a seção atual
+// aparecer uma vez só no menu.
+const primary = new Set([
+  "Alvos",
+  ...Object.entries(routes)
+    .filter(([, to], i, all) => all.findIndex(([, t]) => t === to) === i)
+    .map(([k]) => k),
+]);
+
+const linkClass =
+  (item: string) =>
+  ({ isActive }: { isActive: boolean }) =>
+    `relative flex items-center rounded-lg px-2.5 py-1.5 ${
+      isActive && primary.has(item)
+        ? "bg-elevado/80 font-medium text-texto before:absolute before:top-2 before:bottom-2 before:-left-px before:w-0.5 before:rounded-full before:bg-destaque"
+        : "text-suave hover:bg-elevado/50 hover:text-texto"
+    }`;
 
 const sections = [
   { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
@@ -24,26 +39,29 @@ const sections = [
   { title: "Relatórios", items: ["Histórico", "Comparação entre scans", "Exportação em PDF"] },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav aria-label="Seções" className="space-y-5 p-4 text-sm">
-      <NavLink to="/alvos" className={linkClass}>
+    <nav aria-label="Seções" className="space-y-6 text-sm">
+      <NavLink to="/alvos" onClick={onNavigate} className={linkClass("Alvos")}>
         Alvos
       </NavLink>
       {sections.map((s) => (
         <section key={s.title} className="space-y-1">
-          <h2 className="px-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase">{s.title}</h2>
-          <ul>
+          <h2 className="px-2.5 pb-1 text-xs font-medium text-apagado">{s.title}</h2>
+          <ul className="space-y-px">
             {s.items.map((item) => (
               <li key={item}>
                 {routes[item] ? (
-                  <NavLink to={routes[item]} className={linkClass}>
+                  <NavLink to={routes[item]} onClick={onNavigate} className={linkClass(item)}>
                     {item}
                   </NavLink>
                 ) : (
-                  <span aria-disabled="true" className="flex items-center justify-between px-2 py-1 text-zinc-600">
+                  <span
+                    aria-disabled="true"
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 whitespace-nowrap text-apagado/80"
+                  >
                     {item}
-                    <span className="text-[10px] tracking-wide uppercase">em breve</span>
+                    <span className="font-mono text-[10px] text-apagado/70">em breve</span>
                   </span>
                 )}
               </li>

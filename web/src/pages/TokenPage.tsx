@@ -32,15 +32,21 @@ export default function TokenPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border border-borda bg-superficie p-6">
-        <h1 className="text-2xl font-semibold">Omni</h1>
+      <form onSubmit={onSubmit} className="w-full max-w-sm animate-entrada space-y-6 rounded-2xl bg-superficie/80 p-8 backdrop-blur-sm">
+        <div className="space-y-1">
+          <h1 className="flex items-baseline font-mono text-2xl font-semibold tracking-tight">
+            omni
+            <span aria-hidden="true" className="ml-0.5 inline-block h-5 w-2.5 translate-y-0.5 animate-cursor bg-destaque" />
+          </h1>
+          <p className="text-sm text-suave">Informe o token definido em <code className="font-mono text-xs">OMNI_TOKEN</code> ao iniciar o Omni.</p>
+        </div>
         {expired && (
-          <p role="status" className="text-sm text-amber-400">
+          <p role="status" className="text-sm text-aviso">
             Sessão expirada. Informe o token novamente.
           </p>
         )}
-        <div className="space-y-1">
-          <label htmlFor="token" className="block text-sm text-suave">
+        <div className="space-y-1.5">
+          <label htmlFor="token" className="block text-xs font-medium text-suave">
             Token de acesso
           </label>
           <input
@@ -52,7 +58,7 @@ export default function TokenPage() {
             onChange={(e) => setValue(e.target.value)}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "token-erro" : undefined}
-            className="w-full rounded border border-borda bg-fundo px-3 py-2 outline-none focus:border-destaque"
+            className="campo font-mono"
           />
           {error && (
             <p id="token-erro" className="text-sm text-erro">
@@ -63,7 +69,7 @@ export default function TokenPage() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded bg-destaque px-3 py-2 font-medium text-zinc-950 disabled:opacity-60"
+          className="botao w-full py-2.5"
         >
           Entrar
         </button>

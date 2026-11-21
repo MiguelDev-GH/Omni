@@ -6,7 +6,7 @@ import { queryColor } from "../charts/colors";
 import CountChart from "../charts/CountChart";
 import ProtocolDonut from "../charts/ProtocolDonut";
 import StatusBars from "../charts/StatusBars";
-import { Card, Stat } from "../components/Card";
+import { Card, Notice, PageHeader, Stat } from "../components/Card";
 import { bandwidthSeries, formatBytes, MAX_POINTS, protocolTotals, topSources } from "../lib/traffic";
 import { useAppStore } from "../store/app";
 import { useDBHistory, useDBSeries } from "./QueriesPage";
@@ -40,25 +40,23 @@ export default function OverviewPage() {
   const dropped = traffic.reduce((sum, w) => sum + (w.descartados ?? 0), 0);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Geral</h1>
+    <div className="space-y-8">
+      <PageHeader title="Geral" />
 
       {sniffer === "sem-permissao" && (
-        <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          Captura desativada: o Omni está sem permissão de captura (CAP_NET_RAW).
-        </p>
+        <Notice role="alert">Captura desativada: o Omni está sem permissão de captura (CAP_NET_RAW).</Notice>
       )}
       {targetsLoaded && targets.length === 0 && (
-        <p className="rounded-lg border border-borda bg-superficie px-4 py-3 text-sm text-suave">
+        <Notice tone="info">
           O sniffer observa as portas dos alvos.{" "}
-          <Link to="/alvos" className="text-destaque underline">
+          <Link to="/alvos" className="link">
             Cadastre um alvo
           </Link>{" "}
           para começar a capturar.
-        </p>
+        </Notice>
       )}
       {dropped > 0 && (
-        <p className="text-sm text-amber-300">
+        <p className="text-sm text-aviso">
           A captura descartou {dropped.toLocaleString("pt-BR")} pacotes nos últimos 15 minutos; as métricas estão
           incompletas.
         </p>
@@ -67,13 +65,13 @@ export default function OverviewPage() {
       {httpError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
       {dbError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-4 sm:gap-6">
         <Stat label="Banda agora" value={last ? `${formatBytes(last.bytes)}/s` : "—"} />
         <Stat label="Pacotes por segundo" value={last ? last.pacotes.toLocaleString("pt-BR") : "—"} />
         <Stat label="Total em 15 minutos" value={formatBytes(total)} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-2">
         <Card title="Requisições na API">
           <CountChart id="req-geral" points={httpSeries.requests} label="Requisições" empty="Sem requisições capturadas ainda." />
         </Card>
@@ -90,28 +88,28 @@ export default function OverviewPage() {
         <BandwidthChart points={series} />
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
         <Card title="Protocolos">
           <ProtocolDonut data={protocols} />
         </Card>
-        <Card title="IPs de origem com mais tráfego">
+        <Card title="IPs de origem com mais tráfego" plane>
           {sources.length === 0 ? (
             <p className="text-sm text-suave">Sem tráfego capturado ainda.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-suave">
+            <table className="tabela">
+              <thead>
                 <tr>
-                  <th className="pb-2 font-medium">IP</th>
-                  <th className="pb-2 text-right font-medium">Bytes</th>
-                  <th className="pb-2 text-right font-medium">Pacotes</th>
+                  <th>IP</th>
+                  <th className="text-right">Bytes</th>
+                  <th className="text-right">Pacotes</th>
                 </tr>
               </thead>
               <tbody>
                 {sources.map((s) => (
-                  <tr key={s.ip} className="border-t border-borda">
-                    <td className="py-1.5 font-mono text-xs break-all">{s.ip}</td>
-                    <td className="py-1.5 text-right tabular-nums">{formatBytes(s.bytes)}</td>
-                    <td className="py-1.5 text-right tabular-nums">{s.pacotes.toLocaleString("pt-BR")}</td>
+                  <tr key={s.ip}>
+                    <td className="font-mono text-xs break-all">{s.ip}</td>
+                    <td className="text-right font-mono text-xs tabular-nums">{formatBytes(s.bytes)}</td>
+                    <td className="text-right font-mono text-xs tabular-nums">{s.pacotes.toLocaleString("pt-BR")}</td>
                   </tr>
                 ))}
               </tbody>

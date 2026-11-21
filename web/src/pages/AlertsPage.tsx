@@ -8,7 +8,7 @@ import {
   type AlertStatus,
   type Level,
 } from "../api/alerts";
-import { Card } from "../components/Card";
+import { Card, PageHeader } from "../components/Card";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 10_000;
@@ -23,15 +23,15 @@ const serviceTitle: Record<string, string> = {
 const serviceOrder = ["web", "banco", "dns", "smtp", "sistema"];
 
 const levelDot: Record<Level, string> = {
-  verde: "bg-emerald-500",
-  amarelo: "bg-amber-400",
-  vermelho: "bg-red-500",
+  verde: "bg-destaque",
+  amarelo: "bg-aviso",
+  vermelho: "bg-erro animate-pulso text-erro",
 };
 
 const levelText: Record<Level, string> = {
-  verde: "text-emerald-400",
-  amarelo: "text-amber-400",
-  vermelho: "text-red-400",
+  verde: "text-destaque-forte",
+  amarelo: "text-aviso",
+  vermelho: "text-erro",
 };
 
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium" });
@@ -40,7 +40,7 @@ const formatTime = (iso: string) => timeFmt.format(new Date(iso));
 export function LevelBadge({ level }: { level: Level }) {
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${levelText[level]}`}>
-      <span aria-hidden="true" className={`size-2 rounded-full ${levelDot[level]}`} />
+      <span aria-hidden="true" className={`size-1.5 rounded-full ${levelDot[level]}`} />
       {levelLabel[level]}
     </span>
   );
@@ -59,15 +59,15 @@ function limits(regra: string, s: { limite_amarelo: number; limite_vermelho: num
 function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }) {
   const level = worst(list);
   return (
-    <section aria-label={serviceTitle[service] ?? service} className="min-w-0 rounded-lg border border-borda bg-superficie p-4">
+    <section aria-label={serviceTitle[service] ?? service} className="min-w-0 rounded-2xl bg-superficie/80 p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-medium text-suave">{serviceTitle[service] ?? service}</h2>
+        <h2 className="text-sm font-medium">{serviceTitle[service] ?? service}</h2>
         {list.length > 0 && <LevelBadge level={level} />}
       </div>
       {list.length === 0 ? (
         <p className="text-sm text-suave">Sem medições ainda.</p>
       ) : (
-        <ul className="space-y-2 text-sm">
+        <ul className="space-y-3 text-sm">
           {list.map((s) => (
             <li key={`${s.regra}|${s.recurso}`} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -75,10 +75,10 @@ function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }
                   {s.nome}
                   {s.recurso && <span className="text-suave"> · {s.recurso}</span>}
                 </p>
-                <p className="text-xs text-zinc-500">{limits(s.regra, s)}</p>
+                <p className="text-xs text-apagado">{limits(s.regra, s)}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="tabular-nums">{formatAlertValue(s.regra, s.valor, s.unidade)}</p>
+                <p className="font-mono text-xs tabular-nums">{formatAlertValue(s.regra, s.valor, s.unidade)}</p>
                 <LevelBadge level={s.nivel} />
               </div>
             </li>
@@ -131,34 +131,36 @@ export default function AlertsPage() {
   const services = [...serviceOrder, ...Object.keys(byService).filter((s) => !serviceOrder.includes(s))];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Alertas</h1>
-        {statuses.length > 0 && (
-          <p className="text-sm">
-            Situação geral: <LevelBadge level={overall} />
-          </p>
-        )}
-      </div>
-      <p className="text-sm text-suave">
+    <div className="space-y-8">
+      <PageHeader
+        title="Alertas"
+        aside={
+          statuses.length > 0 && (
+            <p className="text-sm">
+              Situação geral: <LevelBadge level={overall} />
+            </p>
+          )
+        }
+      >
         Cada métrica é comparada com dois limites. Verde é o normal, amarelo pede observação e vermelho indica serviço
         degradado ou fora do ar. Um nível só muda depois que a condição se mantém pelo tempo da regra, para um pico
         isolado não virar alerta.
-      </p>
+      </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar os alertas.</p>}
       {email && (
-        <p role="note" className={`text-sm ${email.ativo ? "text-suave" : "text-amber-400"}`}>
+        <p role="note" className={`-mt-4 text-sm ${email.ativo ? "text-suave" : "text-aviso"}`}>
           {email.ativo
             ? `Notificação por e-mail ativa para ${email.destinatarios} ${email.destinatarios === 1 ? "destinatário" : "destinatários"}.`
             : "Notificação por e-mail desligada: defina OMNI_SMTP_HOST e OMNI_ALERTA_EMAILS ao iniciar o Omni."}
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-4 sm:gap-6">
         {(["vermelho", "amarelo", "verde"] as const).map((l) => (
-          <div key={l} className="rounded-lg border border-borda bg-superficie p-4">
+          <div key={l} className="relative pl-3.5">
+            <span aria-hidden="true" className={`absolute top-1 bottom-1 left-0 w-px ${levelDot[l].split(" ")[0]}`} />
             <p className="text-xs text-suave">{levelLabel[l]}</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${levelText[l]}`}>{counts[l]}</p>
+            <p className={`mt-1 font-mono text-lg font-medium tabular-nums sm:text-2xl ${levelText[l]}`}>{counts[l]}</p>
           </div>
         ))}
       </div>
@@ -169,34 +171,34 @@ export default function AlertsPage() {
         ))}
       </div>
 
-      <Card title="Histórico de mudanças de nível">
+      <Card title="Histórico de mudanças de nível" plane>
         {history.length === 0 ? (
           <p className="text-sm text-suave">Nenhuma mudança de nível desde que o Omni foi iniciado.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table aria-label="Histórico de alertas" className="w-full text-sm">
-              <thead className="text-left text-xs text-suave">
+            <table aria-label="Histórico de alertas" className="tabela">
+              <thead>
                 <tr>
-                  <th className="py-1 pr-3 font-medium">Hora</th>
-                  <th className="py-1 pr-3 font-medium">Nível</th>
-                  <th className="py-1 pr-3 font-medium">Métrica</th>
-                  <th className="py-1 pr-3 font-medium">Recurso</th>
-                  <th className="py-1 pr-3 font-medium">Valor</th>
-                  <th className="py-1 font-medium">Detalhe</th>
+                  <th className="pr-3">Hora</th>
+                  <th className="pr-3">Nível</th>
+                  <th className="pr-3">Métrica</th>
+                  <th className="pr-3">Recurso</th>
+                  <th className="pr-3">Valor</th>
+                  <th>Detalhe</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((a) => (
-                  <tr key={a.id} className="border-t border-borda align-top">
-                    <td className="py-1.5 pr-3 whitespace-nowrap text-suave tabular-nums">{formatTime(a.hora)}</td>
-                    <td className="py-1.5 pr-3 whitespace-nowrap">
+                  <tr key={a.id} className="align-top">
+                    <td className="pr-3 font-mono text-xs whitespace-nowrap text-suave tabular-nums">{formatTime(a.hora)}</td>
+                    <td className="pr-3 whitespace-nowrap">
                       <LevelBadge level={a.nivel} />
-                      <span className="text-xs text-zinc-500"> (era {levelLabel[a.nivel_anterior].toLowerCase()})</span>
+                      <span className="text-xs text-apagado"> (era {levelLabel[a.nivel_anterior].toLowerCase()})</span>
                     </td>
-                    <td className="py-1.5 pr-3">{a.nome}</td>
-                    <td className="py-1.5 pr-3 font-mono text-xs">{a.recurso || serviceTitle[a.servico] || a.servico}</td>
-                    <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">{formatAlertValue(a.regra, a.valor, a.unidade)}</td>
-                    <td className="py-1.5 break-words text-suave">{a.detalhe ?? ""}</td>
+                    <td className="pr-3">{a.nome}</td>
+                    <td className="pr-3 font-mono text-xs">{a.recurso || serviceTitle[a.servico] || a.servico}</td>
+                    <td className="pr-3 font-mono text-xs whitespace-nowrap tabular-nums">{formatAlertValue(a.regra, a.valor, a.unidade)}</td>
+                    <td className="break-words text-suave">{a.detalhe ?? ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -206,12 +208,12 @@ export default function AlertsPage() {
       </Card>
 
       {rules.length > 0 && (
-        <Card title="Regras em uso">
-          <ul className="grid gap-1 text-sm sm:grid-cols-2">
+        <Card title="Regras em uso" plane>
+          <ul className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
             {rules.map((r) => (
               <li key={r.id}>
                 <span>{r.nome}</span>
-                <span className="text-xs text-zinc-500"> · {serviceTitle[r.servico] ?? r.servico} · {limits(r.id, r)}</span>
+                <span className="text-xs text-apagado"> · {serviceTitle[r.servico] ?? r.servico} · {limits(r.id, r)}</span>
               </li>
             ))}
           </ul>

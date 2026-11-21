@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { compareScan, listScans, scanFindings, severities, severityLabels, type Comparison, type Finding, type Scan } from "../api/scans";
-import { Card } from "../components/Card";
+import { Card, InternalBadge, PageHeader } from "../components/Card";
 import FindingsDiff from "../components/FindingsDiff";
 import FindingsTable, { severityClasses } from "../components/FindingsTable";
+import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 import { statusLabels } from "./ArsenalPage";
 
@@ -15,7 +16,7 @@ function Counts({ s }: { s: Scan }) {
   return (
     <span className="flex flex-wrap gap-1">
       {present.map((sev) => (
-        <span key={sev} className={`rounded border px-1.5 text-[11px] ${severityClasses[sev]}`}>
+        <span key={sev} className={`rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap ${severityClasses[sev]}`}>
           {s.achados[sev]} {severityLabels[sev].toLowerCase()}
         </span>
       ))}
@@ -63,70 +64,64 @@ export default function ReportsPage() {
   const shown = detail && detail.scanId === opened ? detail : null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Relatórios</h1>
-        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
-          Visão interna
-        </span>
-      </div>
+    <div className="space-y-8">
+      <PageHeader title="Relatórios" aside={<InternalBadge />} />
       {error && <p className="text-sm text-erro">{error}</p>}
 
-      <Card title="Histórico de varreduras">
-        {targets.length > 0 && (
-          <div className="mb-3 flex items-center gap-2 text-sm">
-            <label htmlFor="alvo-relatorio" className="text-suave">
-              Alvo
-            </label>
-            <select
-              id="alvo-relatorio"
-              value={selected ?? ""}
-              onChange={(e) => {
-                selectTarget(Number(e.target.value));
-                setParams({});
-              }}
-              className="rounded border border-borda bg-fundo px-2 py-1"
-            >
-              {targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+      <Card
+        title="Histórico de varreduras"
+        plane
+        action={
+          targets.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <label htmlFor="alvo-relatorio" className="text-suave">
+                Alvo
+              </label>
+              <Select
+                id="alvo-relatorio"
+                value={selected}
+                onChange={(id) => {
+                  selectTarget(id);
+                  setParams({});
+                }}
+                options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
+              />
+            </div>
+          )
+        }
+      >
         {scans !== null && mine.length === 0 ? (
           <p className="text-sm text-suave">Nenhuma varredura deste alvo ainda. Use o Arsenal para iniciar uma.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table aria-label="Varreduras" className="w-full text-sm">
-              <thead className="text-left text-xs text-suave">
+            <table aria-label="Varreduras" className="tabela">
+              <thead>
                 <tr>
-                  <th className="pb-2 font-medium">Varredura</th>
-                  <th className="pb-2 font-medium">Ferramentas</th>
-                  <th className="pb-2 font-medium">Data</th>
-                  <th className="pb-2 font-medium">Status</th>
-                  <th className="pb-2 font-medium">Achados</th>
+                  <th className="pr-3">Varredura</th>
+                  <th className="pr-3">Ferramentas</th>
+                  <th className="pr-3">Data</th>
+                  <th className="pr-3">Status</th>
+                  <th>Achados</th>
                 </tr>
               </thead>
               <tbody>
                 {mine.map((s) => (
-                  <tr key={s.id} className={`border-t border-borda ${s.id === opened ? "bg-zinc-800/60" : ""}`}>
-                    <td className="py-1.5">
+                  <tr key={s.id} className={s.id === opened ? "bg-destaque-tinta/60" : ""}>
+                    <td className="pr-3">
                       <button
                         type="button"
                         onClick={() => setParams({ varredura: String(s.id) })}
-                        className="text-destaque underline"
+                        className="link font-mono text-xs"
                       >
                         #{s.id}
                       </button>
                     </td>
-                    <td className="py-1.5">{s.ferramentas.join(", ")}</td>
-                    <td className="py-1.5 whitespace-nowrap text-suave">{when(s.criada_em)}</td>
-                    <td className={`py-1.5 ${s.status === "falhou" ? "text-erro" : ""}`} title={s.erro}>
+                    <td className="pr-3 font-mono text-xs">{s.ferramentas.join(", ")}</td>
+                    <td className="pr-3 font-mono text-xs whitespace-nowrap text-suave">{when(s.criada_em)}</td>
+                    <td className={`pr-3 ${s.status === "falhou" ? "text-erro" : ""}`} title={s.erro}>
                       {statusLabels[s.status]}
                     </td>
-                    <td className="py-1.5">
+                    <td>
                       <Counts s={s} />
                     </td>
                   </tr>
@@ -138,12 +133,12 @@ export default function ReportsPage() {
       </Card>
 
       {opened !== null && (
-        <Card title={`Varredura #${opened}: o que mudou desde a anterior`}>
+        <Card title={`Varredura #${opened}: o que mudou desde a anterior`} plane>
           {shown ? (
             <div className="space-y-4">
               <FindingsDiff cmp={shown.cmp} />
               <details>
-                <summary className="cursor-pointer text-sm text-suave">Todos os achados ({shown.all.length})</summary>
+                <summary className="cursor-pointer text-sm text-suave hover:text-texto">Todos os achados ({shown.all.length})</summary>
                 <div className="mt-2">
                   <FindingsTable list={shown.all} label="Todos os achados" />
                 </div>

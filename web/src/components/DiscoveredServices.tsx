@@ -40,13 +40,13 @@ export default function DiscoveredServices({ targets, onPick }: Props) {
               <button
                 type="button"
                 onClick={() => onPick(s)}
-                className="flex items-center gap-2 rounded border border-borda bg-fundo px-2.5 py-1 text-sm hover:border-destaque"
+                className="flex items-center gap-2 rounded-lg bg-elevado px-2.5 py-1.5 text-sm ring-1 ring-borda/60 ring-inset hover:text-destaque-forte hover:ring-destaque/60"
               >
                 <span>
-                  {s.processo || "Processo desconhecido"} · {s.portas.join(", ")}
+                  {s.processo || "Processo desconhecido"} · <span className="font-mono text-xs">{s.portas.join(", ")}</span>
                 </span>
                 {s.tipo === "banco" && (
-                  <span className="rounded bg-zinc-800 px-1.5 text-[10px] tracking-wide text-suave uppercase">banco</span>
+                  <span className="rounded-md bg-fundo px-1.5 font-mono text-[10px] text-suave">banco</span>
                 )}
               </button>
             </li>
@@ -57,7 +57,7 @@ export default function DiscoveredServices({ targets, onPick }: Props) {
 
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-medium text-suave">Detectado nesta máquina</h3>
+      <h3 className="text-xs font-medium text-suave">Detectado nesta máquina</h3>
       {body}
     </section>
   );
