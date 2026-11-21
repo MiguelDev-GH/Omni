@@ -7,6 +7,10 @@ const routes: Record<string, string> = {
   "Status HTTP": "/requisicoes",
   "Consultas no banco": "/consultas",
   Nmap: "/arsenal",
+  Nuclei: "/arsenal",
+  testssl: "/arsenal",
+  Histórico: "/relatorios",
+  "Comparação entre scans": "/relatorios",
 };
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
