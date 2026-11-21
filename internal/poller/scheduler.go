@@ -64,7 +64,7 @@ type portKey struct {
 type check struct {
 	target target.Target
 	port   int
-	tcp    bool
+	kind   string
 }
 
 // Scheduler executa rodadas de verificação, grava os resultados e publica
@@ -119,10 +119,16 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 	var checks []check
 	for _, t := range targets {
 		for _, p := range t.AppPorts {
-			checks = append(checks, check{target: t, port: p})
+			checks = append(checks, check{target: t, port: p, kind: KindHTTP})
 		}
 		if t.DBPort != 0 {
-			checks = append(checks, check{target: t, port: t.DBPort, tcp: true})
+			checks = append(checks, check{target: t, port: t.DBPort, kind: KindTCP})
+		}
+		if t.DNSPort != 0 {
+			checks = append(checks, check{target: t, port: t.DNSPort, kind: KindDNS})
+		}
+		if t.SMTPPort != 0 {
+			checks = append(checks, check{target: t, port: t.SMTPPort, kind: KindSMTP})
 		}
 	}
 
@@ -168,9 +174,14 @@ func (s *Scheduler) runChecks(ctx context.Context, checks []check) []Result {
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if c.tcp {
+			switch c.kind {
+			case KindTCP:
 				results[i] = CheckTCP(ctx, c.target.ID, c.target.Host, c.port, CheckTimeout)
-			} else {
+			case KindDNS:
+				results[i] = CheckDNS(ctx, c.target.ID, c.target.Host, c.port, c.target.Domain)
+			case KindSMTP:
+				results[i] = CheckSMTP(ctx, c.target.ID, c.target.Host, c.port, c.target.Domain)
+			default:
 				results[i] = CheckHTTP(ctx, s.client, c.target.ID, c.target.Host, c.port)
 			}
 		}()

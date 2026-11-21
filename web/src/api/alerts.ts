@@ -1,7 +1,7 @@
 import { apiFetch } from "./client";
 
 export type Level = "verde" | "amarelo" | "vermelho";
-export type Service = "web" | "banco" | "sistema";
+export type Service = "web" | "banco" | "dns" | "smtp" | "sistema";
 
 // Alert é uma mudança de nível, como no evento ALERTA.
 export type Alert = {
@@ -63,12 +63,13 @@ export const levelLabel: Record<Level, string> = { verde: "Verde", amarelo: "Ama
 // Valores da regra de disponibilidade, iguais aos do backend.
 export function availabilityText(v: number): string {
   if (v >= 2) return "fora do ar";
-  if (v >= 1) return "erro 5xx";
+  if (v >= 1) return "respondendo com erro";
   return "no ar";
 }
 
 export function formatAlertValue(regra: string, valor: number, unidade: string): string {
   if (regra === "disponibilidade") return availabilityText(valor);
+  if (regra === "smtp_sem_starttls") return valor >= 1 ? "sem STARTTLS" : "com STARTTLS";
   const n = Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
   if (unidade === "") return n;
   if (unidade === "%") return `${n}%`;

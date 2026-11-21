@@ -231,3 +231,99 @@ func TestWatcherFeedNeverBlocks(t *testing.T) {
 		t.Fatal("Feed bloqueou com o buffer cheio")
 	}
 }
+
+func dnsSMTPTargets() *fakeTargets {
+	return &fakeTargets{list: []target.Target{{ID: 1, Name: "loja", AppPorts: []int{3000}, Domain: "loja.local",
+		DNSPort: 1053, SMTPPort: 1025}}}
+}
+
+func TestWatcherDNSDegradedAndLatency(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), dnsSMTPTargets())
+	for i := 0; i < 3; i++ {
+		at := t0.Add(time.Duration(i) * 30 * time.Second)
+		w.handle(context.Background(), mkEvent(eventStatus, statusPayload(
+			map[string]any{"alvo_id": 1, "porta": 1053, "tipo": "dns", "no_ar": true, "degradado": true,
+				"detalhe": "NXDOMAIN", "latencia_ms": 450.0, "hora": at},
+		)), at)
+	}
+	byRule := map[string]Alert{}
+	for _, a := range *got {
+		byRule[a.Rule] = a
+	}
+	avail := byRule[RuleAvailability]
+	if avail.Level != Yellow || avail.Service != ServiceDNS || avail.Subject != "loja:1053" || avail.Detail != "NXDOMAIN" {
+		t.Errorf("disponibilidade = %+v", avail)
+	}
+	if byRule[RuleDNSLatency].Level != Yellow {
+		t.Errorf("latência DNS = %+v", byRule[RuleDNSLatency])
+	}
+	if _, ok := byRule[RuleProbeLatency]; ok {
+		t.Error("DNS não deveria usar a regra de latência do HTTP")
+	}
+}
+
+func TestWatcherProbeFailureRate(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), dnsSMTPTargets())
+	// 3 falhas em 6 verificações: 50% é vermelho.
+	for i, up := range []bool{true, false, true, false, true, false} {
+		at := t0.Add(time.Duration(i) * 30 * time.Second)
+		w.handle(context.Background(), mkEvent(eventStatus, statusPayload(
+			map[string]any{"alvo_id": 1, "porta": 1025, "tipo": "smtp", "no_ar": up, "erro": "timeout",
+				"latencia_ms": 10.0, "starttls": true, "hora": at},
+		)), at)
+	}
+	var rate *Alert
+	for i := range *got {
+		if (*got)[i].Rule == RuleProbeErrors {
+			rate = &(*got)[i]
+		}
+	}
+	if rate == nil || rate.Level != Red || rate.Service != ServiceSMTP || rate.Value != 50 {
+		t.Fatalf("taxa de falhas = %+v (alertas: %+v)", rate, *got)
+	}
+	if !strings.Contains(rate.Detail, "3 de 6") {
+		t.Errorf("detalhe = %q", rate.Detail)
+	}
+}
+
+func TestWatcherFailureRateNeedsMinimumSamples(t *testing.T) {
+	w, _ := newTestWatcher(DefaultRules(), dnsSMTPTargets())
+	for i := 0; i < probeMinSamples-1; i++ {
+		at := t0.Add(time.Duration(i) * 30 * time.Second)
+		w.handle(context.Background(), mkEvent(eventStatus, statusPayload(
+			map[string]any{"alvo_id": 1, "porta": 1053, "tipo": "dns", "no_ar": false, "hora": at},
+		)), at)
+	}
+	statuses, _ := w.engine.Snapshot()
+	for _, s := range statuses {
+		if s.Rule == RuleProbeErrors {
+			t.Fatalf("taxa calculada com poucas amostras: %+v", s)
+		}
+	}
+}
+
+func TestWatcherSMTPWithoutStartTLS(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), dnsSMTPTargets())
+	w.handle(context.Background(), mkEvent(eventStatus, statusPayload(
+		map[string]any{"alvo_id": 1, "porta": 1025, "tipo": "smtp", "no_ar": true, "starttls": false,
+			"latencia_ms": 5.0, "hora": t0},
+	)), t0)
+	if len(*got) != 1 || (*got)[0].Rule != RuleSMTPNoTLS || (*got)[0].Level != Yellow {
+		t.Fatalf("alertas = %+v", *got)
+	}
+}
+
+func TestWatcherKeepsDNSAndSMTPPortsOnRefresh(t *testing.T) {
+	w, _ := newTestWatcher(DefaultRules(), dnsSMTPTargets())
+	ev := func(at time.Time) rawEvent {
+		return mkEvent(eventStatus, statusPayload(
+			map[string]any{"alvo_id": 1, "porta": 1053, "tipo": "dns", "no_ar": false, "hora": at},
+		))
+	}
+	w.handle(context.Background(), ev(t0), t0)
+	w.handle(context.Background(), ev(t0.Add(namesRefresh)), t0.Add(namesRefresh))
+	statuses, _ := w.engine.Snapshot()
+	if len(statuses) == 0 || len(w.probes["loja:1053"]) != 2 {
+		t.Fatalf("estado da porta DNS esquecido: %+v, janela %v", statuses, w.probes)
+	}
+}

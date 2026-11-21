@@ -31,6 +31,8 @@ func (l Level) rank() int {
 const (
 	ServiceWeb    = "web"
 	ServiceDB     = "banco"
+	ServiceDNS    = "dns"
+	ServiceSMTP   = "smtp"
 	ServiceSystem = "sistema"
 )
 
@@ -42,6 +44,10 @@ const (
 	RuleHTTPP95      = "http_p95"
 	RuleDBErrors     = "banco_erros"
 	RuleDBP95        = "banco_p95"
+	RuleDNSLatency   = "dns_latencia"
+	RuleSMTPLatency  = "smtp_latencia"
+	RuleProbeErrors  = "taxa_falhas_sonda"
+	RuleSMTPNoTLS    = "smtp_sem_starttls"
 	RuleCPU          = "sistema_cpu"
 	RuleMemory       = "sistema_memoria"
 	RuleDisk         = "sistema_disco"
@@ -89,7 +95,7 @@ func (r Rule) threshold(l Level) float64 {
 // verificação para um destes números.
 const (
 	AvailabilityUp       = 0 // respondeu normalmente
-	AvailabilityDegraded = 1 // respondeu com status 5xx
+	AvailabilityDegraded = 1 // respondeu com erro: HTTP 5xx, RCODE no DNS, recusa no SMTP
 	AvailabilityDown     = 2 // não respondeu
 )
 
@@ -110,6 +116,14 @@ func DefaultRules() []Rule {
 			Warn: 10, Crit: 25, For: 30 * time.Second},
 		{ID: RuleDBP95, Service: ServiceDB, Name: "Latência p95 das consultas", Unit: "ms",
 			Warn: 500, Crit: 2000, For: 30 * time.Second},
+		{ID: RuleDNSLatency, Service: ServiceDNS, Name: "Tempo de resolução DNS", Unit: "ms",
+			Warn: 200, Crit: 1000, For: 30 * time.Second},
+		{ID: RuleSMTPLatency, Service: ServiceSMTP, Name: "Latência da conversa SMTP", Unit: "ms",
+			Warn: 2000, Crit: 5000, For: 30 * time.Second},
+		{ID: RuleProbeErrors, Service: ServiceDNS, Name: "Taxa de falhas da sonda", Unit: "%",
+			Warn: 20, Crit: 50},
+		{ID: RuleSMTPNoTLS, Service: ServiceSMTP, Name: "SMTP sem STARTTLS", Unit: "",
+			Warn: 1, Crit: 2},
 		{ID: RuleCPU, Service: ServiceSystem, Name: "Uso de CPU", Unit: "%",
 			Warn: 80, Crit: 95, For: time.Minute},
 		{ID: RuleMemory, Service: ServiceSystem, Name: "Uso de memória", Unit: "%",

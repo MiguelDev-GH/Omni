@@ -19,6 +19,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Comunicação em tempo real (WebSocket)](#comunicação-em-tempo-real-websocket)
 - [Interface (frontend)](#interface-frontend)
 - [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
+- [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp)
 - [Requisitos de implantação](#requisitos-de-implantação)
 - [O que falta implementar, por camada](#o-que-falta-implementar-por-camada)
 - [Segurança da própria plataforma](#segurança-da-própria-plataforma)
@@ -210,12 +211,16 @@ Um nível só muda depois que a condição se mantém pelo tempo da regra (colun
 
 | Regra | Serviço | Amarelo a partir de | Vermelho a partir de | Por |
 |---|---|---|---|---|
-| Disponibilidade (por porta) | Web / Banco | respondeu com 5xx | não respondeu | imediato |
+| Disponibilidade (por porta) | Web / Banco / DNS / SMTP | respondeu com erro (HTTP 5xx, RCODE de erro, comando SMTP recusado) | não respondeu | imediato |
 | Latência da verificação ativa | Web / Banco | 1000 ms | 3000 ms | 1 min |
 | Taxa de erros 5xx | Web | 10% | 25% | 30 s |
 | Latência p95 das requisições | Web | 1000 ms | 2500 ms | 30 s |
 | Taxa de erros nas consultas | Banco | 10% | 25% | 30 s |
 | Latência p95 das consultas | Banco | 500 ms | 2000 ms | 30 s |
+| Tempo de resolução DNS | DNS | 200 ms | 1000 ms | 30 s |
+| Latência da conversa SMTP | SMTP | 2000 ms | 5000 ms | 30 s |
+| Taxa de falhas da sonda (últimas 10, mínimo 5) | DNS / SMTP | 20% | 50% | imediato |
+| SMTP sem STARTTLS | SMTP | servidor não oferece STARTTLS | — | imediato |
 | Uso de CPU / memória / disco | Sistema | 80% / 85% / 85% | 95% | 1 min |
 
 As taxas e o p95 só contam com pelo menos 20 requisições ou consultas na janela de 10 s, para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
@@ -254,6 +259,39 @@ OMNI_TOKEN=... OMNI_SMTP_HOST=127.0.0.1 OMNI_SMTP_PORTA=1025 \
 - **Sem injeção de cabeçalho.** Quebras de linha são removidas dos campos que vêm do usuário (como o nome do alvo), e os endereços são validados na inicialização: um nome como `x\r\nBcc: alguem@exemplo.com` não cria cópias ocultas.
 - **Limite de 20 e-mails por minuto.** Um ataque que derruba o serviço não vira, de quebra, uma enxurrada de e-mails; o e-mail seguinte informa quantos alertas foram suprimidos.
 - **Envio fora do caminho crítico.** Os e-mails saem de uma fila numa goroutine própria: um SMTP lento ou fora do ar nunca atrasa o Poller, o sniffer ou o WebSocket.
+
+## Monitoramento de DNS e SMTP
+
+Cada alvo pode ter uma **porta DNS** e uma **porta SMTP** (campos `porta_dns` e `porta_smtp`), no mesmo host do alvo. O Poller testa as duas a cada rodada, junto com as portas da aplicação, e o resultado sai no `STATUS_ALVOS` com `tipo` `dns` ou `smtp`:
+
+```json
+{ "alvo_id": 1, "porta": 1053, "tipo": "dns", "no_ar": true, "degradado": true, "detalhe": "NXDOMAIN", "latencia_ms": 0.8, "hora": "..." }
+{ "alvo_id": 1, "porta": 1025, "tipo": "smtp", "no_ar": true, "starttls": false, "detalhe": "aceita destinatário postmaster", "latencia_ms": 3.1, "hora": "..." }
+```
+
+**Sonda DNS** (`internal/probe/dns.go`): um cliente DNS feito só com a biblioteca padrão, que monta o pacote byte a byte (RFC 1035). Pergunta pelo registro A do **domínio** do alvo (obrigatório quando há porta DNS) e mede o tempo de resolução. Responder com qualquer código conta como "no ar"; `NXDOMAIN`, `SERVFAIL`, `REFUSED` ou uma resposta sem endereços contam como degradado (amarelo). Respostas truncadas (bit TC) são repetidas por TCP. Por segurança, a sonda:
+
+- usa um ID de consulta aleatório (a porta de origem também é aleatória) e descarta respostas com ID diferente ou para outro nome, a defesa básica contra envenenamento de cache (ataque de Kaminsky);
+- limita os saltos de ponteiros de compressão, para um pacote malicioso com ponteiros em ciclo não travar a leitura.
+
+**Sonda SMTP** (`internal/probe/smtp.go`): conversa com o servidor **sem enviar e-mail**: espera a saudação `220`, manda `EHLO` e anota se o servidor oferece `STARTTLS`. Com domínio no alvo, testa também `MAIL FROM:<>` e `RCPT TO:<postmaster@domínio>` e desfaz com `RSET`; todo domínio que recebe e-mail precisa aceitar `postmaster` (RFC 5321, seção 4.5.1). Um comando recusado (4xx/5xx) é degradado; conexão recusada, timeout ou saudação diferente de 220 é fora do ar. Servidor sem STARTTLS gera o alerta amarelo "SMTP sem STARTTLS": os e-mails trafegariam em texto puro.
+
+A taxa de falhas usa as últimas 10 verificações de cada porta (precisa de pelo menos 5). Com o intervalo padrão de 30 s, isso cobre os últimos 5 minutos.
+
+**Ambiente de teste** em `exemplos/dns-smtp/`: um CoreDNS que resolve `loja.local` na porta 1053 e um Mailpit na porta 1025.
+
+```bash
+cd exemplos/dns-smtp && docker compose up -d
+dig @127.0.0.1 -p 1053 loja.local +short        # 127.0.0.1
+```
+
+Cadastre (ou edite) o alvo com domínio `loja.local`, porta DNS `1053` e porta SMTP `1025`. Para ver os níveis mudarem:
+
+- **Amarelo no DNS:** troque o domínio para `nao-existe.loja.local` (NXDOMAIN).
+- **Vermelho no DNS ou SMTP:** `docker compose stop coredns` ou `docker compose stop mailpit`.
+- **Amarelo "SMTP sem STARTTLS":** já aparece com o Mailpit padrão, que não tem TLS.
+
+**Ainda não coberto:** consultas por segundo do DNS, volume e fila do SMTP. Essas métricas dependem do tráfego real e entram com a captura passiva no sniffer (UDP 53 e SMTP).
 
 ## Requisitos de implantação
 

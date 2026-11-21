@@ -70,3 +70,25 @@ func TestMissingTargetErrors(t *testing.T) {
 
 	assert.ErrorIs(t, s.DeleteTarget(ctx, 999), ErrNotFound)
 }
+
+func TestTargetDNSAndSMTPPortsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+
+	in := sample()
+	in.DNSPort, in.SMTPPort = 1053, 1025
+	created, err := s.CreateTarget(ctx, in)
+	require.NoError(t, err)
+	got, err := s.GetTarget(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1053, got.DNSPort)
+	assert.Equal(t, 1025, got.SMTPPort)
+
+	got.DNSPort, got.SMTPPort = 0, 2525
+	require.NoError(t, s.UpdateTarget(ctx, got))
+	list, err := s.ListTargets(ctx)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, 0, list[0].DNSPort)
+	assert.Equal(t, 2525, list[0].SMTPPort)
+}

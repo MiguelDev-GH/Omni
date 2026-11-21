@@ -13,8 +13,14 @@ import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 10_000;
 
-const serviceTitle: Record<string, string> = { web: "Web server", banco: "Banco de dados", sistema: "Sistema" };
-const serviceOrder = ["web", "banco", "sistema"];
+const serviceTitle: Record<string, string> = {
+  web: "Web server",
+  banco: "Banco de dados",
+  dns: "DNS",
+  smtp: "SMTP",
+  sistema: "Sistema",
+};
+const serviceOrder = ["web", "banco", "dns", "smtp", "sistema"];
 
 const levelDot: Record<Level, string> = {
   verde: "bg-emerald-500",
@@ -45,7 +51,8 @@ function worst(list: AlertStatus[]): Level {
 }
 
 function limits(regra: string, s: { limite_amarelo: number; limite_vermelho: number; unidade: string }) {
-  if (regra === "disponibilidade") return "erro 5xx é amarelo; fora do ar é vermelho";
+  if (regra === "disponibilidade") return "resposta com erro é amarelo; fora do ar é vermelho";
+  if (regra === "smtp_sem_starttls") return "sem STARTTLS é amarelo";
   return `amarelo ≥ ${formatAlertValue(regra, s.limite_amarelo, s.unidade)} · vermelho ≥ ${formatAlertValue(regra, s.limite_vermelho, s.unidade)}`;
 }
 
@@ -108,7 +115,7 @@ export default function AlertsPage() {
 
   const statuses = useMemo(() => Object.values(statusMap), [statusMap]);
   const byService = useMemo(() => {
-    const groups: Record<string, AlertStatus[]> = { web: [], banco: [], sistema: [] };
+    const groups: Record<string, AlertStatus[]> = Object.fromEntries(serviceOrder.map((s) => [s, []]));
     for (const s of statuses) (groups[s.servico] ??= []).push(s);
     for (const list of Object.values(groups)) {
       list.sort((a, b) => levelRank[b.nivel] - levelRank[a.nivel] || a.recurso.localeCompare(b.recurso) || a.nome.localeCompare(b.nome));

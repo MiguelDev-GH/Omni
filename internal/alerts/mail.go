@@ -174,9 +174,16 @@ func (m *Mailer) buildMessage(a Alert, suppressed int) ([]byte, error) {
 		fmt.Fprintf(&body, "Recurso: %s\n", headerSafe(a.Subject))
 	}
 	fmt.Fprintf(&body, "Métrica: %s\n", a.Name)
-	if a.Rule == RuleAvailability {
+	switch a.Rule {
+	case RuleAvailability:
 		fmt.Fprintf(&body, "Estado: %s\n", availabilityText(a.Value))
-	} else {
+	case RuleSMTPNoTLS:
+		if a.Value >= 1 {
+			body.WriteString("Estado: o servidor não oferece STARTTLS; os e-mails trafegam sem criptografia\n")
+		} else {
+			body.WriteString("Estado: o servidor voltou a oferecer STARTTLS\n")
+		}
+	default:
 		fmt.Fprintf(&body, "Valor: %s (limite: %s)\n", formatValue(a.Value, a.Unit), formatValue(a.Threshold, a.Unit))
 	}
 	if a.Detail != "" {
@@ -226,7 +233,7 @@ func availabilityText(v float64) string {
 	case v >= AvailabilityDown:
 		return "fora do ar"
 	case v >= AvailabilityDegraded:
-		return "no ar, mas respondendo com erro 5xx"
+		return "no ar, mas respondendo com erro"
 	default:
 		return "no ar"
 	}
