@@ -21,6 +21,7 @@ type fakeStore struct {
 	targets []target.Target
 	windows []Window
 	http    []l7.HTTPWindow
+	db      []l7.DBWindow
 	pruned  []time.Time
 }
 
@@ -42,6 +43,19 @@ func (f *fakeStore) InsertHTTPWindow(_ context.Context, w l7.HTTPWindow) error {
 	defer f.mu.Unlock()
 	f.http = append(f.http, w)
 	return nil
+}
+
+func (f *fakeStore) InsertDBWindow(_ context.Context, w l7.DBWindow) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.db = append(f.db, w)
+	return nil
+}
+
+func (f *fakeStore) savedDB() []l7.DBWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]l7.DBWindow(nil), f.db...)
 }
 
 func (f *fakeStore) savedHTTP() []l7.HTTPWindow {
@@ -243,4 +257,30 @@ func TestEngineRecordsHTTPWindows(t *testing.T) {
 	require.Len(t, w.Routes, 1)
 	assert.Equal(t, "/users/:id", w.Routes[0].Route)
 	assert.NotEmpty(t, pub.ofType(EventHTTP))
+}
+
+func TestEngineRecordsDBWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pg.pcap")
+	c := testutil.NewConn("127.0.0.1", 50000, "127.0.0.1", 5432)
+	query := []byte{'Q', 0, 0, 0, 0}
+	query = append(query, "SELECT * FROM u WHERE email = 'a@b.c'\x00"...)
+	query[4] = byte(len(query) - 1)
+	frames := c.Handshake()
+	frames = append(frames,
+		c.FromClient(query),
+		c.FromServer([]byte{'C', 0, 0, 0, 13, 'S', 'E', 'L', 'E', 'C', 'T', ' ', '1', 0, 'Z', 0, 0, 0, 5, 'I'}),
+	)
+	testutil.WritePCAP(t, path, frames...)
+
+	st := &fakeStore{targets: []target.Target{{ID: 1, AppPorts: []int{3000}, DBPort: 5432}}}
+	pub := &fakePub{}
+	e := NewEngine(func(string) (Source, error) { return OpenFile(path) }, st, pub)
+	startEngine(t, e)
+
+	require.Eventually(t, func() bool { return len(st.savedDB()) > 0 }, 2*time.Second, 10*time.Millisecond)
+	w := st.savedDB()[0]
+	assert.Equal(t, uint64(1), w.Queries)
+	require.Len(t, w.Top, 1)
+	assert.Equal(t, "SELECT * FROM u WHERE email = ?", w.Top[0].Query)
+	assert.NotEmpty(t, pub.ofType(EventDB))
 }
