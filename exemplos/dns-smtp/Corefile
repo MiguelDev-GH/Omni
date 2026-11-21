@@ -1,0 +1,10 @@
+# Zona de teste: loja.local aponta para a máquina local. Qualquer outro nome
+# dentro da zona responde NXDOMAIN, o que serve para testar o alerta amarelo.
+loja.local:53 {
+    hosts {
+        127.0.0.1 loja.local
+        127.0.0.1 mail.loja.local
+    }
+    log
+    errors
+}
