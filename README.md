@@ -196,7 +196,7 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 
 ## Requisitos de implantação
 
-- **Sistema:** servidor Linux. O Windows funciona com Npcap, mas não é o alvo principal.
+- **Sistema:** servidor Linux. No Windows, rode o Omni dentro do WSL2 (veja [Windows](#windows)).
 - **Reverse proxy terminando o TLS** e repassando à aplicação via `localhost`. Sem isso, o tráfego HTTPS fica ilegível para o Sniffer.
 - **Banco acessado via TCP em `127.0.0.1`,** e não por unix socket, que o pcap não enxerga.
 - **libpcap:** a captura ao vivo usa cgo e precisa do `libpcap-dev` (Debian/Ubuntu) ou `libpcap` (Arch) para compilar. Um binário compilado com `CGO_ENABLED=0` roda, mas com o sniffer sempre inativo.
@@ -208,6 +208,25 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 - **Docker** instalado, só para o Arsenal. O Omni fala com a API do Docker Engine pelo socket Unix (`/var/run/docker.sock` ou `DOCKER_HOST=unix://...`), então o usuário que roda o Omni precisa de acesso a ele. Os containers rodam com `network_mode: host`, 1 CPU e 512 MiB; o Nuclei recebe 1,5 GiB, porque carregar os templates passa de 512 MiB. Os templates do Nuclei ficam no volume `omni-nuclei-templates` e são baixados na primeira varredura.
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
+
+### Windows
+
+O Omni não roda completo direto no Windows. O binário compila e a interface abre, mas dois motores ficam desligados:
+
+| Motor | No Windows nativo | Motivo |
+|---|---|---|
+| Poller | Funciona | Só faz conexões TCP e requisições HTTP |
+| Sniffer | Inativo | A interface padrão `any` não existe no Npcap, e `OMNI_INTERFACE` só aceita nomes no estilo Linux (até 15 caracteres), o que recusa os nomes do Npcap (`\Device\NPF_...`) |
+| Arsenal (Docker) | Indisponível | O Omni só fala com o Docker por socket Unix (`unix://`), e o Docker Desktop atende no Windows por named pipe (`npipe://`) |
+
+**Caminho recomendado: WSL2.** O Omni roda dentro de uma distribuição Linux do WSL2, e a interface é aberta pelo navegador do Windows em `http://localhost:8080`, porque o WSL2 repassa as portas do loopback para o Windows. Dentro do WSL, o Omni se comporta como num servidor Linux: siga os requisitos acima (`libpcap-dev`, `setcap`, Docker pelo socket Unix).
+
+Cuidados no WSL2:
+
+- **Use o Docker Engine instalado na própria distribuição**, e não a integração do Docker Desktop. Com a integração, o comando `docker` da distribuição fala com o motor do Docker Desktop, que roda em outra máquina virtual: containers com `network_mode: host` ficam no loopback dessa outra máquina, fora do alcance da aplicação e do Sniffer. Desligue a integração em *Settings → Resources → WSL integration* e instale o Docker Engine pelo repositório oficial da distribuição.
+- **O Sniffer só enxerga o tráfego de dentro do WSL.** Aplicações rodando no Windows podem ser vigiadas pelo Poller e varridas pelo Arsenal, mas o tráfego delas não passa pela interface do WSL.
+- **O `setcap` não funciona em `/mnt/c`.** Compile o binário para o sistema de arquivos do Linux (por exemplo, `go build -o ~/omni-bin/omni ./cmd/omni`) e aplique as capabilities nele.
+- **Guarde o banco do Omni no sistema de arquivos do Linux** (`OMNI_DB=~/omni.db`): o SQLite em `/mnt/c` pode ter problemas de trava de arquivo.
 
 ## O que falta implementar, por camada
 
@@ -283,6 +302,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **O tráfego gerado pelos próprios scans** precisa ser marcado e filtrado das métricas, pela origem ou por um User-Agent próprio. Sem isso, os gráficos de requisições e de status HTTP ficam poluídos.
 - **Aplicações que usam SQLite como banco** não geram tráfego de rede, então não há gráfico de consultas para elas.
 - **Traceroute** só faz sentido para destinos externos ao servidor.
+- **Windows nativo** roda só com o Poller: o Sniffer e o Arsenal ficam desligados. Use o WSL2 (veja [Windows](#windows)).
 
 ## Roadmap
 
