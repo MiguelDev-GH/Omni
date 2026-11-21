@@ -26,7 +26,9 @@ const (
 	shutdownTimeout = 10 * time.Second
 	clientBuffer    = 256
 	ticketTTL       = 30 * time.Second
-	dockerEvery     = 30 * time.Second
+	// dockerEvery acompanha o ritmo do ESTADO_MOTORES do sniffer, para uma
+	// aba recém-aberta saber logo o estado do Docker.
+	dockerEvery = 5 * time.Second
 )
 
 // openCapture abre a captura ao vivo; os testes a trocam para não depender
