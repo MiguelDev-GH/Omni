@@ -137,12 +137,17 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "ALERTA_QUEDA", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "erro": "dial tcp 127.0.0.1:3000: connect: connection refused", "hora": "2026-11-20T17:31:52Z" } }
 { "tipo": "SERVICO_RESTAURADO", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "hora": "2026-11-20T17:31:56Z" } }
 { "tipo": "METRICAS_SISTEMA", "dados": { "cpu": 10.9, "memoria": 50.2, "disco": 4.7, "hora": "2026-11-20T17:31:49Z" } }
+{ "tipo": "METRICAS_TRAFEGO", "dados": { "inicio": "2026-11-21T12:00:00Z", "bytes": 48210, "pacotes": 61, "descartados": 0, "protocolos": { "HTTP": 40100, "PostgreSQL": 8110 }, "top_origens": [ { "ip": "127.0.0.1", "bytes": 30020, "pacotes": 33 } ] } }
+{ "tipo": "ESTADO_MOTORES", "dados": { "sniffer": "ativo" } }
 ```
 
 - `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
 - `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
+- `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta; as portas da aplicação contam como HTTP.
+- `ESTADO_MOTORES` sai a cada 5 s e a cada mudança, com o estado do sniffer: `ativo`, `inativo` (sem alvos cadastrados) ou `sem-permissao` (falta `CAP_NET_RAW`; o resto do Omni segue no ar).
+- As janelas com tráfego ficam 24 h no banco e saem em `GET /api/trafego` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 3600 janelas).
 
 ## Interface (frontend)
 
@@ -183,10 +188,12 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 - **Sistema:** servidor Linux. O Windows funciona com Npcap, mas não é o alvo principal.
 - **Reverse proxy terminando o TLS** e repassando à aplicação via `localhost`. Sem isso, o tráfego HTTPS fica ilegível para o Sniffer.
 - **Banco acessado via TCP em `127.0.0.1`,** e não por unix socket, que o pcap não enxerga.
-- **Privilégios mínimos:** a captura usa só `CAP_NET_RAW` e `CAP_NET_ADMIN`, sem root:
+- **libpcap:** a captura ao vivo usa cgo e precisa do `libpcap-dev` (Debian/Ubuntu) ou `libpcap` (Arch) para compilar. Um binário compilado com `CGO_ENABLED=0` roda, mas com o sniffer sempre inativo.
+- **Privilégios mínimos:** a captura usa só `CAP_NET_RAW` e `CAP_NET_ADMIN`, sem root. Refaça depois de cada build, porque o binário novo perde as capabilities:
   ```bash
   sudo setcap cap_net_raw,cap_net_admin=eip ./omni
   ```
+- **Interface de captura:** `OMNI_INTERFACE` (padrão `any`, que inclui o loopback). O filtro BPF cobre as portas TCP de todos os alvos e é refeito quando os alvos mudam.
 - **Docker** instalado, só para o Arsenal. Os containers rodam com `network_mode: host`.
 
 ## O que falta implementar, por camada
@@ -224,7 +231,7 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 
 ### Camada 3: Rede
 
-- [ ] **Top IPs de origem** por volume e por número de conexões, para detectar abuso ou DDoS.
+- [ ] **Top IPs de origem por número de conexões,** para detectar abuso ou DDoS (o volume em bytes já aparece na tela Geral).
 - [ ] **ICMP:** destino inalcançável e TTL excedido.
 - [ ] **Fragmentação IP.**
 - [ ] **Suporte completo a IPv6.**
@@ -232,14 +239,12 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 
 ### Camada 2: Enlace
 
-- [ ] **Tratar o tipo de enlace `LINUX_SLL`** entregue pela interface `any`.
 - [ ] **Detecção de ARP spoofing:** o mesmo IP anunciado com MACs diferentes.
 - [ ] **Interfaces virtuais** (`docker0`, `veth*`, bridges) quando a aplicação roda em containers.
 
 ### Camada 1 e sistema
 
 - [ ] **Contadores da placa** (`/sys/class/net/*/statistics`): erros, descartes e utilização do link.
-- [ ] **Exibir os pacotes descartados pelo próprio pcap,** para que a interface avise quando as métricas estão incompletas.
 - [ ] **Captura de alto desempenho:** AF_PACKET com ring buffer e `DecodingLayerParser`, para não sobrecarregar o garbage collector.
 - [ ] **Limites de CPU e RAM** para o Omni e os containers, para não derrubar a produção.
 
