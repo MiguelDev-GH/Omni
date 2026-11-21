@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
@@ -172,4 +173,21 @@ func classify(err error) error {
 		return fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
 	return err
+}
+
+// MigrateWithRetry tenta Migrate a cada intervalo até dar certo ou ctx acabar,
+// para que a loja suba mesmo com o banco ainda fora do ar.
+func MigrateWithRetry(ctx context.Context, m interface{ Migrate(context.Context) error }, every time.Duration) error {
+	for {
+		err := m.Migrate(ctx)
+		if err == nil {
+			return nil
+		}
+		slog.Warn("migração do banco falhou; tentando de novo", "erro", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(every):
+		}
+	}
 }

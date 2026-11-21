@@ -19,5 +19,13 @@ services:
       timeout: 2s
       retries: 30
 
+  caddy:
+    image: caddy:2.10.2-alpine
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - loja-caddy:/data
+
 volumes:
   loja-dados:
+  loja-caddy:

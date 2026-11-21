@@ -1,4 +1,4 @@
-.PHONY: subir derrubar derrubar-tudo teste
+.PHONY: subir derrubar derrubar-tudo rodar teste
 
 # subir inicia os serviços do compose e espera ficarem saudáveis.
 subir:
@@ -11,6 +11,10 @@ derrubar:
 # derrubar-tudo para os serviços e apaga os volumes.
 derrubar-tudo:
 	docker compose down -v
+
+# rodar sobe a API da loja em 127.0.0.1:3000.
+rodar:
+	go run ./cmd/loja
 
 # teste roda lint, vet e testes da loja cobaia.
 teste:
