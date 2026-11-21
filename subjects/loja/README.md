@@ -14,6 +14,8 @@ Tudo usa a rede do host para que o tráfego proxy → app e app → banco passe 
 
 Pré-requisitos: Go, Docker com Compose v2 e o Omni rodando (`OMNI_TOKEN=<token> ./omni` na raiz do repositório). Para o sniffer, o binário do Omni precisa das capabilities de captura (`sudo setcap cap_net_raw,cap_net_admin=eip ./omni`).
 
+No Windows, rode tudo dentro do WSL2 com o Docker Engine instalado na própria distribuição: com o Docker Desktop, o `network_mode: host` deixa o banco e o Caddy fora do alcance da loja e do sniffer (veja [Windows](../../README.md#windows)).
+
 ```bash
 OMNI_TOKEN=<token> make demo
 ```
