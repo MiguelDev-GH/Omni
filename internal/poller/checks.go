@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/MiguelDev-GH/omni/internal/probe"
 )
 
 const userAgent = "Omni-Poller/1"
@@ -15,13 +17,29 @@ const userAgent = "Omni-Poller/1"
 type Result struct {
 	TargetID   int64     `json:"alvo_id"`
 	Port       int       `json:"porta"`
-	Kind       string    `json:"tipo"` // "http" ou "tcp"
+	Kind       string    `json:"tipo"` // "http", "tcp", "dns" ou "smtp"
 	Up         bool      `json:"no_ar"`
 	StatusCode int       `json:"status_http,omitempty"`
 	LatencyMS  float64   `json:"latencia_ms"`
 	Err        string    `json:"erro,omitempty"`
 	At         time.Time `json:"hora"`
+	// Degraded marca um servidor que respondeu com erro: RCODE diferente
+	// de NOERROR no DNS ou comando recusado no SMTP. No HTTP, o erro fica
+	// em StatusCode.
+	Degraded bool `json:"degradado,omitempty"`
+	// Detail resume a resposta das sondas DNS e SMTP.
+	Detail string `json:"detalhe,omitempty"`
+	// StartTLS diz se o servidor SMTP oferece STARTTLS; nil fora do SMTP.
+	StartTLS *bool `json:"starttls,omitempty"`
 }
+
+// Tipos de verificação.
+const (
+	KindHTTP = "http"
+	KindTCP  = "tcp"
+	KindDNS  = "dns"
+	KindSMTP = "smtp"
+)
 
 // NewHTTPClient cria o cliente das verificações HTTP: com o timeout dado e
 // sem seguir redirecionamentos nem usar o proxy do ambiente (um proxy
@@ -83,5 +101,34 @@ func CheckTCP(ctx context.Context, targetID int64, host string, port int, timeou
 	}
 	_ = conn.Close()
 	res.Up = true
+	return res
+}
+
+// CheckDNS pergunta ao servidor DNS em host:porta pelo registro A de domain.
+// O servidor está no ar se responder; um RCODE de erro ou uma resposta sem
+// endereços marca Degraded.
+func CheckDNS(ctx context.Context, targetID int64, host string, port int, domain string) Result {
+	at := time.Now().UTC()
+	r := probe.QueryDNS(ctx, host, port, domain, CheckTimeout)
+	return Result{
+		TargetID: targetID, Port: port, Kind: KindDNS, At: at,
+		Up: r.Up, Degraded: r.Up && !r.OK(), LatencyMS: r.LatencyMS, Err: r.Err, Detail: r.Detail(),
+	}
+}
+
+// CheckSMTP conversa com o servidor SMTP em host:porta sem enviar e-mail.
+// Com domain, testa também o destinatário postmaster@domain.
+func CheckSMTP(ctx context.Context, targetID int64, host string, port int, domain string) Result {
+	at := time.Now().UTC()
+	r := probe.ProbeSMTP(ctx, host, port, domain, CheckTimeout)
+	res := Result{
+		TargetID: targetID, Port: port, Kind: KindSMTP, At: at,
+		Up: r.Up, Degraded: r.Up && !r.OK(), LatencyMS: r.LatencyMS, Err: r.Err, Detail: r.Detail(),
+	}
+	// O suporte a STARTTLS só é conhecido depois de um EHLO aceito.
+	if r.Up && r.Stage != "ehlo" {
+		tls := r.StartTLS
+		res.StartTLS = &tls
+	}
 	return res
 }
