@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router";
+import { loadTargets } from "../api/targets";
 import { useOmniSocket } from "../realtime/useOmniSocket";
 import Sidebar from "./Sidebar";
 import Toasts from "./Toasts";
@@ -6,6 +8,11 @@ import Topbar from "./Topbar";
 
 export default function Layout() {
   useOmniSocket();
+  // A barra superior e a tela Geral precisam dos alvos em qualquer página;
+  // a página de Alvos recarrega a lista e mostra os próprios erros.
+  useEffect(() => {
+    loadTargets().catch(() => {});
+  }, []);
   return (
     <div className="flex min-h-screen flex-col">
       <Topbar />

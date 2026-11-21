@@ -11,7 +11,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | ✅ Concluída |
 | [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ✅ Concluída |
 | [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ✅ Concluída |
-| [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ⏳ A fazer |
+| [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | 🚧 Em andamento |
 | [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ⏳ A fazer |
 | [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ⏳ A fazer |
 | [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | ⏳ A fazer |
@@ -79,6 +79,12 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Gráfico de área de banda e gráfico de rosca de protocolos.
 
 **Branch:** `feat/sniffer-camadas-3-4` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+**Decisões da Sprint 4:**
+
+- O tráfego é global: um único filtro BPF cobre as portas de todos os alvos, e a tela Geral não separa por alvo.
+- Só janelas com pacotes vão para o banco, com retenção de 24 h; a interface completa com zero os segundos sem janela.
+- A tela Geral passa a ser a página inicial.
 
 ### Sprint 5: Decodificação HTTP
 

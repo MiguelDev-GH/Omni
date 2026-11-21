@@ -13,6 +13,7 @@ test("shows sections and disables future items", () => {
     expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
   }
   expect(screen.getByRole("link", { name: "Alvos" })).toHaveAttribute("href", "/alvos");
+  expect(screen.getByRole("link", { name: "Geral" })).toHaveAttribute("href", "/geral");
   const nmap = screen.getByText("Nmap").closest("[aria-disabled]");
   expect(nmap).toHaveAttribute("aria-disabled", "true");
   expect(screen.queryByRole("link", { name: /Nmap/ })).toBeNull();

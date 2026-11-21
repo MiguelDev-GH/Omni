@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: libpcap
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - name: gofmt
         run: test -z "$(gofmt -l .)"
       - name: go vet
@@ -38,6 +40,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: libpcap
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

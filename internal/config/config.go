@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -14,7 +15,11 @@ const (
 	minTokenLen         = 32
 	defaultPollInterval = "30s"
 	minPollInterval     = time.Second
+	defaultInterface    = "any"
 )
+
+// interfaceRe aceita nomes de interface do Linux (até 15 caracteres), sem hífen no início.
+var interfaceRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@-]{0,14}$`)
 
 var (
 	ErrTokenAusente   = errors.New("OMNI_TOKEN não definido")
@@ -23,6 +28,7 @@ var (
 
 	ErrIntervaloInvalido = errors.New("OMNI_INTERVALO_POLLER inválido; use uma duração de no mínimo 1s, como 30s")
 	ErrOrigemInvalida    = errors.New("origem inválida em OMNI_ORIGENS; use esquema http ou https, host e porta opcional")
+	ErrInterfaceInvalida = errors.New("OMNI_INTERFACE inválida; use o nome de uma interface, como eth0, ou any")
 )
 
 type Config struct {
@@ -33,6 +39,9 @@ type Config struct {
 
 	PollInterval   time.Duration
 	AllowedOrigins []string
+
+	// Interface é onde o sniffer captura; "any" cobre todas, inclusive o loopback.
+	Interface string
 }
 
 // Load monta a Config usando getenv (normalmente os.Getenv).
@@ -62,6 +71,10 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	c.AllowedOrigins = origins
+	c.Interface = withDefault(getenv("OMNI_INTERFACE"), defaultInterface)
+	if !interfaceRe.MatchString(c.Interface) {
+		return Config{}, fmt.Errorf("%w: %q", ErrInterfaceInvalida, c.Interface)
+	}
 	return c, nil
 }
 

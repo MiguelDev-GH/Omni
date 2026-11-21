@@ -16,7 +16,8 @@ func TestLoadDefaults(t *testing.T) {
 	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
 	require.NoError(t, err)
 	assert.Equal(t, Config{Addr: "127.0.0.1:8080", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second,
-		AllowedOrigins: []string{"http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"}}, c)
+		AllowedOrigins: []string{"http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"},
+		Interface:      "any"}, c)
 }
 
 func TestLoadReadsOverrides(t *testing.T) {
@@ -109,5 +110,16 @@ func TestLoadOrigins(t *testing.T) {
 		_, err := load(map[string]string{"OMNI_ORIGENS": bad})
 		assert.ErrorIs(t, err, ErrOrigemInvalida, bad)
 		assert.ErrorContains(t, err, bad)
+	}
+}
+
+func TestLoadInterface(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_INTERFACE": "eth0"}))
+	require.NoError(t, err)
+	assert.Equal(t, "eth0", c.Interface)
+
+	for _, bad := range []string{"eth0; rm -rf /", "-i", "nome-muito-longo-demais", "a b"} {
+		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_INTERFACE": bad}))
+		assert.ErrorIs(t, err, ErrInterfaceInvalida, bad)
 	}
 }

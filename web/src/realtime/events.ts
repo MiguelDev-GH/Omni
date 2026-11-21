@@ -1,4 +1,5 @@
-import { portKey, useAppStore, type PortStatus, type SystemMetrics } from "../store/app";
+import type { TrafficWindow } from "../api/traffic";
+import { portKey, useAppStore, type EngineState, type PortStatus, type SystemMetrics } from "../store/app";
 
 type Transition = { alvo_id: number; alvo: string; porta: number; erro?: string; hora: string };
 
@@ -15,6 +16,21 @@ function isTransition(v: unknown): v is Transition {
 function isMetrics(v: unknown): v is SystemMetrics {
   return isObject(v) && ["cpu", "memoria", "disco"].every((k) => typeof v[k] === "number");
 }
+
+function isTrafficWindow(v: unknown): v is TrafficWindow {
+  return (
+    isObject(v) &&
+    typeof v.inicio === "string" &&
+    typeof v.bytes === "number" &&
+    typeof v.pacotes === "number" &&
+    isObject(v.protocolos) &&
+    Array.isArray(v.top_origens)
+  );
+}
+
+const engineStates: EngineState[] = ["ativo", "inativo", "sem-permissao", "indisponivel"];
+
+const isEngineState = (v: unknown): v is EngineState => engineStates.includes(v as EngineState);
 
 // markPort atualiza só o campo no_ar de uma porta, preservando o resto.
 function markPort(t: Transition, up: boolean) {
@@ -58,6 +74,12 @@ export function handleEvent(raw: string): void {
       break;
     case "METRICAS_SISTEMA":
       if (isMetrics(dados)) st.setSystem(dados);
+      break;
+    case "METRICAS_TRAFEGO":
+      if (isTrafficWindow(dados)) st.addTraffic([dados]);
+      break;
+    case "ESTADO_MOTORES":
+      if (isObject(dados) && isEngineState(dados.sniffer)) st.setEngine("sniffer", dados.sniffer);
       break;
   }
 }

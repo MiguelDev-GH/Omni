@@ -45,7 +45,7 @@ func TestOpenIsIdempotent(t *testing.T) {
 
 	var version int
 	require.NoError(t, s.db.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 2, version)
+	assert.Equal(t, 3, version)
 }
 
 func TestOpenUsesPathWithSpecialCharsVerbatim(t *testing.T) {

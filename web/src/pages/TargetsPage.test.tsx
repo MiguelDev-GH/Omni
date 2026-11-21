@@ -64,7 +64,8 @@ test("creates target with parsed ports", async () => {
   const post = calls.find((c) => c.method === "POST" && c.url === "/api/alvos")!;
   expect(post.url).toBe("/api/alvos");
   expect(post.body).toBe('{"nome":"api","host":"127.0.0.1","portas_app":[3000,8080]}');
-  await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.url === "/api/alvos")).toHaveLength(2));
+  // Um GET do layout, um da página ao montar e o recarregamento depois do POST.
+  await waitFor(() => expect(calls.filter((c) => c.method === "GET" && c.url === "/api/alvos")).toHaveLength(3));
 });
 
 test("shows server error under field", async () => {
