@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { listTraffic } from "../api/traffic";
 import BandwidthChart from "../charts/BandwidthChart";
+import { queryColor } from "../charts/colors";
 import CountChart from "../charts/CountChart";
 import ProtocolDonut from "../charts/ProtocolDonut";
 import StatusBars from "../charts/StatusBars";
 import { Card, Stat } from "../components/Card";
 import { bandwidthSeries, formatBytes, MAX_POINTS, protocolTotals, topSources } from "../lib/traffic";
 import { useAppStore } from "../store/app";
+import { useDBHistory, useDBSeries } from "./QueriesPage";
 import { useHTTPHistory, useHTTPSeries } from "./RequestsPage";
 
 export default function OverviewPage() {
@@ -18,6 +20,8 @@ export default function OverviewPage() {
   const [loadError, setLoadError] = useState(false);
   const httpError = useHTTPHistory();
   const httpSeries = useHTTPSeries();
+  const dbError = useDBHistory();
+  const dbSeries = useDBSeries();
 
   // Carrega os últimos 15 minutos uma vez; os eventos ao vivo completam a série.
   useEffect(() => {
@@ -61,6 +65,7 @@ export default function OverviewPage() {
       )}
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de tráfego.</p>}
       {httpError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
+      {dbError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Banda agora" value={last ? `${formatBytes(last.bytes)}/s` : "—"} />
@@ -72,10 +77,14 @@ export default function OverviewPage() {
         <Card title="Requisições na API">
           <CountChart id="req-geral" points={httpSeries.requests} label="Requisições" empty="Sem requisições capturadas ainda." />
         </Card>
-        <Card title="Status HTTP">
-          <StatusBars points={httpSeries.status} />
+        <Card title="Consultas no banco">
+          <CountChart id="db-geral" points={dbSeries} label="Consultas" color={queryColor} empty="Sem consultas capturadas ainda." />
         </Card>
       </div>
+
+      <Card title="Status HTTP">
+        <StatusBars points={httpSeries.status} />
+      </Card>
 
       <Card title="Banda nos últimos 15 minutos">
         <BandwidthChart points={series} />

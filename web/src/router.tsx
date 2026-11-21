@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import Layout from "./components/Layout";
 import NotFoundPage from "./pages/NotFoundPage";
 import OverviewPage from "./pages/OverviewPage";
+import QueriesPage from "./pages/QueriesPage";
 import RequestsPage from "./pages/RequestsPage";
 import TargetsPage from "./pages/TargetsPage";
 
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
       { path: "/geral", element: <OverviewPage /> },
       { path: "/alvos", element: <TargetsPage /> },
       { path: "/requisicoes", element: <RequestsPage /> },
+      { path: "/consultas", element: <QueriesPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

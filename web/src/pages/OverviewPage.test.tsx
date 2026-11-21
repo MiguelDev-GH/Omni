@@ -29,6 +29,7 @@ function renderPage(history: TrafficWindow[] = [], targets: unknown[] = [{ id: 1
     if (c.url === "/api/alvos") return json(200, targets);
     if (c.url.startsWith("/api/trafego")) return json(200, history);
     if (c.url.startsWith("/api/requisicoes")) return json(200, []);
+    if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
   });
   installFakeWebSocket();
@@ -117,4 +118,11 @@ test("METRICAS_HTTP feeds the requests chart and status bars", async () => {
   const legend = screen.getByRole("list", { name: "Status HTTP" });
   expect(within(legend).getByText("5xx").nextElementSibling).toHaveTextContent("1");
   expect(within(legend).getByText("4xx").nextElementSibling).toHaveTextContent("2");
+});
+
+test("METRICAS_BANCO feeds the queries chart", async () => {
+  renderPage();
+  const ws = await socket();
+  act(() => ws.message({ tipo: "METRICAS_BANCO", dados: { inicio: "2026-11-21T12:00:00Z", consultas: 9, erros: 0, tipos: { SELECT: 9 }, p50_ms: 1, p95_ms: 2, top: [] } }));
+  expect(screen.getByRole("img", { name: "Consultas a cada 10 s, 1 pontos" })).toBeInTheDocument();
 });
