@@ -29,7 +29,7 @@ Todo trabalho no Omni segue três regras:
 | `chore` | Manutenção que não se encaixa acima (configs, skills de agentes) |
 | `revert` | Reverte um commit anterior |
 
-**Escopos sugeridos** (opcionais, entre parênteses): `sniffer`, `poller`, `orquestrador`, `api`, `ws`, `db`, `frontend`, `relatorios`, `skills`.
+**Escopos sugeridos** (opcionais, entre parênteses): `sniffer`, `poller`, `orquestrador`, `api`, `ws`, `db`, `frontend`, `relatorios`, `skills`, `subjects`.
 
 ## Branches
 
@@ -91,8 +91,9 @@ A lista oficial fica em `.github/labels.yml`. Um workflow cria e atualiza as lab
 | `docker` | Mexe no orquestrador Docker ou nos containers do Arsenal |
 | `remoção` | Apaga código, arquivos ou funcionalidades |
 | `documentação` | Mexe no README, em skills ou em outros documentos |
+| `cobaia` | Mexe na aplicação de teste em `subjects/` |
 
-**Como escolher:** aplique uma label de natureza (`funcionalidade`, `remoção` ou `documentação`) quando ela couber e todas as labels de área (`visual`, `motor`, `docker`) das partes tocadas.
+**Como escolher:** aplique uma label de natureza (`funcionalidade`, `remoção` ou `documentação`) quando ela couber e todas as labels de área (`visual`, `motor`, `docker`, `cobaia`) das partes tocadas.
 
 | Mudança | Labels |
 |---|---|

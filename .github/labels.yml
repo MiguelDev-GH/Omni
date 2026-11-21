@@ -25,3 +25,7 @@
 - name: motor
   color: "FBCA04"
   description: "Backend e ferramentas do motor (sniffer, poller, API), exceto Docker"
+
+- name: cobaia
+  color: "D4C5F9"
+  description: "Aplicação de teste em subjects/, usada como alvo do Omni"
