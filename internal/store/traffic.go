@@ -62,14 +62,20 @@ func (s *Store) TrafficSince(ctx context.Context, since time.Time, limit int) ([
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
-		list[i], list[j] = list[j], list[i]
-	}
+	reverse(list)
 	return list, nil
 }
 
-// PruneTraffic apaga as janelas que começaram antes de before.
+// snifferTables são as tabelas de métricas do sniffer, todas com start_ms.
+var snifferTables = []string{"traffic_windows", "http_windows", "http_routes", "db_windows", "db_queries"}
+
+// PruneTraffic apaga as janelas de todas as métricas do sniffer que
+// começaram antes de before.
 func (s *Store) PruneTraffic(ctx context.Context, before time.Time) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM traffic_windows WHERE start_ms < ?", before.UnixMilli())
-	return err
+	for _, table := range snifferTables {
+		if _, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE start_ms < ?", before.UnixMilli()); err != nil {
+			return err
+		}
+	}
+	return nil
 }

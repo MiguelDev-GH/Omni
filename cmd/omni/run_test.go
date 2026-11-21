@@ -304,12 +304,19 @@ func TestRunKeepsServingWithoutCapturePermission(t *testing.T) {
 	conn := dialWS(t, base)
 	require.NoError(t, conn.SetReadDeadline(time.Now().Add(7*time.Second)))
 	for {
+		// Outros eventos (como STATUS_ALVOS, com números) chegam antes; só o
+		// estado dos motores é decodificado.
 		var ev struct {
-			Type string            `json:"tipo"`
-			Data map[string]string `json:"dados"`
+			Type string          `json:"tipo"`
+			Data json.RawMessage `json:"dados"`
 		}
 		require.NoError(t, conn.ReadJSON(&ev))
-		if ev.Type == sniffer.EventEngines && ev.Data["sniffer"] == sniffer.StateNoPermission {
+		if ev.Type != sniffer.EventEngines {
+			continue
+		}
+		var engines map[string]string
+		require.NoError(t, json.Unmarshal(ev.Data, &engines))
+		if engines["sniffer"] == sniffer.StateNoPermission {
 			break
 		}
 	}
@@ -321,4 +328,29 @@ func TestRunKeepsServingWithoutCapturePermission(t *testing.T) {
 	assert.Equal(t, "[]", body)
 	cancel()
 	assert.NoError(t, waitDone(t, done))
+}
+
+func TestRunScanWithoutDockerKeepsServing(t *testing.T) {
+	cfg := config.Config{DBPath: filepath.Join(t.TempDir(), "omni.db"), Token: tok}
+	st, err := store.Open(context.Background(), cfg.DBPath)
+	require.NoError(t, err)
+	tg, err := st.CreateTarget(context.Background(), target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000}})
+	require.NoError(t, err)
+	require.NoError(t, st.Close())
+
+	_, base, _ := startRun(t, cfg)
+	req, err := http.NewRequest(http.MethodPost, base+"/api/varreduras",
+		strings.NewReader(fmt.Sprintf(`{"alvo_id": %d, "ferramentas": ["nmap"]}`, tg.ID)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+
+	code, _ := get(t, base+"/api/saude", false)
+	assert.Equal(t, http.StatusOK, code)
+	code, body := get(t, base+"/api/ferramentas", true)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, body, `"nome":"nmap"`)
 }

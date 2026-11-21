@@ -28,6 +28,8 @@ function renderPage(history: TrafficWindow[] = [], targets: unknown[] = [{ id: 1
     if (c.url === "/api/ws/ticket") return json(200, { ticket: "t" });
     if (c.url === "/api/alvos") return json(200, targets);
     if (c.url.startsWith("/api/trafego")) return json(200, history);
+    if (c.url.startsWith("/api/requisicoes")) return json(200, []);
+    if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
   });
   installFakeWebSocket();
@@ -102,4 +104,25 @@ test("asks for a target when there is none", async () => {
   renderPage([], []);
   expect(await screen.findByRole("link", { name: "Cadastre um alvo" })).toHaveAttribute("href", "/alvos");
   expect(screen.getAllByText("Sem tráfego capturado ainda.").length).toBeGreaterThan(0);
+});
+
+test("METRICAS_HTTP feeds the requests chart and status bars", async () => {
+  renderPage();
+  const ws = await socket();
+  expect(screen.getAllByText("Sem requisições capturadas ainda.")).toHaveLength(2);
+  act(() => {
+    ws.message({ tipo: "METRICAS_HTTP", dados: { inicio: "2026-11-21T12:00:00Z", requisicoes: 5, status: { "2xx": 4, "5xx": 1 }, p50_ms: 1, p95_ms: 3, rotas: [] } });
+    ws.message({ tipo: "METRICAS_HTTP", dados: { inicio: "2026-11-21T12:00:20Z", requisicoes: 2, status: { "4xx": 2 }, p50_ms: 1, p95_ms: 3, rotas: [] } });
+  });
+  expect(screen.getByRole("img", { name: "Requisições a cada 10 s, 3 pontos" })).toBeInTheDocument();
+  const legend = screen.getByRole("list", { name: "Status HTTP" });
+  expect(within(legend).getByText("5xx").nextElementSibling).toHaveTextContent("1");
+  expect(within(legend).getByText("4xx").nextElementSibling).toHaveTextContent("2");
+});
+
+test("METRICAS_BANCO feeds the queries chart", async () => {
+  renderPage();
+  const ws = await socket();
+  act(() => ws.message({ tipo: "METRICAS_BANCO", dados: { inicio: "2026-11-21T12:00:00Z", consultas: 9, erros: 0, tipos: { SELECT: 9 }, p50_ms: 1, p95_ms: 2, top: [] } }));
+  expect(screen.getByRole("img", { name: "Consultas a cada 10 s, 1 pontos" })).toBeInTheDocument();
 });

@@ -1,7 +1,17 @@
 import { NavLink } from "react-router";
 
 // Seções do README; os itens sem rota chegam nas próximas sprints.
-const routes: Record<string, string> = { Geral: "/geral" };
+const routes: Record<string, string> = {
+  Geral: "/geral",
+  "Requisições na API": "/requisicoes",
+  "Status HTTP": "/requisicoes",
+  "Consultas no banco": "/consultas",
+  Nmap: "/arsenal",
+  Nuclei: "/arsenal",
+  testssl: "/arsenal",
+  Histórico: "/relatorios",
+  "Comparação entre scans": "/relatorios",
+};
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded px-2 py-1.5 ${isActive ? "bg-zinc-800 text-texto" : "text-suave hover:text-texto"}`;

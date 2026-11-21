@@ -21,14 +21,9 @@ type TrafficStore interface {
 // sniffer; sem desde, devolve os últimos 15 minutos.
 func TrafficHandler(ts TrafficStore) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		since := time.Now().Add(-trafficWindow)
-		if v := r.URL.Query().Get("desde"); v != "" {
-			t, err := time.Parse(time.RFC3339, v)
-			if err != nil {
-				writeError(w, http.StatusBadRequest, "desde inválido")
-				return
-			}
-			since = t
+		since, ok := parseSince(w, r, trafficWindow)
+		if !ok {
+			return
 		}
 		list, err := ts.TrafficSince(r.Context(), since, trafficLimit)
 		if err != nil {

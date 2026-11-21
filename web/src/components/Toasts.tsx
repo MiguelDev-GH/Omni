@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router";
 import { useAppStore, type Toast } from "../store/app";
 
 const TOAST_MS = 10_000;
@@ -22,6 +23,11 @@ function ToastItem({ toast }: { toast: Toast }) {
       <div className="min-w-0 flex-1">
         <p className={`font-medium ${isError ? "text-erro" : "text-destaque"}`}>{toast.title}</p>
         <p className="text-sm break-words text-suave">{toast.body}</p>
+        {toast.link && (
+          <Link to={toast.link.to} onClick={() => dismiss(toast.id)} className="text-sm text-destaque underline">
+            {toast.link.label}
+          </Link>
+        )}
       </div>
       <button type="button" onClick={() => dismiss(toast.id)} className="text-sm text-suave hover:text-texto">
         Fechar

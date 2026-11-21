@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.95 scan initiated Sat Nov 21 15:59:42 2026 as: /usr/bin/nmap -sV -Pn -oX - -p 38080,55432,39999 -&#45; 127.0.0.1 -->
+<nmaprun scanner="nmap" args="/usr/bin/nmap -sV -Pn -oX - -p 38080,55432,39999 -&#45; 127.0.0.1" start="1795276782" startstr="Sat Nov 21 15:59:42 2026" version="7.95" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="3" services="38080,39999,55432"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1795276782" endtime="1795276789"><status state="up" reason="user-set" reason_ttl="0"/>
+<address addr="127.0.0.1" addrtype="ipv4"/>
+<hostnames>
+<hostname name="localhost" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="38080"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="SimpleHTTPServer" version="0.6" extrainfo="Python 3.14.10" method="probed" conf="10"><cpe>cpe:/a:python:simplehttpserver:0.6</cpe></service></port>
+<port protocol="tcp" portid="39999"><state state="closed" reason="reset" reason_ttl="64"/></port>
+<port protocol="tcp" portid="55432"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="postgresql" product="PostgreSQL DB" version="9.6.0 or later" method="probed" conf="10"><cpe>cpe:/a:postgresql:postgresql</cpe></service></port>
+</ports>
+<times srtt="44" rttvar="2828" to="100000"/>
+</host>
+<runstats><finished time="1795276789" timestr="Sat Nov 21 15:59:49 2026" summary="Nmap done at Sat Nov 21 15:59:49 2026; 1 IP address (1 host up) scanned in 6.50 seconds" elapsed="6.50" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

@@ -12,7 +12,11 @@ export type TrafficWindow = {
   top_origens: SourceCount[];
 };
 
+// sinceQuery monta "?desde=<RFC3339>" sem milissegundos, ou "" sem data.
+export function sinceQuery(since?: Date): string {
+  return since ? `?desde=${encodeURIComponent(since.toISOString().replace(/\.\d{3}Z$/, "Z"))}` : "";
+}
+
 export function listTraffic(since?: Date): Promise<TrafficWindow[]> {
-  const q = since ? `?desde=${encodeURIComponent(since.toISOString().replace(/\.\d{3}Z$/, "Z"))}` : "";
-  return apiFetch<TrafficWindow[]>(`/api/trafego${q}`);
+  return apiFetch<TrafficWindow[]>(`/api/trafego${sinceQuery(since)}`);
 }

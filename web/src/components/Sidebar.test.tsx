@@ -14,8 +14,9 @@ test("shows sections and disables future items", () => {
   }
   expect(screen.getByRole("link", { name: "Alvos" })).toHaveAttribute("href", "/alvos");
   expect(screen.getByRole("link", { name: "Geral" })).toHaveAttribute("href", "/geral");
-  const nmap = screen.getByText("Nmap").closest("[aria-disabled]");
-  expect(nmap).toHaveAttribute("aria-disabled", "true");
-  expect(screen.queryByRole("link", { name: /Nmap/ })).toBeNull();
+  expect(screen.getByRole("link", { name: "Nmap" })).toHaveAttribute("href", "/arsenal");
+  const nikto = screen.getByText("Nikto").closest("[aria-disabled]");
+  expect(nikto).toHaveAttribute("aria-disabled", "true");
+  expect(screen.queryByRole("link", { name: /Nikto/ })).toBeNull();
   expect(screen.getAllByText("em breve").length).toBeGreaterThan(0);
 });

@@ -11,11 +11,11 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | ✅ Concluída |
 | [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ✅ Concluída |
 | [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ✅ Concluída |
-| [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | 🚧 Em andamento |
-| [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ⏳ A fazer |
-| [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ⏳ A fazer |
-| [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | ⏳ A fazer |
-| [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | ⏳ A fazer |
+| [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ✅ Concluída |
+| [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | 🚧 Em andamento |
+| [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | 🚧 Em andamento |
+| [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | 🚧 Em andamento |
+| [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | 🚧 Em andamento |
 | [Expansão](#fase-4-expansão) | Expansão | Restante das pendências do README | 📋 Backlog |
 
 Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
@@ -95,7 +95,14 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Nenhum valor de `Authorization`, `Cookie` ou corpo é guardado; tráfego gerado pelo próprio Omni fica fora das métricas.
 - Latência p50 e p95 por rota, barras empilhadas de status e tela "Requisições na API" com as rotas mais lentas.
 
-**Branch:** `feat/sniffer-http` · **Labels:** `funcionalidade`, `motor`, `visual`
+**Branch:** `feat/sprints-5-a-8` (as Sprints 5 a 8 foram entregues juntas, num PR com um commit por parte) · **Labels:** `funcionalidade`, `motor`, `visual`, `docker`
+
+**Decisões da Sprint 5:**
+
+- O assembler recebe uma função de callback em vez de um canal: o motor processa os pacotes numa só goroutine, e um canal cheio travaria a captura.
+- A latência é o tempo até o primeiro byte da resposta.
+- Os percentis de cada janela são exatos; os somados de várias janelas (ranking de 24 h) vêm de histogramas com faixas de 25%.
+- Cada janela guarda no máximo 100 rotas; o excedente vira o grupo `(outras)`.
 
 ### Sprint 6: Decodificação PostgreSQL
 
@@ -105,7 +112,12 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Consultas normalizadas, sem valores literais nem senhas.
 - Tela "Consultas no banco" com as mais lentas das últimas 24 horas.
 
-**Branch:** `feat/sniffer-postgres` · **Labels:** `funcionalidade`, `motor`, `visual`
+**Branch:** `feat/sprints-5-a-8` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+**Decisões da Sprint 6:**
+
+- A porta de banco 3306 (MySQL) não passa pelo decodificador do PostgreSQL.
+- Uma conexão que não parece PostgreSQL, ou que aceitou SSL, é ignorada até fechar.
 
 ---
 
@@ -121,7 +133,13 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Docker parado devolve 503 sem derrubar o resto da aplicação.
 - Tela Arsenal com console ao vivo e tabela de achados, rotulados como "Visão interna".
 
-**Branch:** `feat/orquestrador-nmap` · **Labels:** `funcionalidade`, `docker`, `visual`
+**Branch:** `feat/sprints-5-a-8` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+**Decisões da Sprint 7:**
+
+- Em vez do Docker SDK, um cliente mínimo da API do Docker Engine pelo socket Unix (ping, imagem, criar, iniciar, logs, esperar e remover): evita uma árvore grande de dependências para seis chamadas.
+- Uma varredura pode rodar várias ferramentas em sequência, e cada alvo tem no máximo uma varredura em andamento (409 na segunda).
+- Imagem do Nmap: `instrumentisto/nmap:7.95` (Alpine).
 
 ### Sprint 8: Nuclei, testssl e comparação entre scans
 
@@ -131,7 +149,13 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 - Comparação entre scans: achados novos e resolvidos.
 - Tela de Relatórios com o histórico de varreduras por alvo.
 
-**Branch:** `feat/arsenal-nuclei-testssl` · **Labels:** `funcionalidade`, `docker`, `visual`
+**Branch:** `feat/sprints-5-a-8` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+**Decisões da Sprint 8:**
+
+- O Nuclei roda os templates HTTP com as tags `exposure,misconfig,tech,cve`, concorrência 10 e 100 requisições por segundo, para não sobrecarregar a produção. Ele precisa de cerca de 1 GiB e por isso tem limite de 1,5 GiB, em vez dos 512 MiB das outras ferramentas.
+- O testssl escreve o JSON na saída padrão junto com o texto do console; o parser extrai os objetos e guarda só os problemas de severidade baixa ou maior, mais a nota geral.
+- A comparação usa, para cada ferramenta, a última varredura concluída do mesmo alvo que rodou aquela ferramenta.
 
 ---
 

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,7 +46,9 @@ func TestOpenIsIdempotent(t *testing.T) {
 
 	var version int
 	require.NoError(t, s.db.QueryRow("PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 3, version)
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	require.NoError(t, err)
+	assert.Equal(t, len(entries), version)
 }
 
 func TestOpenUsesPathWithSpecialCharsVerbatim(t *testing.T) {

@@ -1,3 +1,5 @@
+import type { DBWindow } from "../api/queries";
+import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
 import { portKey, useAppStore, type EngineState, type PortStatus, type SystemMetrics } from "../store/app";
 
@@ -26,6 +28,14 @@ function isTrafficWindow(v: unknown): v is TrafficWindow {
     isObject(v.protocolos) &&
     Array.isArray(v.top_origens)
   );
+}
+
+function isHTTPWindow(v: unknown): v is HTTPWindow {
+  return isObject(v) && typeof v.inicio === "string" && typeof v.requisicoes === "number" && isObject(v.status);
+}
+
+function isDBWindow(v: unknown): v is DBWindow {
+  return isObject(v) && typeof v.inicio === "string" && typeof v.consultas === "number" && typeof v.erros === "number";
 }
 
 const engineStates: EngineState[] = ["ativo", "inativo", "sem-permissao", "indisponivel"];
@@ -78,8 +88,42 @@ export function handleEvent(raw: string): void {
     case "METRICAS_TRAFEGO":
       if (isTrafficWindow(dados)) st.addTraffic([dados]);
       break;
+    case "METRICAS_HTTP":
+      if (isHTTPWindow(dados)) st.addHTTP([dados]);
+      break;
+    case "METRICAS_BANCO":
+      if (isDBWindow(dados)) st.addDB([dados]);
+      break;
     case "ESTADO_MOTORES":
       if (isObject(dados) && isEngineState(dados.sniffer)) st.setEngine("sniffer", dados.sniffer);
+      if (isObject(dados) && isEngineState(dados.docker)) st.setEngine("docker", dados.docker);
+      break;
+    case "SCAN_LOG":
+      if (isObject(dados) && typeof dados.scan_id === "number" && Array.isArray(dados.linhas)) {
+        st.appendScanLog(dados.scan_id, dados.linhas.filter((l): l is string => typeof l === "string"));
+      }
+      break;
+    case "SCAN_CONCLUIDO":
+      if (isObject(dados) && typeof dados.scan_id === "number") {
+        const n = typeof dados.achados === "number" ? dados.achados : 0;
+        const novos = typeof dados.novos_desde_ultimo === "number" ? dados.novos_desde_ultimo : 0;
+        st.bumpScanEvents();
+        st.pushToast({
+          kind: "ok",
+          title: "Varredura concluída",
+          body: `Varredura #${dados.scan_id}: ${n} ${n === 1 ? "achado" : "achados"}, ${novos} ${novos === 1 ? "novo" : "novos"} desde a anterior.`,
+          link: { to: `/relatorios?varredura=${dados.scan_id}`, label: "Ver achados" },
+        });
+      }
+      break;
+    case "SCAN_FALHOU":
+      if (isObject(dados) && typeof dados.scan_id === "number") {
+        st.bumpScanEvents();
+        st.pushToast({ kind: "erro", title: "Varredura falhou", body: `Varredura #${dados.scan_id}: ${typeof dados.erro === "string" ? dados.erro : ""}` });
+      }
+      break;
+    case "SCAN_INICIADO":
+      if (isObject(dados) && typeof dados.scan_id === "number") st.bumpScanEvents();
       break;
   }
 }

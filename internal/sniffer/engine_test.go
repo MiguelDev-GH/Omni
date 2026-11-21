@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 	"github.com/MiguelDev-GH/omni/internal/sniffer/testutil"
 	"github.com/MiguelDev-GH/omni/internal/target"
 	"github.com/MiguelDev-GH/omni/internal/ws"
@@ -19,6 +20,8 @@ type fakeStore struct {
 	mu      sync.Mutex
 	targets []target.Target
 	windows []Window
+	http    []l7.HTTPWindow
+	db      []l7.DBWindow
 	pruned  []time.Time
 }
 
@@ -33,6 +36,32 @@ func (f *fakeStore) InsertTrafficWindow(_ context.Context, w Window) error {
 	defer f.mu.Unlock()
 	f.windows = append(f.windows, w)
 	return nil
+}
+
+func (f *fakeStore) InsertHTTPWindow(_ context.Context, w l7.HTTPWindow) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.http = append(f.http, w)
+	return nil
+}
+
+func (f *fakeStore) InsertDBWindow(_ context.Context, w l7.DBWindow) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.db = append(f.db, w)
+	return nil
+}
+
+func (f *fakeStore) savedDB() []l7.DBWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]l7.DBWindow(nil), f.db...)
+}
+
+func (f *fakeStore) savedHTTP() []l7.HTTPWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]l7.HTTPWindow(nil), f.http...)
 }
 
 func (f *fakeStore) PruneTraffic(_ context.Context, before time.Time) error {
@@ -91,6 +120,7 @@ func startEngine(t *testing.T, e *Engine) context.CancelFunc {
 	t.Helper()
 	e.window = 20 * time.Millisecond
 	e.statusEvery = 50 * time.Millisecond
+	e.l7Window = 30 * time.Millisecond
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- e.Run(ctx) }()
@@ -201,4 +231,56 @@ func TestEnginePrunesOldWindows(t *testing.T) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	assert.WithinDuration(t, before.Add(-Retention), st.pruned[0], time.Second)
+}
+
+func TestEngineRecordsHTTPWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "http.pcap")
+	c := testutil.NewConn("10.0.0.1", 40000, "10.0.0.2", 3000)
+	frames := c.Handshake()
+	frames = append(frames,
+		c.FromClient([]byte("GET /users/7 HTTP/1.1\r\nAuthorization: Bearer segredo\r\n\r\n")),
+		c.FromServer([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")),
+		c.FromClient([]byte("GET / HTTP/1.1\r\nUser-Agent: Omni-Poller/1\r\n\r\n")),
+		c.FromServer([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")),
+	)
+	testutil.WritePCAP(t, path, frames...)
+
+	st := &fakeStore{targets: appTarget}
+	pub := &fakePub{}
+	e := NewEngine(func(string) (Source, error) { return OpenFile(path) }, st, pub)
+	startEngine(t, e)
+
+	require.Eventually(t, func() bool { return len(st.savedHTTP()) > 0 }, 2*time.Second, 10*time.Millisecond)
+	w := st.savedHTTP()[0]
+	assert.Equal(t, uint64(1), w.Requests)
+	assert.Equal(t, map[string]uint64{"2xx": 1}, w.ByStatus)
+	require.Len(t, w.Routes, 1)
+	assert.Equal(t, "/users/:id", w.Routes[0].Route)
+	assert.NotEmpty(t, pub.ofType(EventHTTP))
+}
+
+func TestEngineRecordsDBWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pg.pcap")
+	c := testutil.NewConn("127.0.0.1", 50000, "127.0.0.1", 5432)
+	query := []byte{'Q', 0, 0, 0, 0}
+	query = append(query, "SELECT * FROM u WHERE email = 'a@b.c'\x00"...)
+	query[4] = byte(len(query) - 1)
+	frames := c.Handshake()
+	frames = append(frames,
+		c.FromClient(query),
+		c.FromServer([]byte{'C', 0, 0, 0, 13, 'S', 'E', 'L', 'E', 'C', 'T', ' ', '1', 0, 'Z', 0, 0, 0, 5, 'I'}),
+	)
+	testutil.WritePCAP(t, path, frames...)
+
+	st := &fakeStore{targets: []target.Target{{ID: 1, AppPorts: []int{3000}, DBPort: 5432}}}
+	pub := &fakePub{}
+	e := NewEngine(func(string) (Source, error) { return OpenFile(path) }, st, pub)
+	startEngine(t, e)
+
+	require.Eventually(t, func() bool { return len(st.savedDB()) > 0 }, 2*time.Second, 10*time.Millisecond)
+	w := st.savedDB()[0]
+	assert.Equal(t, uint64(1), w.Queries)
+	require.Len(t, w.Top, 1)
+	assert.Equal(t, "SELECT * FROM u WHERE email = ?", w.Top[0].Query)
+	assert.NotEmpty(t, pub.ofType(EventDB))
 }
