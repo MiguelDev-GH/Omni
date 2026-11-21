@@ -14,6 +14,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
 	"github.com/MiguelDev-GH/omni/internal/poller"
+	"github.com/MiguelDev-GH/omni/internal/sniffer"
 	"github.com/MiguelDev-GH/omni/internal/store"
 	"github.com/MiguelDev-GH/omni/internal/sysmetrics"
 	"github.com/MiguelDev-GH/omni/internal/web"
@@ -26,7 +27,11 @@ const (
 	ticketTTL       = 30 * time.Second
 )
 
-// run serve a API, o WebSocket, o poller e as métricas do sistema até ctx ser
+// openCapture abre a captura ao vivo; os testes a trocam para não depender
+// das permissões da máquina.
+var openCapture = sniffer.OpenLive
+
+// run serve a API, o WebSocket, o poller, o sniffer e as métricas do sistema até ctx ser
 // cancelado ou o servidor HTTP falhar. Sempre fecha ln e, só depois de todas as
 // goroutines terminarem, o banco.
 func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
@@ -43,6 +48,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv := api.NewServer(st, cfg.Token)
 	srv.Handle("POST /api/ws/ticket", ws.TicketHandler(tickets))
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
+	srv.Handle("GET /api/trafego", api.TrafficHandler(st))
 	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
 	}
@@ -60,10 +66,15 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	}()
 	defer hub.Close()
 
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		poller.NewScheduler(st, hub, cfg.PollInterval).Run(bgCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
+		_ = sniffer.NewEngine(open, st, hub).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()

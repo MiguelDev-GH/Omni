@@ -17,6 +17,9 @@ import (
 
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/poller"
+	"github.com/MiguelDev-GH/omni/internal/sniffer"
+	"github.com/MiguelDev-GH/omni/internal/store"
+	"github.com/MiguelDev-GH/omni/internal/target"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -286,4 +289,36 @@ func mustPort(t *testing.T, s string) int {
 	_, err := fmt.Sscan(s, &p)
 	require.NoError(t, err)
 	return p
+}
+
+func TestRunKeepsServingWithoutCapturePermission(t *testing.T) {
+	// TestMain já troca openCapture por uma captura sem permissão.
+	cfg := wsConfig(t)
+	st, err := store.Open(context.Background(), cfg.DBPath)
+	require.NoError(t, err)
+	_, err = st.CreateTarget(context.Background(), target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000}})
+	require.NoError(t, err)
+	require.NoError(t, st.Close())
+
+	cancel, base, done := startRun(t, cfg)
+	conn := dialWS(t, base)
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(7*time.Second)))
+	for {
+		var ev struct {
+			Type string            `json:"tipo"`
+			Data map[string]string `json:"dados"`
+		}
+		require.NoError(t, conn.ReadJSON(&ev))
+		if ev.Type == sniffer.EventEngines && ev.Data["sniffer"] == sniffer.StateNoPermission {
+			break
+		}
+	}
+
+	code, _ := get(t, base+"/api/saude", false)
+	assert.Equal(t, http.StatusOK, code)
+	code, body := get(t, base+"/api/trafego", true)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "[]", body)
+	cancel()
+	assert.NoError(t, waitDone(t, done))
 }
