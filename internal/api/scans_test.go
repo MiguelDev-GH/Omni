@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -52,6 +54,7 @@ func newScanServer(t *testing.T, r orchestrator.Runner) (*Server, *store.Store, 
 	srv.Handle("GET /api/varreduras", ListScansHandler(st))
 	srv.Handle("GET /api/varreduras/{id}", GetScanHandler(st))
 	srv.Handle("GET /api/varreduras/{id}/achados", ScanFindingsHandler(st))
+	srv.Handle("GET /api/varreduras/{id}/comparacao", CompareScanHandler(st, st))
 	srv.Handle("GET /api/ferramentas", ToolsHandler())
 	return srv, st, tg
 }
@@ -156,3 +159,57 @@ func (b *blockingRunner) Run(ctx context.Context, _ orchestrator.Spec, _ io.Writ
 func (b *blockingRunner) Available(context.Context) error { return nil }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// switchRunner devolve a saída atual, trocada pelo teste entre varreduras.
+type switchRunner struct{ out *[]byte }
+
+func (s switchRunner) Run(context.Context, orchestrator.Spec, io.Writer) ([]byte, error) {
+	return *s.out, nil
+}
+func (s switchRunner) Available(context.Context) error { return nil }
+
+const nmapTemplate = `<nmaprun><host><ports>%s</ports></host></nmaprun>`
+
+func openPort(p int) string {
+	return fmt.Sprintf(`<port protocol="tcp" portid="%d"><state state="open"/><service name="svc"/></port>`, p)
+}
+
+func TestScanComparison(t *testing.T) {
+	out := []byte(fmt.Sprintf(nmapTemplate, openPort(22)+openPort(80)))
+	srv, st, tg := newScanServer(t, switchRunner{&out})
+	run := func() int64 {
+		rec := do(t, srv, "POST", "/api/varreduras", `{"alvo_id": `+itoa(tg.ID)+`, "ferramentas": ["nmap"]}`, true)
+		require.Equal(t, http.StatusAccepted, rec.Code, rec.Body.String())
+		id := int64(decode[map[string]float64](t, rec)["id"])
+		require.Eventually(t, func() bool {
+			sc, err := st.GetScan(context.Background(), id)
+			return err == nil && sc.Status == store.ScanDone
+		}, 2*time.Second, 5*time.Millisecond)
+		return id
+	}
+	first := run()
+	rec := do(t, srv, "GET", "/api/varreduras/"+itoa(first)+"/comparacao", "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	cmp := decode[map[string]any](t, rec)
+	assert.Len(t, cmp["novos"], 2, "primeiro scan: tudo é novo")
+	assert.Empty(t, cmp["resolvidos"])
+
+	out = []byte(fmt.Sprintf(nmapTemplate, openPort(80)+openPort(5432)))
+	second := run()
+	rec = do(t, srv, "GET", "/api/varreduras/"+itoa(second)+"/comparacao", "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got struct {
+		New      []map[string]any `json:"novos"`
+		Resolved []map[string]any `json:"resolvidos"`
+		Previous map[string]int64 `json:"anteriores"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Len(t, got.New, 1)
+	assert.EqualValues(t, 5432, got.New[0]["porta"])
+	require.Len(t, got.Resolved, 1)
+	assert.EqualValues(t, 22, got.Resolved[0]["porta"])
+	assert.Equal(t, map[string]int64{"nmap": first}, got.Previous)
+
+	rec = do(t, srv, "GET", "/api/varreduras/999/comparacao", "", true)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}

@@ -1,0 +1,1375 @@
+[
+         {
+              "id"           : "engine_problem",
+              "ip"           : "/",
+              "port"         : "443",
+              "severity"     : "WARN",
+              "finding"      : "No engine or GOST support via engine with your /home/testssl/bin/openssl.Linux.x86_64"
+          }
+ Warning: Target is not a server name: results may be completely wrong, at minimum trust may show false results.
+,         {
+              "id"           : "cmdline_ip-target",
+              "ip"           : "/",
+              "port"         : "443",
+              "severity"     : "WARN",
+              "finding"      : "Target is not a server name: results may be completely wrong, at minimum trust may show false results."
+          }
+
+ Start 2026-11-21 16:15:41        -->> 127.0.0.1:38443 (127.0.0.1) <<--
+
+ rDNS (127.0.0.1):       localhost.
+ Service detected:       HTTP,         {
+              "id"           : "service",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "HTTP"
+          }
+
+,         {
+              "id"           : "pre_128cipher",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No 128 cipher limit bug"
+          }
+
+ Testing protocols via sockets except NPN+ALPN 
+
+ SSLv2      not offered (OK)
+,         {
+              "id"           : "SSLv2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "not offered"
+          }
+ SSLv3      not offered (OK)
+,         {
+              "id"           : "SSLv3",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "not offered"
+          }
+ TLS 1      not offered
+,         {
+              "id"           : "TLS1",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+ TLS 1.1    not offered
+,         {
+              "id"           : "TLS1_1",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+ TLS 1.2    offered (OK)
+,         {
+              "id"           : "TLS1_2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "offered"
+          }
+ TLS 1.3    offered (OK): final
+,         {
+              "id"           : "TLS1_3",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "offered with final"
+          }
+ NPN/SPDY   not offered
+,         {
+              "id"           : "NPN",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+ ALPN/HTTP2 not offered
+,         {
+              "id"           : "ALPN",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+
+ Testing cipher categories 
+
+ NULL ciphers (no encryption)                      not offered (OK),         {
+              "id"           : "cipherlist_NULL",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cwe"          : "CWE-327",
+              "finding"      : "not offered"
+          }
+
+ Anonymous NULL Ciphers (no authentication)        not offered (OK),         {
+              "id"           : "cipherlist_aNULL",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cwe"          : "CWE-327",
+              "finding"      : "not offered"
+          }
+
+ Export ciphers (w/o ADH+NULL)                     not offered (OK),         {
+              "id"           : "cipherlist_EXPORT",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cwe"          : "CWE-327",
+              "finding"      : "not offered"
+          }
+
+ LOW: 64 Bit + DES, RC[2,4], MD5 (w/o export)      not offered (OK),         {
+              "id"           : "cipherlist_LOW",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cwe"          : "CWE-327",
+              "finding"      : "not offered"
+          }
+
+ Triple DES Ciphers / IDEA                         not offered,         {
+              "id"           : "cipherlist_3DES_IDEA",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "cwe"          : "CWE-310",
+              "finding"      : "not offered"
+          }
+
+ Obsoleted CBC ciphers (AES, ARIA etc.)            offered,         {
+              "id"           : "cipherlist_OBSOLETED",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "cwe"          : "CWE-310",
+              "finding"      : "offered"
+          }
+
+ Strong encryption (AEAD ciphers) with no FS       not offered,         {
+              "id"           : "cipherlist_STRONG_NOFS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+
+ Forward Secrecy strong encryption (AEAD ciphers)  offered (OK),         {
+              "id"           : "cipherlist_STRONG_FS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "offered"
+          }
+
+
+
+ Testing server's cipher preferences 
+
+Hexcode  Cipher Suite Name (OpenSSL)       KeyExch.   Encryption  Bits     Cipher Suite Name (IANA/RFC)
+-----------------------------------------------------------------------------------------------------------------------------
+SSLv2
+ - 
+SSLv3
+ - 
+TLSv1
+ - 
+TLSv1.1
+ - 
+TLSv1.2 (server order)
+,         {
+              "id"           : "cipher_order-tls1_2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "server"
+          }
+ xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384              
+,         {
+              "id"           : "cipher-tls1_2_xc030",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.2   xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+          }
+ xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256              
+,         {
+              "id"           : "cipher-tls1_2_xc02f",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.2   xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+          }
+ xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256        
+,         {
+              "id"           : "cipher-tls1_2_xcca8",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.2   xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+          }
+ xc028   ECDHE-RSA-AES256-SHA384           ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384              
+,         {
+              "id"           : "cipher-tls1_2_xc028",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "finding"      : "TLSv1.2   xc028   ECDHE-RSA-AES256-SHA384           ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384"
+          }
+ xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256              
+,         {
+              "id"           : "cipher-tls1_2_xc027",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "finding"      : "TLSv1.2   xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+          }
+,         {
+              "id"           : "cipherorder_TLSv1_2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-CHACHA20-POLY1305 ECDHE-RSA-AES256-SHA384 ECDHE-RSA-AES128-SHA256"
+          }
+,         {
+              "id"           : "prioritize_chacha_TLSv1_2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "false"
+          }
+TLSv1.3 (server order)
+,         {
+              "id"           : "cipher_order-tls1_3",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "server"
+          }
+ x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384                             
+,         {
+              "id"           : "cipher-tls1_3_x1302",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.3   x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384"
+          }
+ x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256                       
+,         {
+              "id"           : "cipher-tls1_3_x1303",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.3   x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256"
+          }
+ x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256                             
+,         {
+              "id"           : "cipher-tls1_3_x1301",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "TLSv1.3   x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256"
+          }
+,         {
+              "id"           : "cipherorder_TLSv1_3",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 TLS_AES_128_GCM_SHA256"
+          }
+,         {
+              "id"           : "prioritize_chacha_TLSv1_3",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "false"
+          }
+
+ Has server cipher order?     yes (OK) -- TLS 1.3 and below,         {
+              "id"           : "cipher_order",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "server"
+          }
+
+
+
+ Testing robust forward secrecy (FS) -- omitting Null Authentication/Encryption, 3DES, RC4 
+
+ FS is offered (OK) ,         {
+              "id"           : "FS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "offered"
+          }
+          TLS_AES_256_GCM_SHA384
+                              TLS_CHACHA20_POLY1305_SHA256
+                              ECDHE-RSA-AES256-GCM-SHA384
+                              ECDHE-RSA-AES256-SHA384
+                              ECDHE-RSA-CHACHA20-POLY1305
+                              TLS_AES_128_GCM_SHA256
+                              ECDHE-RSA-AES128-GCM-SHA256
+                              ECDHE-RSA-AES128-SHA256 
+,         {
+              "id"           : "FS_ciphers",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA384 ECDHE-RSA-CHACHA20-POLY1305 TLS_AES_128_GCM_SHA256 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-AES128-SHA256"
+          }
+ KEMs offered                 X25519MLKEM768 
+,         {
+              "id"           : "FS_KEMs",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "X25519MLKEM768"
+          }
+ Elliptic curves offered:     prime256v1 secp384r1 secp521r1 X25519 X448 
+,         {
+              "id"           : "FS_ECDHE_curves",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "prime256v1 secp384r1 secp521r1 X25519 X448"
+          }
+ Finite field group:          ffdhe2048 ffdhe3072,         {
+              "id"           : "DH_groups",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "ffdhe2048 ffdhe3072"
+          }
+
+ TLS 1.2 sig_algs offered:    RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 
+                              RSA-PSS-RSAE+SHA512 RSA+SHA256 RSA+SHA384 
+                              RSA+SHA512 RSA+SHA224 
+,         {
+              "id"           : "FS_TLS12_sig_algs",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512 RSA+SHA256 RSA+SHA384 RSA+SHA512 RSA+SHA224"
+          }
+ TLS 1.3 sig_algs offered:    RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 
+                              RSA-PSS-RSAE+SHA512 
+,         {
+              "id"           : "FS_TLS13_sig_algs",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512"
+          }
+
+ Testing server defaults (Server Hello) 
+
+ TLS extensions (standard)    ,         {
+              "id"           : "TLS_extensions",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "'max fragment length/#1' 'supported_groups/#10' 'EC point formats/#11' 'encrypt-then-mac/#22' 'extended master secret/#23' 'session ticket/#35' 'supported versions/#43' 'key share/#51' 'renegotiation info/#65281'"
+          }
+"max fragment length/#1" "supported_groups/#10"
+                              "EC point formats/#11" "encrypt-then-mac/#22"
+                              "extended master secret/#23" "session ticket/#35"
+                              "supported versions/#43" "key share/#51"
+                              "renegotiation info/#65281"
+ Session Ticket RFC 5077 hint 7200 seconds, session tickets keys seems to be rotated < daily
+,         {
+              "id"           : "TLS_session_ticket",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "valid for 7200 seconds only (<daily)"
+          }
+ SSL Session ID support       yes
+,         {
+              "id"           : "SSL_sessionID_support",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "yes"
+          }
+ Session Resumption           Tickets: yes, ,         {
+              "id"           : "sessionresumption_ticket",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "supported"
+          }
+ID: yes
+,         {
+              "id"           : "sessionresumption_ID",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "supported"
+          }
+ TLS clock skew               Random values, no fingerprinting possible ,         {
+              "id"           : "TLS_timestamp",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "random"
+          }
+
+ Certificate Compression      none
+,         {
+              "id"           : "certificate_compression",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "none"
+          }
+ Client Authentication        none
+,         {
+              "id"           : "clientAuth",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "none"
+          }
+,         {
+              "id"           : "cert_numbers",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "1"
+          }
+ Signature Algorithm          SHA256 with RSA
+,         {
+              "id"           : "cert_signatureAlgorithm",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "SHA256 with RSA"
+          }
+ Server key size              RSA 2048 bits (exponent is 65537)
+,         {
+              "id"           : "cert_keySize",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "RSA 2048 bits (exponent is 65537)"
+          }
+ Server key usage             --
+,         {
+              "id"           : "cert_keyUsage",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No server key usage information"
+          }
+ Server extended key usage    --
+,         {
+              "id"           : "cert_extKeyUsage",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No server extended key usage information"
+          }
+ Serial                       ,         {
+              "id"           : "cert_serialNumber",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "79DCEB1989AFE1E921B58BB87FA65C032FEDF2A6"
+          }
+79DCEB1989AFE1E921B58BB87FA65C032FEDF2A6 (OK: length 20)
+,         {
+              "id"           : "cert_serialNumberLen",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "20"
+          }
+ Fingerprints                 SHA1 B63530C46B1C6121A291E224D8789D70340AA11F
+,         {
+              "id"           : "cert_fingerprintSHA1",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "B63530C46B1C6121A291E224D8789D70340AA11F"
+          }
+,         {
+              "id"           : "cert_fingerprintSHA256",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "E27C2FC0932946B3D02FD20D72B80E020CBD2EC79E5810B1D51CC16DCF59E65F"
+          }
+                              SHA256 E27C2FC0932946B3D02FD20D72B80E020CBD2EC79E5810B1D51CC16DCF59E65F
+,         {
+              "id"           : "cert",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "-----BEGIN CERTIFICATE-----\nMIIC6DCCAdCgAwIBAgIUedzrGYmv4ekhtYu4f6ZcAy/t8qYwDQYJKoZIhvcNAQELBQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI2MTEyMTE2MTUzN1oXDTI2MTEyMzE2MTUzN1owFDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnHFxjZMth7vq2nqxYjkpQWNBIm7cm2s20NXRMbx+UJ9s5FAa8IfjNhGSLcsH1K710JZvanFt0jFvuncKDz9b/W5QPwAaJtLFTqVU+rcJ+6VLXqHHX2rqxCzIIJ9+BfUYCeupYSuvAtrmt6fJgdtIZPyIVl+guEOCmaQDL6Xh60UsCzVbmoPOaXdiRjMFstfmGW28vG10lDRrAVyhpnd3yii/NmhUJhmLf/tgEsn0D2tXNrZuWct7pO0wzGu2FBbUR4BL7FwssmEyVGoXwy3q24Tp6Xxjy7bty25Ifs3MACmLsilFzPQ8RZIyFsYM0ISOJOTMpTxdIjtO7tKADTzbXwIDAQABozIwMDAdBgNVHQ4EFgQUEItVo45dJy0a8kckUz3hVjYDZvYwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAK/sTPf3Znl2j0Ls62ga+OWLblJtFqm5GeM06zJGwMnud+TBInEchgD4Dzd4RNsijMLqtMXV7t9GGpQufjAJZ7j4tAnLHknOUtkwKQbN+iTCB+hujjaU6mFnpFv3bhZFoAOWRlzZuUfMVNP1r+ccNoy3/pPRHEK+tNIW2GbWbBbGSuEf3jZQeSdO7iQcWILrPEVt9f1BB2QKm69X55adfO732LxoxT4zb+H/PcqWJfMMHHMwy1q4zbVOffEdq6acgM254E/2EzhZ77othlYbg3y1/gR8nJxJoPT0K+PiFwB/9E++0+GIUqSWvkznI7iW9wDALAJIkLM8SDgkpnvrzag==\n-----END CERTIFICATE-----"
+          }
+ Common Name (CN)             localhost ,         {
+              "id"           : "cert_commonName",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "localhost"
+          }
+
+,         {
+              "id"           : "cert_commonName_wo_SNI",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "localhost"
+          }
+ subjectAltName (SAN)         missing (NOT ok) -- Browsers are complaining
+,         {
+              "id"           : "cert_subjectAltName",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "HIGH",
+              "finding"      : "No SAN, browsers are complaining"
+          }
+ Trust (hostname)             certificate does not match supplied URI
+,         {
+              "id"           : "cert_trust",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "HIGH",
+              "finding"      : "certificate does not match supplied URI"
+          }
+ Chain of trust               NOT ok (self signed),         {
+              "id"           : "cert_chain_of_trust",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "CRITICAL",
+              "finding"      : "failed (self signed)."
+          }
+
+ EV cert (experimental)       no ,         {
+              "id"           : "cert_certificatePolicies_EV",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "no"
+          }
+
+ Certificate Validity (UTC)   short-lived cert (1 days) (2026-11-21 16:15 --> 2026-11-23 16:15)
+,         {
+              "id"           : "cert_expirationStatus",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "short-lived cert (1 days)"
+          }
+,         {
+              "id"           : "cert_notBefore",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "2026-11-21 16:15"
+          }
+,         {
+              "id"           : "cert_notAfter",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "2026-11-23 16:15"
+          }
+,         {
+              "id"           : "cert_extlifeSpan",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "certificate has no extended life time according to browser forum"
+          }
+ ETS/"eTLS", visibility info  not present
+,         {
+              "id"           : "cert_eTLS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not present"
+          }
+ Certificate Revocation List  ,         {
+              "id"           : "cert_crlDistributionPoints",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "--"
+          }
+--
+ OCSP URI                     --
+,         {
+              "id"           : "cert_ocspURL",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "--"
+          }
+                              NOT ok -- neither CRL nor OCSP URI provided
+,         {
+              "id"           : "cert_revocation",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "HIGH",
+              "finding"      : "Neither CRL nor OCSP URI provided"
+          }
+ OCSP stapling                not offered,         {
+              "id"           : "OCSP_stapling",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "not offered"
+          }
+
+ OCSP must staple extension   --
+,         {
+              "id"           : "cert_mustStapleExtension",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "--"
+          }
+ DNS CAA RR (experimental)    not offered,         {
+              "id"           : "DNS_CAArecord",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "finding"      : "--"
+          }
+
+ Certificate Transparency     --
+,         {
+              "id"           : "certificate_transparency",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "--"
+          }
+ Certificates provided        1,         {
+              "id"           : "certs_countServer",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "1"
+          }
+,         {
+              "id"           : "certs_list_ordering_problem",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "no"
+          }
+
+ Issuer                       localhost
+,         {
+              "id"           : "cert_caIssuers",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "localhost"
+          }
+ Intermediate Bad OCSP (exp.) Ok
+,         {
+              "id"           : "intermediate_cert_badOCSP",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "intermediate certificate(s) is/are ok"
+          }
+
+
+ Testing HTTP header response @ "/" 
+
+ HTTP Status Code             200 OK,         {
+              "id"           : "HTTP_status_code",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "200 OK ('/')"
+          }
+
+ HTTP clock skew              0 sec from localtime,         {
+              "id"           : "HTTP_clock_skew",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0 seconds from localtime"
+          }
+,         {
+              "id"           : "HTTP_headerTime",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "1795277791"
+          }
+
+ Strict Transport Security    not offered,         {
+              "id"           : "HSTS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "finding"      : "not offered"
+          }
+
+ Public Key Pinning           --
+,         {
+              "id"           : "HPKP",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No support for HTTP Public Key Pinning"
+          }
+ Server banner                SimpleHTTP/0.6 Python/3.14.10
+,         {
+              "id"           : "banner_server",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "SimpleHTTP/0.6 Python/3.14.10"
+          }
+ Application banner           --
+,         {
+              "id"           : "banner_application",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No application banner found"
+          }
+ Cookie(s)                    (none issued at "/")
+,         {
+              "id"           : "cookie_count",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0 at '/'"
+          }
+ Security headers             --
+,         {
+              "id"           : "security_headers",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "MEDIUM",
+              "finding"      : "--"
+          }
+ Reverse Proxy banner         --
+,         {
+              "id"           : "banner_reverseproxy",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "cwe"          : "CWE-200",
+              "finding"      : "--"
+          }
+
+
+ Testing vulnerabilities 
+
+ Heartbleed (CVE-2014-0160)                not vulnerable (OK), no heartbeat extension
+,         {
+              "id"           : "heartbleed",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2014-0160",
+              "cwe"          : "CWE-119",
+              "finding"      : "not vulnerable, no heartbeat extension"
+          }
+ CCS (CVE-2014-0224)                       not vulnerable (OK),         {
+              "id"           : "CCS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2014-0224",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable"
+          }
+
+ Ticketbleed (CVE-2016-9244), experiment.  not vulnerable (OK),         {
+              "id"           : "ticketbleed",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2016-9244",
+              "cwe"          : "CWE-200",
+              "finding"      : "not vulnerable"
+          }
+
+ ROBOT                                     Server does not support any cipher suites that use RSA key transport
+,         {
+              "id"           : "ROBOT",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2017-17382 CVE-2017-17427 CVE-2017-17428 CVE-2017-13098 CVE-2017-1000385 CVE-2017-13099 CVE-2016-6883 CVE-2012-5081 CVE-2017-6168",
+              "cwe"          : "CWE-203",
+              "finding"      : "not vulnerable, no RSA key transport cipher"
+          }
+ Secure Renegotiation (RFC 5746)           supported (OK)
+,         {
+              "id"           : "secure_renego",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cwe"          : "CWE-310",
+              "finding"      : "supported"
+          }
+ Secure Client-Initiated Renegotiation     not vulnerable (OK)
+,         {
+              "id"           : "secure_client_renego",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2011-1473",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable"
+          }
+ CRIME, TLS (CVE-2012-4929)                not vulnerable (OK),         {
+              "id"           : "CRIME_TLS",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2012-4929",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable"
+          }
+
+ BREACH (CVE-2013-3587)                    no gzip/deflate/compress/br HTTP compression (OK)  - only supplied "/" tested
+,         {
+              "id"           : "BREACH",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2013-3587",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable, no gzip/deflate/compress/br HTTP compression  - only supplied '/' tested"
+          }
+ POODLE, SSL (CVE-2014-3566)               not vulnerable (OK), no SSLv3 support
+,         {
+              "id"           : "POODLE_SSL",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2014-3566",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable, no SSLv3"
+          }
+ TLS_FALLBACK_SCSV (RFC 7507)              No fallback possible (OK), no protocol below TLS 1.2 offered
+,         {
+              "id"           : "fallback_SCSV",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "finding"      : "no protocol below TLS 1.2 offered"
+          }
+ SWEET32 (CVE-2016-2183, CVE-2016-6329)    not vulnerable (OK),         {
+              "id"           : "SWEET32",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2016-2183 CVE-2016-6329",
+              "cwe"          : "CWE-327",
+              "finding"      : "not vulnerable"
+          }
+
+ FREAK (CVE-2015-0204)                     not vulnerable (OK),         {
+              "id"           : "FREAK",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2015-0204",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable"
+          }
+
+ DROWN (CVE-2016-0800, CVE-2016-0703)      not vulnerable on this host and port (OK)
+,         {
+              "id"           : "DROWN",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2016-0800 CVE-2016-0703",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable on this host and port"
+          }
+                                           make sure you don't use this certificate elsewhere with SSLv2 enabled services, see
+                                           https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=E27C2FC0932946B3D02FD20D72B80E020CBD2EC79E5810B1D51CC16DCF59E65F
+,         {
+              "id"           : "DROWN_hint",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "cve"          : "CVE-2016-0800 CVE-2016-0703",
+              "cwe"          : "CWE-310",
+              "finding"      : "Make sure you don't use this certificate elsewhere with SSLv2 enabled services, see https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=E27C2FC0932946B3D02FD20D72B80E020CBD2EC79E5810B1D51CC16DCF59E65F"
+          }
+ LOGJAM (CVE-2015-4000), experimental      not vulnerable (OK): no DH EXPORT ciphers,         {
+              "id"           : "LOGJAM",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2015-4000",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable, no DH EXPORT ciphers,"
+          }
+, no DH key detected with <= TLS 1.2,         {
+              "id"           : "LOGJAM-common_primes",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2015-4000",
+              "cwe"          : "CWE-310",
+              "finding"      : "no DH key with <= TLS 1.2"
+          }
+
+ BEAST (CVE-2011-3389)                     not vulnerable (OK), no SSL3 or TLS1
+,         {
+              "id"           : "BEAST",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2011-3389",
+              "cwe"          : "CWE-20",
+              "finding"      : "not vulnerable, no SSL3 or TLS1"
+          }
+ LUCKY13 (CVE-2013-0169), experimental     potentially VULNERABLE, uses obsolete cipher block chaining ciphers with TLS, see server prefs.,         {
+              "id"           : "LUCKY13",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "LOW",
+              "cve"          : "CVE-2013-0169",
+              "cwe"          : "CWE-310",
+              "finding"      : "potentially vulnerable, uses obsolete TLS CBC ciphers"
+          }
+
+ Winshock (CVE-2014-6321), experimental    not vulnerable (OK),         {
+              "id"           : "winshock",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2014-6321",
+              "cwe"          : "CWE-94",
+              "finding"      : "not vulnerable"
+          }
+
+ RC4 (CVE-2013-2566, CVE-2015-2808)        no RC4 ciphers detected (OK)
+,         {
+              "id"           : "RC4",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "OK",
+              "cve"          : "CVE-2013-2566 CVE-2015-2808",
+              "cwe"          : "CWE-310",
+              "finding"      : "not vulnerable"
+          }
+
+
+ Running client simulations (HTTP) via sockets 
+
+ Browser                      Protocol  Cipher Suite Name (OpenSSL)       Forward Secrecy
+------------------------------------------------------------------------------------------------
+ Android 7.0 (native)         TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-android_70",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ Android 8.1 (native)         TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-android_81",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ Android 9.0 (native)         TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-android_90",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Android 10.0 (native)        TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-android_X",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Android 11/12 (native)       TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-android_11_12",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Android 13/14 (native)       TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-android_13_14",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Android 15 (native)          TLSv1.3   TLS_AES_256_GCM_SHA384            X25519MLKEM768
+,         {
+              "id"           : "clientsimulation-android_15",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Chrome 101 (Win 10)          TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-chrome_101_win10",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Chromium 137 (Win 11)        TLSv1.3   TLS_AES_256_GCM_SHA384            X25519MLKEM768
+,         {
+              "id"           : "clientsimulation-chromium_137_win11",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Firefox 100 (Win 10)         TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-firefox_100_win10",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Firefox 137 (Win 11)         TLSv1.3   TLS_AES_256_GCM_SHA384            X25519MLKEM768
+,         {
+              "id"           : "clientsimulation-firefox_137_win11",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ IE 8 Win 7                   No connection
+,         {
+              "id"           : "clientsimulation-ie_8_win7",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No connection"
+          }
+ IE 11 Win 7                  TLSv1.2   ECDHE-RSA-AES256-SHA384           256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-ie_11_win7",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-SHA384"
+          }
+ IE 11 Win 8.1                TLSv1.2   ECDHE-RSA-AES256-SHA384           256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-ie_11_win81",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-SHA384"
+          }
+ IE 11 Win Phone 8.1          TLSv1.2   ECDHE-RSA-AES128-SHA256           256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-ie_11_winphone81",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES128-SHA256"
+          }
+ IE 11 Win 10                 TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-ie_11_win10",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ Edge 15 Win 10               TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-edge_15_win10",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ Edge 101 Win 10 21H2         TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-edge_101_win10_21h2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Edge 133 Win 11 23H2         TLSv1.3   TLS_AES_256_GCM_SHA384            X25519MLKEM768
+,         {
+              "id"           : "clientsimulation-edge_133_win11_23h2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Safari 18.4 (iOS 18.4)       TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-safari_184_ios_184",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Safari 15.4 (macOS 12.3.1)   TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-safari_154_osx_1231",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Safari 18.4 (macOS 15.4)     TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-safari_184_osx_154",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Java 7u25                    No connection
+,         {
+              "id"           : "clientsimulation-java_7u25",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "No connection"
+          }
+ Java 8u442 (OpenJDK)         TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-java_80442",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Java 11.0.2 (OpenJDK)        TLSv1.3   TLS_AES_256_GCM_SHA384            256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-java_1102",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Java 17.0.3 (OpenJDK)        TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-java_1703",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Java 21.0.6 (OpenJDK)        TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-java_2106",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ go 1.17.8                    TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-go_1178",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ LibreSSL 3.3.6 (macOS)       TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-libressl_336",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ OpenSSL 1.0.2e               TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-openssl_102e",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ OpenSSL 1.1.1d (Debian)      TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-openssl_111d",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ OpenSSL 3.0.15 (Debian)      TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-openssl_315",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ OpenSSL 3.5.0 (git)          TLSv1.3   TLS_AES_256_GCM_SHA384            X25519MLKEM768
+,         {
+              "id"           : "clientsimulation-openssl_350",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+ Apple Mail (16.0)            TLSv1.2   ECDHE-RSA-AES256-GCM-SHA384       256 bit ECDH (P-256)
+,         {
+              "id"           : "clientsimulation-apple_mail_16_0",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.2 ECDHE-RSA-AES256-GCM-SHA384"
+          }
+ Thunderbird (91.9)           TLSv1.3   TLS_AES_256_GCM_SHA384            253 bit ECDH (X25519)
+,         {
+              "id"           : "clientsimulation-thunderbird_91_9",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "TLSv1.3 TLS_AES_256_GCM_SHA384"
+          }
+
+
+ Rating (experimental) 
+
+ Rating specs (not complete)  SSL Labs's 'SSL Server Rating Guide' (version 2009r from 2025-05-16)
+ Specification documentation  https://github.com/ssllabs/research/wiki/SSL-Server-Rating-Guide
+,         {
+              "id"           : "rating_spec",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "SSL Labs's 'SSL Server Rating Guide' (version 2009r from 2025-05-16)"
+          }
+,         {
+              "id"           : "rating_doc",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "https://github.com/ssllabs/research/wiki/SSL-Server-Rating-Guide"
+          }
+ Protocol Support (weighted)  0 (0)
+ Key Exchange     (weighted)  0 (0)
+ Cipher Strength  (weighted)  0 (0)
+ Final Score                  0
+ Overall Grade                T
+,         {
+              "id"           : "protocol_support_score",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "protocol_support_score_weighted",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "key_exchange_score",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "key_exchange_score_weighted",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "cipher_strength_score",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "cipher_strength_score_weighted",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "final_score",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "0"
+          }
+,         {
+              "id"           : "overall_grade",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "CRITICAL",
+              "finding"      : "T"
+          }
+ Grade cap reasons            Grade capped to T. Issues with chain of trust
+                                (self signed)
+,         {
+              "id"           : "grade_cap_reason_1",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "Grade capped to T. Issues with chain of trust (self signed)"
+          }
+                              Grade capped to
+                                M. Domain name mismatch
+,         {
+              "id"           : "grade_cap_reason_2",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "Grade capped to M. Domain name mismatch"
+          }
+
+ Done 2026-11-21 16:16:59 [  81s] -->> 127.0.0.1:38443 (127.0.0.1) <<--
+
+
+,         {
+              "id"           : "scanTime",
+              "ip"           : "127.0.0.1/127.0.0.1",
+              "port"         : "38443",
+              "severity"     : "INFO",
+              "finding"      : "81"
+          }
+]

@@ -30,7 +30,8 @@ const (
 
 // DockerRunner roda as ferramentas em containers efêmeros pela API do
 // Docker Engine no socket Unix. Cada container tem rede do host, 1 CPU,
-// 512 MiB e é sempre removido no fim, inclusive em erro ou cancelamento.
+// 512 MiB (ou o limite da Spec) e é sempre removido no fim, inclusive em
+// erro ou cancelamento.
 type DockerRunner struct {
 	c *http.Client
 }
@@ -187,6 +188,10 @@ func (d *DockerRunner) create(ctx context.Context, s Spec) (string, error) {
 	for name, path := range s.Volumes {
 		mounts = append(mounts, mount{Type: "volume", Source: name, Target: path})
 	}
+	mem := s.Memory
+	if mem <= 0 {
+		mem = memLimit
+	}
 	body := map[string]any{
 		"Image":  s.Image,
 		"Cmd":    s.Args, // lista de argumentos, nunca uma linha de shell
@@ -194,8 +199,8 @@ func (d *DockerRunner) create(ctx context.Context, s Spec) (string, error) {
 		"HostConfig": map[string]any{
 			"NetworkMode": "host",
 			"NanoCpus":    nanoCPUs,
-			"Memory":      memLimit,
-			"MemorySwap":  memLimit,
+			"Memory":      mem,
+			"MemorySwap":  mem,
 			"PidsLimit":   pidsLimit,
 			"SecurityOpt": []string{"no-new-privileges"},
 			"Mounts":      mounts,

@@ -143,3 +143,26 @@ func scanError(w http.ResponseWriter, err error) {
 func writeField(w http.ResponseWriter, status int, msg, field string) {
 	writeJSON(w, status, map[string]string{"erro": msg, "campo": field})
 }
+
+// CompareScanHandler responde GET /api/varreduras/{id}/comparacao com os
+// achados novos e resolvidos em relação à varredura concluída anterior do
+// mesmo alvo, ferramenta por ferramenta.
+func CompareScanHandler(st orchestrator.Store, scans ScanStore) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		sc, err := scans.GetScan(r.Context(), id)
+		if err != nil {
+			scanError(w, err)
+			return
+		}
+		cmp, err := orchestrator.Compare(r.Context(), st, sc)
+		if err != nil {
+			storeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, cmp)
+	})
+}

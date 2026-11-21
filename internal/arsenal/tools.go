@@ -22,6 +22,8 @@ type Tool struct {
 	// AnyExit aceita código de saída diferente de zero (o testssl usa o
 	// código para contar problemas).
 	AnyExit bool `json:"-"`
+	// Memory é o limite de memória do container em bytes; zero usa 512 MiB.
+	Memory int64 `json:"-"`
 }
 
 // Tools são as ferramentas disponíveis, na ordem exibida na interface.
@@ -32,6 +34,24 @@ var Tools = []Tool{
 		Image:       NmapImage,
 		Args:        NmapArgs,
 		Parse:       ParseNmapXML,
+	},
+	{
+		Name:        "nuclei",
+		Description: "Vulnerabilidades conhecidas (CVEs), exposições e más configurações",
+		Image:       NucleiImage,
+		Args:        NucleiArgs,
+		Parse:       ParseNucleiJSONL,
+		Volumes:     map[string]string{nucleiTemplates: "/root/nuclei-templates"},
+		// Carregar os templates passa de 512 MiB: o pico medido é de cerca de 1 GiB.
+		Memory: 1536 << 20,
+	},
+	{
+		Name:        "testssl",
+		Description: "Certificado e força da criptografia TLS",
+		Image:       TestsslImage,
+		Args:        TestsslArgs,
+		Parse:       ParseTestsslJSON,
+		AnyExit:     true,
 	},
 }
 

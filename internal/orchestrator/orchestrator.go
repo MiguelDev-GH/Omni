@@ -51,6 +51,8 @@ type Spec struct {
 	Args    []string
 	Volumes map[string]string
 	AnyExit bool
+	// Memory é o limite de memória em bytes; zero usa o padrão de 512 MiB.
+	Memory int64
 }
 
 // Runner roda um container até ele terminar e devolve a saída padrão.
@@ -127,7 +129,8 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 		if err != nil {
 			return 0, err
 		}
-		jobs[i].spec = Spec{Image: jobs[i].tool.Image, Args: args, Volumes: jobs[i].tool.Volumes, AnyExit: jobs[i].tool.AnyExit}
+		tool := jobs[i].tool
+		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, AnyExit: tool.AnyExit, Memory: tool.Memory}
 	}
 	if err := o.runner.Available(ctx); err != nil {
 		o.setDocker(StateUnavailable)

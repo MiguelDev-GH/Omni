@@ -89,6 +89,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/varreduras", api.ListScansHandler(st))
 	srv.Handle("GET /api/varreduras/{id}", api.GetScanHandler(st))
 	srv.Handle("GET /api/varreduras/{id}/achados", api.ScanFindingsHandler(st))
+	srv.Handle("GET /api/varreduras/{id}/comparacao", api.CompareScanHandler(st, st))
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
 	srv.HandleFrontend(web.Handler(web.Assets()))
 
