@@ -6,6 +6,7 @@ const routes: Record<string, string> = {
   "Requisições na API": "/requisicoes",
   "Status HTTP": "/requisicoes",
   "Consultas no banco": "/consultas",
+  Nmap: "/arsenal",
 };
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>

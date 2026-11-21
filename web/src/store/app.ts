@@ -23,7 +23,10 @@ export type PortStatus = {
 
 export type SystemMetrics = { cpu: number; memoria: number; disco: number; hora: string };
 
-export type Toast = { id: number; kind: "erro" | "ok"; title: string; body: string };
+export type Toast = { id: number; kind: "erro" | "ok"; title: string; body: string; link?: { to: string; label: string } };
+
+// MAX_LOG_LINES limita as linhas guardadas do console de cada varredura.
+export const MAX_LOG_LINES = 5000;
 
 const MAX_TOASTS = 5;
 
@@ -51,6 +54,11 @@ export type AppState = {
   addHTTP: (list: HTTPWindow[]) => void;
   db: DBWindow[]; // cronológico, no máximo L7_POINTS
   addDB: (list: DBWindow[]) => void;
+  scanLogs: Record<number, string[]>; // por id de varredura
+  appendScanLog: (scanId: number, lines: string[]) => void;
+  // scanEvents conta os eventos de fim de varredura, para as telas recarregarem.
+  scanEvents: number;
+  bumpScanEvents: () => void;
   toasts: Toast[];
   pushToast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: number) => void;
@@ -69,7 +77,7 @@ export const useAppStore = create<AppState>()((set) => ({
     removeToken();
     set({ token: null, sessionExpired: expired });
   },
-  // O sniffer informa o estado por ESTADO_MOTORES; o Docker chega na Sprint 7.
+  // O sniffer e o Docker informam o estado por ESTADO_MOTORES.
   engines: { poller: "indisponivel", sniffer: "inativo", docker: "inativo" },
   setEngine: (name, s) => set((st) => ({ engines: { ...st.engines, [name]: s } })),
   targets: [],
@@ -97,6 +105,11 @@ export const useAppStore = create<AppState>()((set) => ({
   addHTTP: (list) => set((st) => ({ http: mergeL7(st.http, list) })),
   db: [],
   addDB: (list) => set((st) => ({ db: mergeL7(st.db, list) })),
+  scanLogs: {},
+  appendScanLog: (scanId, lines) =>
+    set((st) => ({ scanLogs: { ...st.scanLogs, [scanId]: [...(st.scanLogs[scanId] ?? []), ...lines].slice(-MAX_LOG_LINES) } })),
+  scanEvents: 0,
+  bumpScanEvents: () => set((st) => ({ scanEvents: st.scanEvents + 1 })),
   toasts: [],
   pushToast: (t) => set((st) => ({ toasts: [...st.toasts, { ...t, id: nextToastId++ }].slice(-MAX_TOASTS) })),
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
