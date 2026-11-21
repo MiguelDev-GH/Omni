@@ -201,6 +201,7 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 ## Aplicação cobaia
 
 Para testar o Omni de ponta a ponta sem uma aplicação real, a pasta [subjects/](subjects/README.md) tem uma loja de exemplo (Go, PostgreSQL e Caddy com TLS) com gerador de carga, cadastro automático dos alvos e falhas de propósito para o Arsenal encontrar. Com o Omni no ar, `cd subjects/loja && OMNI_TOKEN=<token> make demo` sobe tudo.
+
 ## Alertas e notificação por e-mail
 
 O motor de alertas (`internal/alerts`) observa os mesmos eventos que o frontend recebe (`STATUS_ALVOS`, `METRICAS_HTTP`, `METRICAS_BANCO` e `METRICAS_SISTEMA`), compara cada métrica com dois limites e classifica o recurso em três níveis:
