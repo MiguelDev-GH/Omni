@@ -10,7 +10,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 |---|---|---|---|
 | [1](#sprint-1-núcleo-do-backend) | Fundação | Núcleo do backend | ✅ Concluída |
 | [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ✅ Concluída |
-| [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | 🚧 Em andamento |
+| [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ✅ Concluída |
 | [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ⏳ A fazer |
 | [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ⏳ A fazer |
 | [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ⏳ A fazer |
