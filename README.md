@@ -6,7 +6,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
 
-> **Status:** versão básica implementada. As Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas; a Fase 4 (expansão) segue no backlog. Veja [docs/SPRINTS.md](docs/SPRINTS.md).
+> **Status:** versão básica implementada. As Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas, junto com alertas por e-mail e monitoramento de DNS e SMTP. As Sprints 9 a 16 (página própria por ferramenta do Arsenal, Sistema, ffuf, Nikto, SQLMap, Amass, Gitleaks, Inspetor de pacotes, capturas `.pcap` e PDF) estão planejadas. Veja [docs/SPRINTS.md](docs/SPRINTS.md).
 
 ---
 
@@ -93,22 +93,24 @@ graph TD
 | **Poller** | Testes ativos periódicos: disponibilidade e latência HTTP, resolução DNS, handshake SMTP e STARTTLS, validade do certificado. Coleta CPU, RAM, disco e conexões via `gopsutil` e `/proc`. |
 | **Orquestrador Docker** | Sobe containers efêmeros do arsenal com limites de CPU e RAM, coleta a saída, normaliza os achados num esquema único e destrói o container. |
 | **Agregador** | Consolida eventos em janelas de 1s (requisições por rota, status HTTP, latência, consultas, banda, protocolos) e grava em lote. |
-| **API REST** | CRUD de alvos, disparo e agendamento de scans, consultas ao histórico e geração de relatórios em PDF. |
+| **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. O PDF é gerado pelo navegador, a partir de uma página de impressão (Sprint 16). |
 | **Hub WebSocket** | Envia alertas, métricas e pacotes ao frontend em lotes, com buffer por cliente. |
-| **Armazenamento** | SQLite em modo WAL, só com agregados e achados. Capturas completas ficam em arquivos `.pcap` rotativos. |
+| **Armazenamento** | SQLite em modo WAL, só com agregados, achados e relatórios das ferramentas. Capturas completas ficam em arquivos `.pcap` com retenção configurável (Sprint 15). |
 
 ### Arsenal (containers)
 
-| Ferramenta | Função |
-|---|---|
-| **Nmap** | Portas abertas e serviços |
-| **Nuclei** | Vulnerabilidades conhecidas (CVEs) e más configurações, via templates |
-| **Nikto** | Falhas em servidores web |
-| **SQLMap** | Injeção de SQL |
-| **ffuf** | Descoberta de diretórios e rotas ocultas |
-| **Amass** | Descoberta de subdomínios do domínio da aplicação |
-| **testssl.sh** | Validade do certificado e força da criptografia TLS |
-| **Gitleaks / Trufflehog** | Vazamento de segredos no código |
+Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a partir do que ela faz. Os achados de todas seguem um esquema único (para a comparação entre scans e os contadores por severidade), e cada uma guarda também um relatório estruturado, que alimenta a sua página. A saída bruta fica disponível, recolhida, em "Saída da ferramenta".
+
+| Ferramenta | Função | Página na interface | Situação |
+|---|---|---|---|
+| **Nmap** | Portas abertas e serviços | Mapa de portas: todas as portas com estado, serviço e versão, e o que abriu ou fechou desde a varredura anterior | Ferramenta pronta; página na Sprint 9 |
+| **Nuclei** | Vulnerabilidades conhecidas (CVEs) e más configurações, via templates | Resultados por template, com filtros por severidade e tag, descrição e referências | Ferramenta pronta; página na Sprint 9 |
+| **testssl.sh** | Validade do certificado e força da criptografia TLS | Boletim TLS: nota, protocolos oferecidos, dias até o certificado vencer e vulnerabilidades testadas | Ferramenta pronta; página na Sprint 9 |
+| **ffuf** | Descoberta de diretórios e rotas ocultas | Árvore de rotas, marcando as que nunca apareceram no tráfego real | Sprint 11 |
+| **Nikto** | Falhas em servidores web | Checagens do servidor agrupadas em cabeçalhos, arquivos expostos, versão e outros | Sprint 11 |
+| **SQLMap** | Injeção de SQL | Escolha de uma rota vista pelo sniffer e do parâmetro; veredito, técnicas e banco identificado | Sprint 12 |
+| **Amass** | Descoberta de subdomínios do domínio da aplicação (modo passivo) | Subdomínios com endereços, destacando os que apontam para este servidor | Sprint 13 |
+| **Gitleaks** (Vazamentos) | Vazamento de segredos no código | Vazamentos por arquivo, com regra, linha e commit, sem nunca mostrar o segredo | Sprint 13 |
 
 ## Fluxo de funcionamento
 
@@ -117,7 +119,7 @@ graph TD
 3. **Testes ativos:** o Poller verifica periodicamente se a aplicação está no ar e respondendo bem, e coleta métricas do sistema.
 4. **Agregação:** a cada segundo, o Agregador salva os agregados no SQLite e envia as atualizações em lote pelo WebSocket, e os gráficos se atualizam.
 5. **Varredura de segurança:** sob demanda ou agendada, o Orquestrador roda as ferramentas selecionadas, consolida as vulnerabilidades, compara com o scan anterior e avisa o fim pelo WebSocket.
-6. **Relatórios:** o usuário filtra o período e os módulos e exporta um PDF.
+6. **Relatórios:** o usuário filtra o período e os módulos e exporta um PDF pela janela de impressão do navegador (Sprint 16).
 
 ## Comunicação em tempo real (WebSocket)
 
@@ -180,10 +182,12 @@ cd web && npm run dev
 
 **Barra lateral:**
 
-- **Monitoramento:** Geral, Requisições na API, Consultas no banco, Status HTTP, Sistema
-- **Tráfego:** Inspetor de pacotes, Capturas (`.pcap`)
-- **Arsenal:** Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl, Vazamentos
-- **Relatórios:** histórico, comparação entre scans, exportação em PDF
+- **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, Status HTTP, Sistema (Sprint 10)
+- **Tráfego:** Inspetor de pacotes (Sprint 14), Capturas `.pcap` (Sprint 15)
+- **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, testssl (Sprint 9), ffuf, Nikto (Sprint 11), SQLMap (Sprint 12), Amass, Vazamentos (Sprint 13)
+- **Relatórios:** histórico, comparação entre scans, exportação em PDF (Sprint 16)
+
+Os itens com sprint ainda aparecem no menu como "em breve". O que cada sprint entrega está em [docs/SPRINTS.md](docs/SPRINTS.md).
 
 **Tela Geral:**
 
@@ -192,9 +196,9 @@ cd web && npm run dev
 - Barras empilhadas de status HTTP (2xx, 3xx, 4xx, 5xx)
 - Consumo de banda
 - Distribuição de protocolos
-- Logs de **eventos agregados**, como quedas, início e fim de scans e picos de erro
+- Logs de **eventos agregados**, como quedas, início e fim de scans e picos de erro (ainda não implementado; hoje esses eventos aparecem como notificações)
 
-O detalhe pacote a pacote fica **apenas no Inspetor de Tráfego**, que usa uma tabela virtualizada (TanStack Table) com botão de pausa. Colocá-lo na tela Geral travaria o navegador.
+O detalhe pacote a pacote fica **apenas no Inspetor de pacotes** (Sprint 14), que usa uma tabela virtualizada com botão de pausa e filtros. Colocá-lo na tela Geral travaria o navegador. O navegador só recebe pacotes enquanto a página do Inspetor está aberta, em lotes limitados, e no HTTP vê só método e rota, nunca cabeçalhos ou corpos.
 
 As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo dele, uma tabela detalhada, por exemplo as consultas mais lentas das últimas 24 horas.
 
@@ -336,28 +340,35 @@ Cuidados no WSL2:
 
 ### Camada 7: Aplicação
 
-- [ ] **Decodificador HTTP/1.1:** método, rota, status e latência por requisição.
+- [x] **Decodificador HTTP/1.1:** método, rota, status e latência por requisição.
 - [ ] **Decodificador HTTP/2:** protocolo binário, usado pela maioria dos proxies modernos.
-- [ ] **Normalização de rotas:** agrupar `/users/123` e `/users/456` como `/users/:id`.
-- [ ] **Decodificador PostgreSQL:** mensagens `Query` e `Parse`, com pareamento entre consulta e resposta para medir o tempo.
+- [x] **Normalização de rotas:** agrupar `/users/123` e `/users/456` como `/users/:id`.
+- [x] **Decodificador PostgreSQL:** mensagens `Query` e `Parse`, com pareamento entre consulta e resposta para medir o tempo.
 - [ ] **Decodificador MySQL:** `COM_QUERY`, com o mesmo pareamento.
 - [ ] **Complemento opcional para PostgreSQL:** coletar estatísticas de `pg_stat_statements`.
-- [ ] **DNS:** latência, taxa de NXDOMAIN, registros MX e TXT (SPF/DKIM) e respostas inesperadas.
-- [ ] **SMTP:** tempo do handshake (`220`), suporte a STARTTLS e volume de envios.
-- [ ] **Mascaramento de dados sensíveis** (`Authorization`, `Cookie`, senhas) antes de qualquer gravação.
-- [ ] **Parsers do Arsenal** com um esquema único de achado (alvo, ferramenta, severidade, evidência), severidade normalizada (CVSS) e deduplicação entre ferramentas.
-- [ ] **Comparação entre scans:** indicar o que mudou desde o anterior, por exemplo "porta 22 abriu desde ontem".
-- [ ] **Agendamento de scans** e alertas externos (Telegram, Discord, e-mail).
+- [x] **DNS (sonda ativa):** latência e respostas com erro (NXDOMAIN, SERVFAIL, REFUSED). Veja [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp).
+- [ ] **DNS:** registros MX e TXT (SPF/DKIM) e consultas por segundo vindas do tráfego real.
+- [x] **SMTP (sonda ativa):** tempo do handshake (`220`) e suporte a STARTTLS.
+- [ ] **SMTP:** volume de envios e fila, vindos do tráfego real.
+- [x] **Mascaramento de dados sensíveis** (`Authorization`, `Cookie`, senhas) antes de qualquer gravação.
+- [x] **Parsers do Arsenal** com um esquema único de achado (alvo, ferramenta, severidade, evidência) e severidade normalizada.
+- [ ] **Relatório estruturado por ferramenta,** para a página própria de cada uma (Sprint 9).
+- [ ] **Severidade por CVSS** e deduplicação entre ferramentas.
+- [x] **Comparação entre scans:** indicar o que mudou desde o anterior, por exemplo "porta 22 abriu desde ontem".
+- [x] **Alertas por e-mail.** Veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
+- [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
+- [ ] **Novas ferramentas do Arsenal:** ffuf e Nikto (Sprint 11), SQLMap (Sprint 12), Amass e Gitleaks (Sprint 13).
+- [ ] **Exportação de relatório em PDF** (Sprint 16).
 
 ### Camada 6: Apresentação (TLS)
 
-- [ ] **Captura após o reverse proxy** (`lo`) para ler o HTTP em texto puro.
+- [x] **Captura após o reverse proxy** (`lo`) para ler o HTTP em texto puro.
 - [ ] **Metadados do handshake TLS,** visíveis mesmo com criptografia: SNI, versão, cifra e validade do certificado.
 - [ ] **Alternativa sem proxy, mais complexa:** eBPF em `SSL_read`/`SSL_write`.
 
 ### Camada 4: Transporte
 
-- [ ] **Remontagem TCP** com `gopacket/reassembly` (o `tcpassembly` está obsoleto), com limite de memória por fluxo e timeout para conexões abandonadas.
+- [x] **Remontagem TCP** com `gopacket/reassembly` (o `tcpassembly` está obsoleto), com limite de memória por fluxo e timeout para conexões abandonadas.
 - [ ] **RTT** medido pelo par SYN → SYN-ACK.
 - [ ] **Retransmissões e pacotes fora de ordem,** que indicam rede degradada.
 - [ ] **RST em excesso** (serviço recusando conexões) e **SYN sem resposta** (possível SYN flood ou varredura).
@@ -382,7 +393,10 @@ Cuidados no WSL2:
 
 - [ ] **Contadores da placa** (`/sys/class/net/*/statistics`): erros, descartes e utilização do link.
 - [ ] **Captura de alto desempenho:** AF_PACKET com ring buffer e `DecodingLayerParser`, para não sobrecarregar o garbage collector.
-- [ ] **Limites de CPU e RAM** para o Omni e os containers, para não derrubar a produção.
+- [x] **Limites de CPU e RAM nos containers do Arsenal** (1 CPU e 512 MiB; 1,5 GiB para o Nuclei).
+- [ ] **Limites de CPU e RAM para o próprio Omni,** para não derrubar a produção.
+- [ ] **Histórico de CPU, memória e disco** numa página própria (Sprint 10).
+- [ ] **Inspetor de pacotes** ao vivo (Sprint 14) e **capturas `.pcap`** sob demanda, com retenção configurável (Sprint 15).
 
 ## Segurança da própria plataforma
 
@@ -398,7 +412,8 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
 - **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto: `instrumentisto/nmap:7.95`, `projectdiscovery/nuclei:v3.4.10` e `drwetter/testssl.sh:3.2`.
-- **Retenção de dados configurável,** já que capturas podem conter dados pessoais (LGPD).
+- **Retenção de dados configurável,** já que capturas podem conter dados pessoais (LGPD). As capturas `.pcap` (Sprint 15) ficam com permissão `0600`, têm tamanho máximo e são apagadas depois do prazo de `OMNI_RETENCAO_CAPTURAS`.
+- **Regras das ferramentas novas (Sprints 11 a 13):** toda opção vinda da interface (rota e parâmetro do SQLMap, lista de palavras do ffuf, caminho do código-fonte do Gitleaks) é validada no backend contra uma lista fechada ou um padrão estrito; o SQLMap roda só com nível 1 e risco 1 e nunca com opções de extração (`--dump`, `--os-shell`, `--file-*`); o código-fonte é montado **somente leitura** no container do Gitleaks, e o valor dos segredos encontrados nunca é gravado nem mostrado.
 
 ## Limitações conhecidas
 
@@ -406,27 +421,28 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **O tráfego gerado pelos próprios scans** precisa ser marcado e filtrado das métricas, pela origem ou por um User-Agent próprio. Sem isso, os gráficos de requisições e de status HTTP ficam poluídos.
 - **Aplicações que usam SQLite como banco** não geram tráfego de rede, então não há gráfico de consultas para elas.
 - **Traceroute** só faz sentido para destinos externos ao servidor.
+- **O Amass precisa de acesso à internet:** em modo passivo, ele consulta fontes públicas (certificados, DNS passivo) sobre o domínio do alvo, sem mandar tráfego ao alvo. Sem internet, a varredura termina sem subdomínios.
 - **Windows nativo** roda só com o Poller: o Sniffer e o Arsenal ficam desligados. Use o WSL2 (veja [Windows](#windows)).
 
 ## Roadmap
 
-A implementação está dividida em **4 fases e 8 sprints**, e cada sprint entrega uma versão funcional que serve de base para a seguinte:
+A implementação está dividida em **4 fases**. As Sprints 1 a 8 formam a versão básica, já entregue; as Sprints 9 a 16 tiram do "em breve" as seções restantes do menu. Cada sprint entrega uma versão funcional que serve de base para a seguinte:
 
 | Fase | Sprints |
 |---|---|
 | 1. Fundação | 1. Núcleo do backend · 2. Poller e WebSocket · 3. Frontend base |
 | 2. Observação passiva | 4. Sniffer (camadas 3 e 4) · 5. HTTP · 6. PostgreSQL |
 | 3. Arsenal | 7. Orquestrador Docker e Nmap · 8. Nuclei, testssl e comparação entre scans |
-| 4. Expansão | Backlog com o restante das pendências por camada |
+| 4. Expansão | 9. Página por ferramenta do Arsenal · 10. Sistema · 11. ffuf e Nikto · 12. SQLMap · 13. Amass e Gitleaks · 14. Inspetor de pacotes · 15. Capturas `.pcap` · 16. PDF · backlog com o restante das pendências por camada |
 
 **➡️ O que é feito em cada sprint, com entregas e status: [docs/SPRINTS.md](docs/SPRINTS.md)**
 
-O plano técnico detalhado (arquivos, interfaces e testes de cada tarefa) fica em [docs/superpowers/plans/2026-11-18-implementacao-basica.md](docs/superpowers/plans/2026-11-18-implementacao-basica.md).
+O plano técnico detalhado (arquivos, interfaces e testes de cada tarefa) fica em [docs/superpowers/plans/2026-11-18-implementacao-basica.md](docs/superpowers/plans/2026-11-18-implementacao-basica.md) (Sprints 1 a 8) e em [docs/superpowers/plans/2026-11-21-fase-4-arsenal-e-paginas.md](docs/superpowers/plans/2026-11-21-fase-4-arsenal-e-paginas.md) (Sprints 9 a 16).
 
 ## Stack
 
 | Camada | Tecnologias |
 |---|---|
-| **Backend** | Go, `gopacket/gopacket` (fork mantido), `gopacket/reassembly`, Docker SDK, `gorilla/websocket`, `gopsutil`, SQLite |
-| **Frontend** | React + TypeScript, Tailwind CSS + shadcn/ui, Zustand, TanStack Table, Recharts ou Apache ECharts, `react-use-websocket` |
+| **Backend** | Go, `gopacket/gopacket` (fork mantido), `gopacket/reassembly`, cliente mínimo da API do Docker Engine (sem o Docker SDK), `gorilla/websocket`, `gopsutil`, SQLite |
+| **Frontend** | React + TypeScript, Tailwind CSS, Zustand, TanStack Table, Recharts, `react-use-websocket` |
 | **Arsenal** | Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl.sh, Gitleaks |
