@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 	"github.com/MiguelDev-GH/omni/internal/target"
 	"github.com/MiguelDev-GH/omni/internal/ws"
 )
@@ -16,6 +17,8 @@ const (
 	EventTraffic = "METRICAS_TRAFEGO"
 	// EventEngines leva o estado do sniffer, como {"sniffer": "ativo"}.
 	EventEngines = "ESTADO_MOTORES"
+	// EventHTTP leva a l7.HTTPWindow dos últimos 10 s.
+	EventHTTP = "METRICAS_HTTP"
 
 	StateActive       = "ativo"
 	StateNoPermission = "sem-permissao"
@@ -23,6 +26,7 @@ const (
 
 	defaultWindow      = time.Second
 	defaultStatusEvery = 5 * time.Second
+	defaultL7Window    = 10 * time.Second
 	// Retention é por quanto tempo as janelas ficam no banco.
 	Retention  = 24 * time.Hour
 	pruneEvery = time.Minute
@@ -32,6 +36,8 @@ const (
 type TrafficStore interface {
 	ListTargets(ctx context.Context) ([]target.Target, error)
 	InsertTrafficWindow(ctx context.Context, w Window) error
+	InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error
+	// PruneTraffic apaga as janelas de todas as métricas do sniffer anteriores a before.
 	PruneTraffic(ctx context.Context, before time.Time) error
 }
 
@@ -47,6 +53,7 @@ type Engine struct {
 	pub         ws.Publisher
 	window      time.Duration
 	statusEvery time.Duration
+	l7Window    time.Duration
 
 	mu        sync.Mutex
 	state     string
@@ -56,7 +63,7 @@ type Engine struct {
 func NewEngine(open Opener, st TrafficStore, pub ws.Publisher) *Engine {
 	return &Engine{
 		open: open, st: st, pub: pub,
-		window: defaultWindow, statusEvery: defaultStatusEvery,
+		window: defaultWindow, statusEvery: defaultStatusEvery, l7Window: defaultL7Window,
 		state: StateInactive,
 	}
 }
@@ -110,6 +117,9 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app []int) {
 	pkts := src.Packets(capCtx)
 	agg := NewAggregator(app)
 	agg.Flush(time.Now())
+	httpStats := l7.NewHTTPStats()
+	httpStats.Flush(time.Now())
+	httpAsm := l7.NewHTTPAssembler(app, httpStats.Add)
 	var dropped uint64
 	flush := func(now time.Time) {
 		w := agg.Flush(now)
@@ -117,30 +127,41 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app []int) {
 		w.Dropped, dropped = total-dropped, total
 		e.emit(ctx, w)
 	}
+	flushL7 := func(now time.Time) {
+		httpAsm.Flush(now)
+		e.emitHTTP(ctx, httpStats.Flush(now))
+	}
 
 	winT := time.NewTicker(e.window)
 	defer winT.Stop()
 	statT := time.NewTicker(e.statusEvery)
 	defer statT.Stop()
+	l7T := time.NewTicker(e.l7Window)
+	defer l7T.Stop()
 	for {
 		select {
 		case p, ok := <-pkts:
 			if !ok {
 				if ctx.Err() == nil {
 					flush(time.Now())
+					flushL7(time.Now())
 					e.setState(StateInactive, errors.New("a fonte de pacotes terminou"))
 				}
 				return
 			}
 			agg.Add(p)
+			httpAsm.Add(p)
 		case now := <-winT.C:
 			flush(now)
+		case now := <-l7T.C:
+			flushL7(now)
 		case <-statT.C:
 			e.publishState()
 			e.prune(ctx)
 			ts, err := e.st.ListTargets(ctx)
 			if err == nil && BPFForTargets(ts) != bpf {
 				flush(time.Now())
+				flushL7(time.Now())
 				return
 			}
 		case <-ctx.Done():
@@ -156,6 +177,15 @@ func (e *Engine) emit(ctx context.Context, w Window) {
 		}
 	}
 	e.pub.Publish(ws.Event{Type: EventTraffic, Data: w})
+}
+
+func (e *Engine) emitHTTP(ctx context.Context, w l7.HTTPWindow) {
+	if w.Requests > 0 {
+		if err := e.st.InsertHTTPWindow(ctx, w); err != nil && ctx.Err() == nil {
+			slog.Error("sniffer: gravar janela http", "erro", err)
+		}
+	}
+	e.pub.Publish(ws.Event{Type: EventHTTP, Data: w})
 }
 
 // setState grava o estado, registra a mudança no log e publica o estado.

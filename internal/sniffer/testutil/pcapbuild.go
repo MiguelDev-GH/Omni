@@ -47,8 +47,13 @@ func WritePCAPLink(t testing.TB, path string, link layers.LinkType, pkts ...[]by
 // TCP monta um quadro Ethernet com IPv4 ou IPv6 (conforme src) e TCP. flags
 // aceita as letras S, A, F, R e P, como em "SA".
 func TCP(src, dst string, sport, dport uint16, flags string, payload []byte) []byte {
+	return TCPSeq(src, dst, sport, dport, flags, 0, 0, payload)
+}
+
+// TCPSeq é como TCP, com os números de sequência e de confirmação.
+func TCPSeq(src, dst string, sport, dport uint16, flags string, seq, ack uint32, payload []byte) []byte {
 	tcp := &layers.TCP{
-		SrcPort: layers.TCPPort(sport), DstPort: layers.TCPPort(dport), Window: 65535,
+		SrcPort: layers.TCPPort(sport), DstPort: layers.TCPPort(dport), Window: 65535, Seq: seq, Ack: ack,
 		SYN: strings.Contains(flags, "S"), ACK: strings.Contains(flags, "A"),
 		FIN: strings.Contains(flags, "F"), RST: strings.Contains(flags, "R"), PSH: strings.Contains(flags, "P"),
 	}

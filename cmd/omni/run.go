@@ -49,6 +49,8 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("POST /api/ws/ticket", ws.TicketHandler(tickets))
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
 	srv.Handle("GET /api/trafego", api.TrafficHandler(st))
+	srv.Handle("GET /api/requisicoes", api.RequestsHandler(st))
+	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
 	}
