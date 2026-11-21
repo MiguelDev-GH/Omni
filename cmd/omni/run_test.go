@@ -329,3 +329,28 @@ func TestRunKeepsServingWithoutCapturePermission(t *testing.T) {
 	cancel()
 	assert.NoError(t, waitDone(t, done))
 }
+
+func TestRunScanWithoutDockerKeepsServing(t *testing.T) {
+	cfg := config.Config{DBPath: filepath.Join(t.TempDir(), "omni.db"), Token: tok}
+	st, err := store.Open(context.Background(), cfg.DBPath)
+	require.NoError(t, err)
+	tg, err := st.CreateTarget(context.Background(), target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000}})
+	require.NoError(t, err)
+	require.NoError(t, st.Close())
+
+	_, base, _ := startRun(t, cfg)
+	req, err := http.NewRequest(http.MethodPost, base+"/api/varreduras",
+		strings.NewReader(fmt.Sprintf(`{"alvo_id": %d, "ferramentas": ["nmap"]}`, tg.ID)))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+
+	code, _ := get(t, base+"/api/saude", false)
+	assert.Equal(t, http.StatusOK, code)
+	code, body := get(t, base+"/api/ferramentas", true)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, body, `"nome":"nmap"`)
+}

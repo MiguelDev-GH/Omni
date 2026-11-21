@@ -13,6 +13,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/api"
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
+	"github.com/MiguelDev-GH/omni/internal/orchestrator"
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/sniffer"
 	"github.com/MiguelDev-GH/omni/internal/store"
@@ -25,13 +26,18 @@ const (
 	shutdownTimeout = 10 * time.Second
 	clientBuffer    = 256
 	ticketTTL       = 30 * time.Second
+	dockerEvery     = 30 * time.Second
 )
 
 // openCapture abre a captura ao vivo; os testes a trocam para não depender
 // das permissões da máquina.
 var openCapture = sniffer.OpenLive
 
-// run serve a API, o WebSocket, o poller, o sniffer e as métricas do sistema até ctx ser
+// newRunner cria o executor dos containers do Arsenal; os testes o trocam
+// para não depender do Docker da máquina.
+var newRunner = func() (orchestrator.Runner, error) { return orchestrator.NewDockerRunner() }
+
+// run serve a API, o WebSocket, o poller, o sniffer, o Arsenal e as métricas do sistema até ctx ser
 // cancelado ou o servidor HTTP falhar. Sempre fecha ln e, só depois de todas as
 // goroutines terminarem, o banco.
 func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
@@ -41,6 +47,15 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		return err
 	}
 	defer func() { _ = st.Close() }()
+
+	if err := st.FailInterruptedScans(ctx); err != nil {
+		slog.Error("arsenal: marcar varreduras interrompidas", "erro", err)
+	}
+	runner, err := newRunner()
+	if err != nil {
+		_ = ln.Close()
+		return err
+	}
 
 	hub := ws.NewHub(clientBuffer)
 	tickets := ws.NewTickets(ticketTTL)
@@ -56,21 +71,28 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
 	}
-	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
-	srv.HandleFrontend(web.Handler(web.Assets()))
-
 	// Os defers rodam ao contrário: hub.Close (também quando Serve falha, pois
 	// RegisterOnShutdown só roda no Shutdown), depois o fim das goroutines de
-	// fundo e, por último, st.Close.
+	// fundo e das varreduras e, por último, st.Close.
 	bgCtx, stopBg := context.WithCancel(ctx)
 	var wg sync.WaitGroup
+	orch := orchestrator.New(bgCtx, runner, st, hub)
 	defer func() {
 		stopBg()
 		wg.Wait()
+		orch.Wait()
 	}()
 	defer hub.Close()
 
-	wg.Add(3)
+	srv.Handle("GET /api/ferramentas", api.ToolsHandler())
+	srv.Handle("POST /api/varreduras", api.StartScanHandler(orch))
+	srv.Handle("GET /api/varreduras", api.ListScansHandler(st))
+	srv.Handle("GET /api/varreduras/{id}", api.GetScanHandler(st))
+	srv.Handle("GET /api/varreduras/{id}/achados", api.ScanFindingsHandler(st))
+	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
+	srv.HandleFrontend(web.Handler(web.Assets()))
+
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		poller.NewScheduler(st, hub, cfg.PollInterval).Run(bgCtx)
@@ -79,6 +101,10 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		defer wg.Done()
 		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
 		_ = sniffer.NewEngine(open, st, hub).Run(bgCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		orch.MonitorDocker(bgCtx, dockerEvery)
 	}()
 	go func() {
 		defer wg.Done()
