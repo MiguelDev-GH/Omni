@@ -27,6 +27,22 @@ jobs:
 
   subjects:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_USER: loja
+          POSTGRES_PASSWORD: loja-cobaia
+          POSTGRES_DB: loja
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U loja"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+    env:
+      LOJA_TESTE_BANCO: postgres://loja:loja-cobaia@127.0.0.1:5433/loja?sslmode=disable
     defaults:
       run:
         working-directory: subjects/loja

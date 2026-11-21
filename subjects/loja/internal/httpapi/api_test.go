@@ -17,6 +17,7 @@ import (
 // fakeStore guarda os produtos em memória e registra as chamadas.
 type fakeStore struct {
 	down       bool
+	hang       bool
 	outOfStock bool
 	products   map[int64]store.Product
 
@@ -45,8 +46,12 @@ func (f *fakeStore) ListProducts(_ context.Context, limit, offset int) ([]store.
 	return []store.Product{f.products[1]}, nil
 }
 
-func (f *fakeStore) GetProduct(_ context.Context, id int64) (store.Product, error) {
+func (f *fakeStore) GetProduct(ctx context.Context, id int64) (store.Product, error) {
 	f.getCalled = true
+	if f.hang {
+		<-ctx.Done()
+		return store.Product{}, ctx.Err()
+	}
 	if f.down {
 		return store.Product{}, store.ErrUnavailable
 	}
@@ -173,7 +178,7 @@ func TestGetProduct(t *testing.T) {
 
 func TestBadIDs(t *testing.T) {
 	h := New(newFake())
-	for _, p := range []string{"/produtos/abc", "/produtos/-1", "/produtos/0", "/produtos/99999999999999999999", "/pedidos/x"} {
+	for _, p := range []string{"/produtos/abc", "/produtos/-1", "/produtos/0", "/produtos/99999999999999999999", "/produtos/2147483648", "/pedidos/2147483648", "/pedidos/x"} {
 		rec := do(t, h, "GET", p, "")
 		assert.Equal(t, 400, rec.Code, p)
 		assert.Equal(t, "id inválido", errorOf(t, rec), p)
@@ -200,13 +205,15 @@ func TestSearchRouteNotShadowed(t *testing.T) {
 	assert.False(t, f.getCalled)
 	assert.Equal(t, 400, do(t, h, "GET", "/produtos/busca", "").Code)
 	assert.Equal(t, 400, do(t, h, "GET", "/produtos/busca?q="+strings.Repeat("a", 101), "").Code)
+	assert.Equal(t, 400, do(t, h, "GET", "/produtos/busca?q=%ff", "").Code)
+	assert.Equal(t, 400, do(t, h, "GET", "/produtos/busca?q=a%00b", "").Code)
 }
 
 func TestCreateOrderValidation(t *testing.T) {
 	f := newFake()
 	h := New(f)
 	for _, body := range []string{`{`, `{"produto_id":1,"quantidade":0}`, `{"produto_id":1,"quantidade":11}`,
-		`{"produto_id":0,"quantidade":1}`, `{"produto_id":1,"quantidade":1,"x":"` + strings.Repeat("a", 5<<10) + `"}`} {
+		`{"produto_id":0,"quantidade":1}`, `{"produto_id":2147483648,"quantidade":1}`, `{"produto_id":1,"quantidade":1,"x":"` + strings.Repeat("a", 5<<10) + `"}`} {
 		assert.Equal(t, 400, do(t, h, "POST", "/pedidos", body).Code, body[:min(len(body), 40)])
 	}
 	rec := do(t, h, "POST", "/pedidos", `{"produto_id":9,"quantidade":1}`)
@@ -253,4 +260,17 @@ func TestUnknownRoute(t *testing.T) {
 	rec := do(t, New(newFake()), "GET", "/rota-inexistente", "")
 	assert.Equal(t, 404, rec.Code)
 	assert.Equal(t, "rota não encontrada", errorOf(t, rec))
+}
+
+func TestHangingDBReturns503(t *testing.T) {
+	old := queryTimeout
+	queryTimeout = 50 * time.Millisecond
+	defer func() { queryTimeout = old }()
+	f := newFake()
+	f.hang = true
+	start := time.Now()
+	rec := do(t, New(f), "GET", "/produtos/1", "")
+	assert.Less(t, time.Since(start), time.Second)
+	assert.Equal(t, 503, rec.Code)
+	assert.Equal(t, "banco indisponível", errorOf(t, rec))
 }

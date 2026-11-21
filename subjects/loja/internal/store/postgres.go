@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,7 +37,8 @@ WHERE NOT EXISTS (SELECT 1 FROM produtos)`
 
 // Postgres implementa Store com um pool do pgx.
 type Postgres struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	migrateMu sync.Mutex
 }
 
 var _ Store = (*Postgres)(nil)
@@ -60,6 +62,8 @@ func (p *Postgres) Close() { p.pool.Close() }
 
 // Migrate cria as tabelas e os dados iniciais.
 func (p *Postgres) Migrate(ctx context.Context) error {
+	p.migrateMu.Lock()
+	defer p.migrateMu.Unlock()
 	if _, err := p.pool.Exec(ctx, schema); err != nil {
 		return classify(err)
 	}
@@ -67,19 +71,47 @@ func (p *Postgres) Migrate(ctx context.Context) error {
 	return classify(err)
 }
 
-func (p *Postgres) Ping(ctx context.Context) error { return classify(p.pool.Ping(ctx)) }
+// Ping confere a conexão e se as tabelas existem; sem elas, migra de novo.
+func (p *Postgres) Ping(ctx context.Context) error {
+	var ok bool
+	if err := p.pool.QueryRow(ctx, "SELECT to_regclass('produtos') IS NOT NULL AND to_regclass('pedidos') IS NOT NULL").Scan(&ok); err != nil {
+		return classify(err)
+	}
+	if !ok {
+		return p.remigrate(ctx)
+	}
+	return nil
+}
+
+// check classifica err e, se as tabelas da loja sumiram (o volume do banco foi
+// recriado com a loja rodando), migra de novo e devolve ErrUnavailable.
+func (p *Postgres) check(ctx context.Context, err error) error {
+	err = classify(err)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "42P01" {
+		return p.remigrate(ctx)
+	}
+	return err
+}
+
+func (p *Postgres) remigrate(ctx context.Context) error {
+	if err := p.Migrate(ctx); err != nil {
+		slog.Warn("migração do banco falhou", "erro", err)
+	}
+	return fmt.Errorf("%w: tabelas ausentes, migração refeita", ErrUnavailable)
+}
 
 func (p *Postgres) ListProducts(ctx context.Context, limit, offset int) ([]Product, error) {
 	rows, err := p.pool.Query(ctx,
 		"SELECT id, nome, preco_centavos, estoque FROM produtos ORDER BY id LIMIT $1 OFFSET $2", limit, offset)
-	return collectProducts(rows, err)
+	return p.collectProducts(ctx, rows, err)
 }
 
 func (p *Postgres) GetProduct(ctx context.Context, id int64) (Product, error) {
 	var pr Product
 	err := p.pool.QueryRow(ctx, "SELECT id, nome, preco_centavos, estoque FROM produtos WHERE id = $1", id).
 		Scan(&pr.ID, &pr.Name, &pr.PriceCents, &pr.Stock)
-	return pr, classify(err)
+	return pr, p.check(ctx, err)
 }
 
 // SearchProducts usa o protocolo simples, para que o sniffer do Omni veja uma
@@ -88,24 +120,24 @@ func (p *Postgres) SearchProducts(ctx context.Context, q string) ([]Product, err
 	rows, err := p.pool.Query(ctx,
 		"SELECT id, nome, preco_centavos, estoque FROM produtos WHERE nome ILIKE '%' || $1 || '%' ORDER BY id LIMIT 20",
 		pgx.QueryExecModeSimpleProtocol, q)
-	return collectProducts(rows, err)
+	return p.collectProducts(ctx, rows, err)
 }
 
 func (p *Postgres) CreateOrder(ctx context.Context, productID int64, qty int) (Order, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
-		return Order{}, classify(err)
+		return Order{}, p.check(ctx, err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	tag, err := tx.Exec(ctx, "UPDATE produtos SET estoque = estoque - $2 WHERE id = $1 AND estoque >= $2", productID, qty)
 	if err != nil {
-		return Order{}, classify(err)
+		return Order{}, p.check(ctx, err)
 	}
 	if tag.RowsAffected() == 0 {
 		var exists bool
 		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM produtos WHERE id = $1)", productID).Scan(&exists); err != nil {
-			return Order{}, classify(err)
+			return Order{}, p.check(ctx, err)
 		}
 		if !exists {
 			return Order{}, ErrNotFound
@@ -117,21 +149,21 @@ func (p *Postgres) CreateOrder(ctx context.Context, productID int64, qty int) (O
 	err = tx.QueryRow(ctx, "INSERT INTO pedidos (produto_id, quantidade) VALUES ($1, $2) RETURNING id, criado_em",
 		productID, qty).Scan(&o.ID, &o.CreatedAt)
 	if err != nil {
-		return Order{}, classify(err)
+		return Order{}, p.check(ctx, err)
 	}
-	return o, classify(tx.Commit(ctx))
+	return o, p.check(ctx, tx.Commit(ctx))
 }
 
 func (p *Postgres) GetOrder(ctx context.Context, id int64) (Order, error) {
 	var o Order
 	err := p.pool.QueryRow(ctx, "SELECT id, produto_id, quantidade, criado_em FROM pedidos WHERE id = $1", id).
 		Scan(&o.ID, &o.ProductID, &o.Quantity, &o.CreatedAt)
-	return o, classify(err)
+	return o, p.check(ctx, err)
 }
 
 func (p *Postgres) Sleep(ctx context.Context, d time.Duration) error {
 	_, err := p.pool.Exec(ctx, "SELECT pg_sleep($1)", d.Seconds())
-	return classify(err)
+	return p.check(ctx, err)
 }
 
 func (p *Postgres) Broken(ctx context.Context) error {
@@ -139,16 +171,16 @@ func (p *Postgres) Broken(ctx context.Context) error {
 	return classify(err)
 }
 
-func collectProducts(rows pgx.Rows, err error) ([]Product, error) {
+func (p *Postgres) collectProducts(ctx context.Context, rows pgx.Rows, err error) ([]Product, error) {
 	if err != nil {
-		return nil, classify(err)
+		return nil, p.check(ctx, err)
 	}
 	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Product, error) {
 		var pr Product
 		err := r.Scan(&pr.ID, &pr.Name, &pr.PriceCents, &pr.Stock)
 		return pr, err
 	})
-	return list, classify(err)
+	return list, p.check(ctx, err)
 }
 
 // classify traduz os erros do pgx para os erros sentinela do pacote.
@@ -158,6 +190,9 @@ func classify(err error) error {
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

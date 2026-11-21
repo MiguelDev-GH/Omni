@@ -2,12 +2,16 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/MiguelDev-GH/omni/subjects/loja/internal/store"
 )
@@ -46,12 +50,19 @@ func New(s store.Store) http.Handler {
 	return withHeaders(mux)
 }
 
-// withHeaders anuncia servidor e tecnologia, de propósito, para o Nuclei.
+// queryTimeout limita cada requisição, para que um banco travado vire 503 em
+// vez de prender as conexões. Cobre o maior /lento (2 s) com folga.
+var queryTimeout = 5 * time.Second
+
+// withHeaders anuncia servidor e tecnologia, de propósito, para o Nuclei, e
+// aplica o prazo da requisição.
 func withHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Server", "Loja/0.1")
 		w.Header().Set("X-Powered-By", "Go")
-		next.ServeHTTP(w, r)
+		ctx, cancel := context.WithTimeout(r.Context(), queryTimeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -80,7 +91,7 @@ func (a api) listProducts(w http.ResponseWriter, r *http.Request) {
 
 func (a api) searchProducts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
-	if q == "" || len([]rune(q)) > maxSearch {
+	if q == "" || len([]rune(q)) > maxSearch || !utf8.ValidString(q) || strings.ContainsRune(q, 0) {
 		writeJSON(w, http.StatusBadRequest, errorBody("q deve ter de 1 a 100 caracteres"))
 		return
 	}
@@ -106,7 +117,7 @@ func (a api) createOrder(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, errorBody("JSON inválido"))
 		return
 	}
-	if in.ProductID <= 0 || in.Quantity < 1 || in.Quantity > maxQuantity {
+	if in.ProductID <= 0 || in.ProductID > math.MaxInt32 || in.Quantity < 1 || in.Quantity > maxQuantity {
 		writeJSON(w, http.StatusBadRequest, errorBody("produto_id deve ser positivo e quantidade de 1 a 10"))
 		return
 	}
@@ -151,7 +162,8 @@ func (a api) broken(w http.ResponseWriter, r *http.Request) {
 
 // pathID lê o {id} da rota; responde 400 e devolve false se for inválido.
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	// As colunas são integer (int4): ids acima disso são inválidos, não 500.
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 32)
 	if err != nil || id <= 0 {
 		writeJSON(w, http.StatusBadRequest, errorBody("id inválido"))
 		return 0, false
@@ -181,7 +193,7 @@ func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusInternalServerError, errorBody("erro interno"))
-	case errors.Is(err, store.ErrUnavailable):
+	case errors.Is(err, store.ErrUnavailable), errors.Is(err, context.DeadlineExceeded):
 		writeJSON(w, http.StatusServiceUnavailable, errorBody(store.ErrUnavailable.Error()))
 	case errors.Is(err, store.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, errorBody(store.ErrNotFound.Error()))

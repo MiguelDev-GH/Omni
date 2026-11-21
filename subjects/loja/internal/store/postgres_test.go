@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
@@ -144,4 +145,30 @@ func TestUnavailable(t *testing.T) {
 	assert.ErrorIs(t, p.Ping(ctx), ErrUnavailable)
 	_, err = p.GetProduct(ctx, 1)
 	assert.ErrorIs(t, err, ErrUnavailable)
+}
+
+func TestMissingTablesRemigrate(t *testing.T) {
+	p := cleanDB(t)
+	ctx := context.Background()
+	drop := func() {
+		_, err := p.pool.Exec(ctx, "DROP TABLE pedidos, produtos")
+		require.NoError(t, err)
+	}
+
+	drop()
+	_, err := p.GetProduct(ctx, 1)
+	assert.ErrorIs(t, err, ErrUnavailable)
+	_, err = p.GetProduct(ctx, 1)
+	assert.NoError(t, err)
+
+	drop()
+	assert.ErrorIs(t, p.Ping(ctx), ErrUnavailable)
+	assert.NoError(t, p.Ping(ctx))
+}
+
+func TestDeadlineIsUnavailable(t *testing.T) {
+	p := cleanDB(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	assert.ErrorIs(t, p.Sleep(ctx, time.Second), ErrUnavailable)
 }
