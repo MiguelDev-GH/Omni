@@ -1,6 +1,6 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
-import { deleteTarget, loadTargets, type Target } from "../api/targets";
+import { deleteTarget, loadTargets, targetPorts, type Target } from "../api/targets";
 import TargetForm from "../components/TargetForm";
 import { portKey, useAppStore, type PortStatus } from "../store/app";
 
@@ -13,16 +13,25 @@ const columns = col.columns([
   col.accessor((t) => t.portas_app.join(", "), { id: "portas", header: "Portas da aplicação" }),
   col.accessor((t) => dash(t.porta_banco), { id: "banco", header: "Porta do banco" }),
   col.accessor((t) => dash(t.dominio), { id: "dominio", header: "Domínio" }),
+  col.accessor((t) => dnsSmtp(t), { id: "dns_smtp", header: "DNS / SMTP" }),
 ]);
+
+function dnsSmtp(t: Target): string {
+  const parts = [t.porta_dns ? `DNS ${t.porta_dns}` : "", t.porta_smtp ? `SMTP ${t.porta_smtp}` : ""].filter(Boolean);
+  return parts.length === 0 ? "—" : parts.join(" · ");
+}
 
 // targetState resume o último status das portas do alvo.
 function targetState(t: Target, status: Record<string, PortStatus>): { text: string; color: string } {
-  const ports = [...t.portas_app, ...(t.porta_banco ? [t.porta_banco] : [])];
-  const known = ports.map((p) => status[portKey(t.id, p)]).filter((s) => s !== undefined);
+  const known = targetPorts(t)
+    .map((p) => status[portKey(t.id, p)])
+    .filter((s) => s !== undefined);
   if (known.length === 0) return { text: "Aguardando", color: "text-suave" };
   const down = known.filter((s) => !s.no_ar).map((s) => s.porta);
-  if (down.length === 0) return { text: "No ar", color: "text-destaque" };
-  return { text: `Fora do ar (porta ${down.join(", ")})`, color: "text-erro" };
+  if (down.length > 0) return { text: `Fora do ar (porta ${down.join(", ")})`, color: "text-erro" };
+  const degraded = known.filter((s) => s.degradado).map((s) => s.porta);
+  if (degraded.length > 0) return { text: `Com erro (porta ${degraded.join(", ")})`, color: "text-amber-400" };
+  return { text: "No ar", color: "text-destaque" };
 }
 
 type Editing = { mode: "novo" } | { mode: "editar"; target: Target } | null;

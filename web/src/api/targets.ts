@@ -8,7 +8,14 @@ export type Target = {
   portas_app: number[];
   porta_banco?: number;
   dominio?: string;
+  porta_dns?: number;
+  porta_smtp?: number;
 };
+
+// targetPorts lista todas as portas verificadas de um alvo.
+export function targetPorts(t: Target): number[] {
+  return [...t.portas_app, ...[t.porta_banco, t.porta_dns, t.porta_smtp].filter((p): p is number => p !== undefined && p > 0)];
+}
 
 export type TargetInput = Omit<Target, "id">;
 

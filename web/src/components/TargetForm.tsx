@@ -5,7 +5,9 @@ import { createTarget, parsePorts, updateTarget, type Target, type TargetInput }
 import { useAppStore } from "../store/app";
 import DiscoveredServices from "./DiscoveredServices";
 
-type Field = "nome" | "host" | "portas_app" | "porta_banco" | "dominio";
+type Field = "nome" | "host" | "portas_app" | "porta_banco" | "dominio" | "porta_dns" | "porta_smtp";
+
+const singlePorts = ["porta_banco", "porta_dns", "porta_smtp"] as const;
 
 type Props = { initial?: Target; onDone: () => void; onCancel: () => void };
 
@@ -16,6 +18,8 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
     portas_app: initial?.portas_app.join(", ") ?? "",
     porta_banco: initial?.porta_banco ? String(initial.porta_banco) : "",
     dominio: initial?.dominio ?? "",
+    porta_dns: initial?.porta_dns ? String(initial.porta_dns) : "",
+    porta_smtp: initial?.porta_smtp ? String(initial.porta_smtp) : "",
   });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -45,13 +49,16 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
       setErrors({ portas_app: "Use só números separados por vírgula." });
       return;
     }
-    const dbPort = values.porta_banco.trim();
-    if (dbPort !== "" && !/^\d+$/.test(dbPort)) {
-      setErrors({ porta_banco: "Use um número de porta." });
-      return;
-    }
     const input: TargetInput = { nome: values.nome.trim(), host: values.host.trim(), portas_app: ports };
-    if (dbPort !== "") input.porta_banco = Number(dbPort);
+    for (const field of singlePorts) {
+      const v = values[field].trim();
+      if (v === "") continue;
+      if (!/^\d+$/.test(v)) {
+        setErrors({ [field]: "Use um número de porta." });
+        return;
+      }
+      input[field] = Number(v);
+    }
     if (values.dominio.trim() !== "") input.dominio = values.dominio.trim();
 
     setSaving(true);
@@ -81,7 +88,7 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
         <input
           id={field}
           type="text"
-          inputMode={field === "portas_app" || field === "porta_banco" ? "numeric" : undefined}
+          inputMode={field === "portas_app" || (singlePorts as readonly string[]).includes(field) ? "numeric" : undefined}
           value={values[field]}
           onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
           aria-invalid={error ? true : undefined}
@@ -116,7 +123,9 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
         {input("host", "Host")}
         {input("portas_app", "Portas da aplicação", "Separe por vírgula, ex.: 3000, 8080")}
         {input("porta_banco", "Porta do banco (opcional)")}
-        {input("dominio", "Domínio (opcional)")}
+        {input("dominio", "Domínio (opcional)", "A sonda de DNS resolve este nome e a de SMTP testa postmaster@domínio")}
+        {input("porta_dns", "Porta DNS (opcional)", "Servidor DNS no mesmo host, ex.: 53")}
+        {input("porta_smtp", "Porta SMTP (opcional)", "Servidor de e-mail no mesmo host, ex.: 25 ou 587")}
       </div>
       <div className="flex gap-2">
         <button

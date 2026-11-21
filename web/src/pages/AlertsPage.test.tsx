@@ -96,3 +96,28 @@ test("reports a load error", async () => {
   renderPage(null);
   expect(await screen.findByText("Não foi possível carregar os alertas.")).toBeInTheDocument();
 });
+
+test("shows DNS and SMTP services", async () => {
+  renderPage({
+    ...overview,
+    estado: [
+      {
+        regra: "smtp_sem_starttls",
+        servico: "smtp",
+        nome: "SMTP sem STARTTLS",
+        recurso: "loja:1025",
+        nivel: "amarelo",
+        valor: 1,
+        unidade: "",
+        limite_amarelo: 1,
+        limite_vermelho: 2,
+        desde: down.hora,
+        atualizado: down.hora,
+      },
+    ],
+  });
+  const smtp = await screen.findByRole("region", { name: "SMTP" });
+  await within(smtp).findByText("sem STARTTLS");
+  expect(within(smtp).getByText("sem STARTTLS é amarelo")).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "DNS" })).getByText("Sem medições ainda.")).toBeInTheDocument();
+});

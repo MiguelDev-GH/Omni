@@ -34,7 +34,7 @@ test("lists targets", async () => {
   renderPage();
   const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
   expect(within(row).getByText("3000, 8080")).toBeInTheDocument();
-  expect(within(row).getAllByText("—")).toHaveLength(2);
+  expect(within(row).getAllByText("—")).toHaveLength(3);
   expect(screen.getByRole("combobox", { name: "Alvo" })).toHaveDisplayValue("api");
 });
 
@@ -146,4 +146,66 @@ test("shows all ports up", async () => {
   renderPage();
   const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
   expect(within(row).getByText("No ar")).toBeInTheDocument();
+});
+
+test("creates target with DNS and SMTP ports", async () => {
+  const calls = backend([], (c) => json(201, { ...JSON.parse(c.body ?? "{}"), id: 1 }));
+  renderPage();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Novo alvo" }));
+  await user.type(screen.getByLabelText("Nome"), "loja");
+  await user.type(screen.getByLabelText("Host"), "127.0.0.1");
+  await user.type(screen.getByLabelText("Portas da aplicação"), "3000");
+  await user.type(screen.getByLabelText("Domínio (opcional)"), "loja.local");
+  await user.type(screen.getByLabelText("Porta DNS (opcional)"), "1053");
+  await user.type(screen.getByLabelText("Porta SMTP (opcional)"), "1025");
+  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  const isCreate = (c: FetchCall) => c.method === "POST" && c.url === "/api/alvos";
+  await waitFor(() => expect(calls.some(isCreate)).toBe(true));
+  const post = calls.find(isCreate)!;
+  expect(JSON.parse(post.body ?? "{}")).toEqual({
+    nome: "loja",
+    host: "127.0.0.1",
+    portas_app: [3000],
+    dominio: "loja.local",
+    porta_dns: 1053,
+    porta_smtp: 1025,
+  });
+});
+
+test("rejects a non-numeric DNS port locally", async () => {
+  const calls = backend([]);
+  renderPage();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Novo alvo" }));
+  await user.type(screen.getByLabelText("Nome"), "loja");
+  await user.type(screen.getByLabelText("Host"), "127.0.0.1");
+  await user.type(screen.getByLabelText("Portas da aplicação"), "3000");
+  await user.type(screen.getByLabelText("Porta DNS (opcional)"), "dns");
+  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  expect(screen.getByLabelText("Porta DNS (opcional)")).toHaveAttribute("aria-invalid", "true");
+  expect(calls.some((c) => c.method === "POST" && c.url === "/api/alvos")).toBe(false);
+});
+
+test("shows DNS and SMTP ports and a degraded server", async () => {
+  backend([{ ...api, portas_app: [3000], dominio: "loja.local", porta_dns: 1053, porta_smtp: 1025 }]);
+  useAppStore.setState({
+    targetStatus: {
+      "1:3000": { alvo_id: 1, porta: 3000, tipo: "http", no_ar: true, latencia_ms: 1, hora: "2026-11-21T12:00:00Z" },
+      "1:1053": {
+        alvo_id: 1,
+        porta: 1053,
+        tipo: "dns",
+        no_ar: true,
+        degradado: true,
+        detalhe: "NXDOMAIN",
+        latencia_ms: 1,
+        hora: "2026-11-21T12:00:00Z",
+      },
+    },
+  });
+  renderPage();
+  const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
+  expect(within(row).getByText("DNS 1053 · SMTP 1025")).toBeInTheDocument();
+  expect(within(row).getByText("Com erro (porta 1053)")).toBeInTheDocument();
 });

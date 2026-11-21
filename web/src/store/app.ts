@@ -14,12 +14,15 @@ export type EngineName = "poller" | "sniffer" | "docker";
 export type PortStatus = {
   alvo_id: number;
   porta: number;
-  tipo: "http" | "tcp";
+  tipo: "http" | "tcp" | "dns" | "smtp";
   no_ar: boolean;
   status_http?: number;
   latencia_ms: number;
   erro?: string;
   hora: string;
+  degradado?: boolean; // DNS com RCODE de erro ou SMTP com comando recusado
+  detalhe?: string;
+  starttls?: boolean;
 };
 
 export type SystemMetrics = { cpu: number; memoria: number; disco: number; hora: string };
