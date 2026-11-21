@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/MiguelDev-GH/omni/internal/alerts"
 	"github.com/MiguelDev-GH/omni/internal/api"
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
@@ -62,6 +63,23 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	hub := ws.NewHub(clientBuffer)
 	tickets := ws.NewTickets(ticketTTL)
 
+	// Os motores publicam por pub: cada evento vai ao hub e uma cópia vai ao
+	// observador de alertas, que avalia as regras e avisa as mudanças de nível.
+	engine := alerts.NewEngine(alerts.DefaultRules())
+	watcher := alerts.NewWatcher(engine, st)
+	pub := alertTap{next: hub, feed: watcher.Feed}
+	engine.OnAlert(func(a alerts.Alert) { hub.Publish(ws.Event{Type: alerts.EventAlert, Data: a}) })
+	var mailer *alerts.Mailer
+	if cfg.Mail.Enabled() {
+		mc := cfg.Mail
+		mc.PanelURL = "http://" + ln.Addr().String() + "/alertas"
+		mailer = alerts.NewMailer(mc)
+		engine.OnAlert(mailer.Notify)
+		slog.Info("alertas por e-mail ativos", "servidor", mc.Host, "porta", mc.Port, "destinatarios", len(mc.To))
+	} else {
+		slog.Info("alertas por e-mail desligados; defina OMNI_SMTP_HOST e OMNI_ALERTA_EMAILS para ligar")
+	}
+
 	srv := api.NewServer(st, cfg.Token)
 	srv.Handle("POST /api/ws/ticket", ws.TicketHandler(tickets))
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
@@ -70,6 +88,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	srv.Handle("GET /api/consultas", api.QueriesHandler(st))
 	srv.Handle("GET /api/consultas/lentas", api.SlowQueriesHandler(st))
+	srv.Handle("GET /api/alertas", alerts.Handler(engine, alerts.EmailInfo{Enabled: cfg.Mail.Enabled(), Recipients: len(cfg.Mail.To)}))
 	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
 	}
@@ -95,15 +114,26 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
 	srv.HandleFrontend(web.Handler(web.Assets()))
 
-	wg.Add(4)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
-		poller.NewScheduler(st, hub, cfg.PollInterval).Run(bgCtx)
+		watcher.Run(bgCtx)
+	}()
+	if mailer != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mailer.Run(bgCtx)
+		}()
+	}
+	go func() {
+		defer wg.Done()
+		poller.NewScheduler(st, pub, cfg.PollInterval).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()
 		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
-		_ = sniffer.NewEngine(open, st, hub).Run(bgCtx)
+		_ = sniffer.NewEngine(open, st, pub).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()
@@ -111,7 +141,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	}()
 	go func() {
 		defer wg.Done()
-		sysmetrics.Run(bgCtx, hub, filepath.Dir(cfg.DBPath), sysmetrics.DefaultInterval)
+		sysmetrics.Run(bgCtx, pub, filepath.Dir(cfg.DBPath), sysmetrics.DefaultInterval)
 	}()
 
 	httpSrv := &http.Server{

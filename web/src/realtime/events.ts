@@ -1,3 +1,4 @@
+import { formatAlertValue, type Alert, type Level } from "../api/alerts";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
@@ -37,6 +38,25 @@ function isHTTPWindow(v: unknown): v is HTTPWindow {
 function isDBWindow(v: unknown): v is DBWindow {
   return isObject(v) && typeof v.inicio === "string" && typeof v.consultas === "number" && typeof v.erros === "number";
 }
+
+const levels: Level[] = ["verde", "amarelo", "vermelho"];
+
+function isAlert(v: unknown): v is Alert {
+  return (
+    isObject(v) &&
+    typeof v.id === "number" &&
+    typeof v.regra === "string" &&
+    typeof v.nome === "string" &&
+    typeof v.recurso === "string" &&
+    typeof v.servico === "string" &&
+    typeof v.valor === "number" &&
+    levels.includes(v.nivel as Level) &&
+    levels.includes(v.nivel_anterior as Level)
+  );
+}
+
+const alertToastTitle: Record<Level, string> = { verde: "Normalizado", amarelo: "Atenção", vermelho: "Crítico" };
+const alertToastKind = { verde: "ok", amarelo: "aviso", vermelho: "erro" } as const;
 
 const engineStates: EngineState[] = ["ativo", "inativo", "sem-permissao", "indisponivel"];
 
@@ -120,6 +140,23 @@ export function handleEvent(raw: string): void {
       if (isObject(dados) && typeof dados.scan_id === "number") {
         st.bumpScanEvents();
         st.pushToast({ kind: "erro", title: "Varredura falhou", body: `Varredura #${dados.scan_id}: ${typeof dados.erro === "string" ? dados.erro : ""}` });
+      }
+      break;
+    case "ALERTA":
+      if (isAlert(dados)) {
+        st.addAlert(dados);
+        // Queda e volta de uma porta já têm aviso próprio (ALERTA_QUEDA e
+        // SERVICO_RESTAURADO); aqui só entra o "no ar com erro 5xx".
+        const duplicate = dados.regra === "disponibilidade" && dados.nivel !== "amarelo" && dados.nivel_anterior !== "amarelo";
+        if (duplicate) break;
+        const where = dados.recurso || dados.servico;
+        const value = formatAlertValue(dados.regra, dados.valor, typeof dados.unidade === "string" ? dados.unidade : "");
+        st.pushToast({
+          kind: alertToastKind[dados.nivel],
+          title: `${alertToastTitle[dados.nivel]}: ${dados.nome}`,
+          body: `${where}: ${value}`,
+          link: { to: "/alertas", label: "Ver alertas" },
+        });
       }
       break;
     case "SCAN_INICIADO":

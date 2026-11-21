@@ -19,6 +19,8 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Comunicação em tempo real (WebSocket)](#comunicação-em-tempo-real-websocket)
 - [Interface (frontend)](#interface-frontend)
 - [Aplicação cobaia](#aplicação-cobaia)
+- [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
+- [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp)
 - [Requisitos de implantação](#requisitos-de-implantação)
 - [O que falta implementar, por camada](#o-que-falta-implementar-por-camada)
 - [Segurança da própria plataforma](#segurança-da-própria-plataforma)
@@ -159,6 +161,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 - `METRICAS_HTTP` sai a cada 10 s: o sniffer remonta os fluxos TCP das portas da aplicação (`gopacket/reassembly`, até 4 MiB em buffer por conexão, fluxos ociosos fechados em 2 min), pareia requisição e resposta (inclusive em pipeline e fora de ordem) e agrega contagem, classes de status e latência p50/p95 por rota normalizada (`/users/123` vira `/users/:id`). Cabeçalhos, query strings e corpos nunca são guardados, e o tráfego com User-Agent `Omni-` (Poller e Arsenal) fica fora. Rotas: `GET /api/requisicoes` (janelas, últimos 15 minutos) e `GET /api/requisicoes/rotas` (as 100 rotas de mais volume das últimas 24 h).
 - `METRICAS_BANCO` sai a cada 10 s com as consultas ao PostgreSQL na porta do banco dos alvos (consultas simples e Parse/Bind/Execute, com erros). O SQL é normalizado: literais viram `?`, comentários somem e listas viram `(?)`. Mensagens de senha nunca são lidas, e conexões com TLS são ignoradas. Rotas: `GET /api/consultas` e `GET /api/consultas/lentas?limite=` (padrão 20, as de maior p95 em 24 h). As métricas HTTP e de banco ficam 24 h no banco, como as de tráfego.
 - O Docker informa o estado no `ESTADO_MOTORES` a cada 5 s: `ativo` ou `indisponivel`.
+- `ALERTA` sai quando uma métrica muda de nível (verde, amarelo ou vermelho); veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
 - `SCAN_LOG` leva a saída da ferramenta em lotes a cada 500 ms (no máximo 20 000 linhas por ferramenta); `SCAN_CONCLUIDO` traz quantos achados são novos em relação à varredura anterior.
 
 ## Interface (frontend)
@@ -198,10 +201,105 @@ As telas laterais de métricas são **drill-down**: mostram o gráfico e, abaixo
 ## Aplicação cobaia
 
 Para testar o Omni de ponta a ponta sem uma aplicação real, a pasta [subjects/](subjects/README.md) tem uma loja de exemplo (Go, PostgreSQL e Caddy com TLS) com gerador de carga, cadastro automático dos alvos e falhas de propósito para o Arsenal encontrar. Com o Omni no ar, `cd subjects/loja && OMNI_TOKEN=<token> make demo` sobe tudo.
+## Alertas e notificação por e-mail
+
+O motor de alertas (`internal/alerts`) observa os mesmos eventos que o frontend recebe (`STATUS_ALVOS`, `METRICAS_HTTP`, `METRICAS_BANCO` e `METRICAS_SISTEMA`), compara cada métrica com dois limites e classifica o recurso em três níveis:
+
+| Nível | Significado | Ação |
+|---|---|---|
+| 🟢 Verde | Estado normal | Nenhuma; a volta ao verde gera um e-mail de normalização |
+| 🟡 Amarelo | Degradação que exige observação | E-mail |
+| 🔴 Vermelho | Serviço degradado ou indisponível | E-mail imediato |
+
+Um nível só muda depois que a condição se mantém pelo tempo da regra (coluna "Por"), para que um pico isolado não vire alerta. Queda de porta não espera: vira vermelho na primeira verificação que falha.
+
+| Regra | Serviço | Amarelo a partir de | Vermelho a partir de | Por |
+|---|---|---|---|---|
+| Disponibilidade (por porta) | Web / Banco / DNS / SMTP | respondeu com erro (HTTP 5xx, RCODE de erro, comando SMTP recusado) | não respondeu | imediato |
+| Latência da verificação ativa | Web / Banco | 1000 ms | 3000 ms | 1 min |
+| Taxa de erros 5xx | Web | 10% | 25% | 30 s |
+| Latência p95 das requisições | Web | 1000 ms | 2500 ms | 30 s |
+| Taxa de erros nas consultas | Banco | 10% | 25% | 30 s |
+| Latência p95 das consultas | Banco | 500 ms | 2000 ms | 30 s |
+| Tempo de resolução DNS | DNS | 200 ms | 1000 ms | 30 s |
+| Latência da conversa SMTP | SMTP | 2000 ms | 5000 ms | 30 s |
+| Taxa de falhas da sonda (últimas 10, mínimo 5) | DNS / SMTP | 20% | 50% | imediato |
+| SMTP sem STARTTLS | SMTP | servidor não oferece STARTTLS | — | imediato |
+| Uso de CPU / memória / disco | Sistema | 80% / 85% / 85% | 95% | 1 min |
+
+As taxas e o p95 só contam com pelo menos 20 requisições ou consultas na janela de 10 s, para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
+
+```json
+{ "tipo": "ALERTA", "dados": { "id": 3, "regra": "http_p95", "servico": "web", "nome": "Latência p95 das requisições", "recurso": "", "nivel": "amarelo", "nivel_anterior": "verde", "valor": 1234.5, "limite": 1000, "unidade": "ms", "hora": "2026-11-21T20:10:00Z" } }
+```
+
+### Configurar o e-mail
+
+Sem `OMNI_SMTP_HOST` o envio fica desligado e o restante funciona normalmente.
+
+| Variável | Uso |
+|---|---|
+| `OMNI_SMTP_HOST` | Servidor SMTP. Liga o envio |
+| `OMNI_SMTP_PORTA` | Padrão 587 (STARTTLS). Na 465 o TLS começa já na conexão |
+| `OMNI_SMTP_USUARIO` | Usuário do SMTP (opcional) |
+| `OMNI_SMTP_SENHA` ou `OMNI_SMTP_SENHA_ARQUIVO` | Senha, ou caminho de um arquivo com ela (preferível: variáveis de ambiente ficam visíveis em `/proc/<pid>/environ`) |
+| `OMNI_SMTP_REMETENTE` | Endereço que envia; se vazio, usa o usuário quando ele é um e-mail |
+| `OMNI_ALERTA_EMAILS` | Destinatários, separados por vírgula |
+
+**Teste local sem conta de e-mail,** com o [Mailpit](https://mailpit.axllent.org/), que captura as mensagens e as mostra numa página:
+
+```bash
+docker run -d --name mailpit -p 127.0.0.1:1025:1025 -p 127.0.0.1:8025:8025 axllent/mailpit
+OMNI_TOKEN=... OMNI_SMTP_HOST=127.0.0.1 OMNI_SMTP_PORTA=1025 \
+  OMNI_SMTP_REMETENTE=omni@localhost OMNI_ALERTA_EMAILS=equipe@exemplo.com ./omni
+# derrube a loja cobaia e abra http://127.0.0.1:8025
+```
+
+**Gmail:** `OMNI_SMTP_HOST=smtp.gmail.com`, porta 587, o seu endereço como usuário e uma [senha de app](https://support.google.com/accounts/answer/185833) (exige verificação em duas etapas) no lugar da senha da conta.
+
+**Proteções do envio:**
+
+- **TLS obrigatório para a senha.** Se o servidor não oferece STARTTLS, o Omni se recusa a autenticar, exceto em servidor local (`127.0.0.1`/`localhost`).
+- **Sem injeção de cabeçalho.** Quebras de linha são removidas dos campos que vêm do usuário (como o nome do alvo), e os endereços são validados na inicialização: um nome como `x\r\nBcc: alguem@exemplo.com` não cria cópias ocultas.
+- **Limite de 20 e-mails por minuto.** Um ataque que derruba o serviço não vira, de quebra, uma enxurrada de e-mails; o e-mail seguinte informa quantos alertas foram suprimidos.
+- **Envio fora do caminho crítico.** Os e-mails saem de uma fila numa goroutine própria: um SMTP lento ou fora do ar nunca atrasa o Poller, o sniffer ou o WebSocket.
+
+## Monitoramento de DNS e SMTP
+
+Cada alvo pode ter uma **porta DNS** e uma **porta SMTP** (campos `porta_dns` e `porta_smtp`), no mesmo host do alvo. O Poller testa as duas a cada rodada, junto com as portas da aplicação, e o resultado sai no `STATUS_ALVOS` com `tipo` `dns` ou `smtp`:
+
+```json
+{ "alvo_id": 1, "porta": 1053, "tipo": "dns", "no_ar": true, "degradado": true, "detalhe": "NXDOMAIN", "latencia_ms": 0.8, "hora": "..." }
+{ "alvo_id": 1, "porta": 1025, "tipo": "smtp", "no_ar": true, "starttls": false, "detalhe": "aceita destinatário postmaster", "latencia_ms": 3.1, "hora": "..." }
+```
+
+**Sonda DNS** (`internal/probe/dns.go`): um cliente DNS feito só com a biblioteca padrão, que monta o pacote byte a byte (RFC 1035). Pergunta pelo registro A do **domínio** do alvo (obrigatório quando há porta DNS) e mede o tempo de resolução. Responder com qualquer código conta como "no ar"; `NXDOMAIN`, `SERVFAIL`, `REFUSED` ou uma resposta sem endereços contam como degradado (amarelo). Respostas truncadas (bit TC) são repetidas por TCP. Por segurança, a sonda:
+
+- usa um ID de consulta aleatório (a porta de origem também é aleatória) e descarta respostas com ID diferente ou para outro nome, a defesa básica contra envenenamento de cache (ataque de Kaminsky);
+- limita os saltos de ponteiros de compressão, para um pacote malicioso com ponteiros em ciclo não travar a leitura.
+
+**Sonda SMTP** (`internal/probe/smtp.go`): conversa com o servidor **sem enviar e-mail**: espera a saudação `220`, manda `EHLO` e anota se o servidor oferece `STARTTLS`. Com domínio no alvo, testa também `MAIL FROM:<>` e `RCPT TO:<postmaster@domínio>` e desfaz com `RSET`; todo domínio que recebe e-mail precisa aceitar `postmaster` (RFC 5321, seção 4.5.1). Um comando recusado (4xx/5xx) é degradado; conexão recusada, timeout ou saudação diferente de 220 é fora do ar. Servidor sem STARTTLS gera o alerta amarelo "SMTP sem STARTTLS": os e-mails trafegariam em texto puro.
+
+A taxa de falhas usa as últimas 10 verificações de cada porta (precisa de pelo menos 5). Com o intervalo padrão de 30 s, isso cobre os últimos 5 minutos.
+
+**Ambiente de teste** em `exemplos/dns-smtp/`: um CoreDNS que resolve `loja.local` na porta 1053 e um Mailpit na porta 1025.
+
+```bash
+cd exemplos/dns-smtp && docker compose up -d
+dig @127.0.0.1 -p 1053 loja.local +short        # 127.0.0.1
+```
+
+Cadastre (ou edite) o alvo com domínio `loja.local`, porta DNS `1053` e porta SMTP `1025`. Para ver os níveis mudarem:
+
+- **Amarelo no DNS:** troque o domínio para `nao-existe.loja.local` (NXDOMAIN).
+- **Vermelho no DNS ou SMTP:** `docker compose stop coredns` ou `docker compose stop mailpit`.
+- **Amarelo "SMTP sem STARTTLS":** já aparece com o Mailpit padrão, que não tem TLS.
+
+**Ainda não coberto:** consultas por segundo do DNS, volume e fila do SMTP. Essas métricas dependem do tráfego real e entram com a captura passiva no sniffer (UDP 53 e SMTP).
 
 ## Requisitos de implantação
 
-- **Sistema:** servidor Linux. O Windows funciona com Npcap, mas não é o alvo principal.
+- **Sistema:** servidor Linux. No Windows, rode o Omni dentro do WSL2 (veja [Windows](#windows)).
 - **Reverse proxy terminando o TLS** e repassando à aplicação via `localhost`. Sem isso, o tráfego HTTPS fica ilegível para o Sniffer.
 - **Banco acessado via TCP em `127.0.0.1`,** e não por unix socket, que o pcap não enxerga.
 - **libpcap:** a captura ao vivo usa cgo e precisa do `libpcap-dev` (Debian/Ubuntu) ou `libpcap` (Arch) para compilar. Um binário compilado com `CGO_ENABLED=0` roda, mas com o sniffer sempre inativo.
@@ -213,6 +311,25 @@ Para testar o Omni de ponta a ponta sem uma aplicação real, a pasta [subjects/
 - **Docker** instalado, só para o Arsenal. O Omni fala com a API do Docker Engine pelo socket Unix (`/var/run/docker.sock` ou `DOCKER_HOST=unix://...`), então o usuário que roda o Omni precisa de acesso a ele. Os containers rodam com `network_mode: host`, 1 CPU e 512 MiB; o Nuclei recebe 1,5 GiB, porque carregar os templates passa de 512 MiB. Os templates do Nuclei ficam no volume `omni-nuclei-templates` e são baixados na primeira varredura.
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
+
+### Windows
+
+O Omni não roda completo direto no Windows. O binário compila e a interface abre, mas dois motores ficam desligados:
+
+| Motor | No Windows nativo | Motivo |
+|---|---|---|
+| Poller | Funciona | Só faz conexões TCP e requisições HTTP |
+| Sniffer | Inativo | A interface padrão `any` não existe no Npcap, e `OMNI_INTERFACE` só aceita nomes no estilo Linux (até 15 caracteres), o que recusa os nomes do Npcap (`\Device\NPF_...`) |
+| Arsenal (Docker) | Indisponível | O Omni só fala com o Docker por socket Unix (`unix://`), e o Docker Desktop atende no Windows por named pipe (`npipe://`) |
+
+**Caminho recomendado: WSL2.** O Omni roda dentro de uma distribuição Linux do WSL2, e a interface é aberta pelo navegador do Windows em `http://localhost:8080`, porque o WSL2 repassa as portas do loopback para o Windows. Dentro do WSL, o Omni se comporta como num servidor Linux: siga os requisitos acima (`libpcap-dev`, `setcap`, Docker pelo socket Unix).
+
+Cuidados no WSL2:
+
+- **Use o Docker Engine instalado na própria distribuição**, e não a integração do Docker Desktop. Com a integração, o comando `docker` da distribuição fala com o motor do Docker Desktop, que roda em outra máquina virtual: containers com `network_mode: host` ficam no loopback dessa outra máquina, fora do alcance da aplicação e do Sniffer. Desligue a integração em *Settings → Resources → WSL integration* e instale o Docker Engine pelo repositório oficial da distribuição.
+- **O Sniffer só enxerga o tráfego de dentro do WSL.** Aplicações rodando no Windows podem ser vigiadas pelo Poller e varridas pelo Arsenal, mas o tráfego delas não passa pela interface do WSL.
+- **O `setcap` não funciona em `/mnt/c`.** Compile o binário para o sistema de arquivos do Linux (por exemplo, `go build -o ~/omni-bin/omni ./cmd/omni`) e aplique as capabilities nele.
+- **Guarde o banco do Omni no sistema de arquivos do Linux** (`OMNI_DB=~/omni.db`): o SQLite em `/mnt/c` pode ter problemas de trava de arquivo.
 
 ## O que falta implementar, por camada
 
@@ -288,6 +405,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **O tráfego gerado pelos próprios scans** precisa ser marcado e filtrado das métricas, pela origem ou por um User-Agent próprio. Sem isso, os gráficos de requisições e de status HTTP ficam poluídos.
 - **Aplicações que usam SQLite como banco** não geram tráfego de rede, então não há gráfico de consultas para elas.
 - **Traceroute** só faz sentido para destinos externos ao servidor.
+- **Windows nativo** roda só com o Poller: o Sniffer e o Arsenal ficam desligados. Use o WSL2 (veja [Windows](#windows)).
 
 ## Roadmap
 

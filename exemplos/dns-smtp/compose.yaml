@@ -1,0 +1,21 @@
+# Servidores de DNS e SMTP para testar as sondas do Omni na própria máquina.
+#   docker compose up -d     (nesta pasta)
+#   DNS:  127.0.0.1:1053 (UDP e TCP), resolve loja.local
+#   SMTP: 127.0.0.1:1025; os e-mails recebidos aparecem em http://127.0.0.1:8025
+services:
+  coredns:
+    image: coredns/coredns:latest
+    command: ["-conf", "/Corefile"]
+    volumes:
+      - ./Corefile:/Corefile:ro
+    ports:
+      - "127.0.0.1:1053:53/udp"
+      - "127.0.0.1:1053:53/tcp"
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped

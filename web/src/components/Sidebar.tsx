@@ -3,6 +3,7 @@ import { NavLink } from "react-router";
 // Seções do README; os itens sem rota chegam nas próximas sprints.
 const routes: Record<string, string> = {
   Geral: "/geral",
+  Alertas: "/alertas",
   "Requisições na API": "/requisicoes",
   "Status HTTP": "/requisicoes",
   "Consultas no banco": "/consultas",
@@ -17,7 +18,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded px-2 py-1.5 ${isActive ? "bg-zinc-800 text-texto" : "text-suave hover:text-texto"}`;
 
 const sections = [
-  { title: "Monitoramento", items: ["Geral", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
+  { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
   { title: "Tráfego", items: ["Inspetor de pacotes", "Capturas"] },
   { title: "Arsenal", items: ["Nmap", "Nuclei", "Nikto", "SQLMap", "ffuf", "Amass", "testssl", "Vazamentos"] },
   { title: "Relatórios", items: ["Histórico", "Comparação entre scans", "Exportação em PDF"] },

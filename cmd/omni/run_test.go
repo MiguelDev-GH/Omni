@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MiguelDev-GH/omni/internal/alerts"
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/sniffer"
@@ -199,6 +200,41 @@ func TestRunWiresHubAndPoller(t *testing.T) {
 		assert.True(t, ev.Data.Results[0].Up)
 		break
 	}
+	cancel()
+	assert.NoError(t, waitDone(t, done))
+}
+
+func TestRunAlertsWhenTargetGoesDown(t *testing.T) {
+	app := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	cancel, base, done := startRun(t, wsConfig(t))
+	createTarget(t, base, app)
+	conn := dialWS(t, base)
+	app.Close()
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+	for {
+		var ev struct {
+			Type string          `json:"tipo"`
+			Data json.RawMessage `json:"dados"`
+		}
+		require.NoError(t, conn.ReadJSON(&ev))
+		if ev.Type != alerts.EventAlert {
+			continue
+		}
+		var a alerts.Alert
+		require.NoError(t, json.Unmarshal(ev.Data, &a))
+		assert.Equal(t, alerts.RuleAvailability, a.Rule)
+		assert.Equal(t, alerts.Red, a.Level)
+		assert.Equal(t, alerts.Green, a.Previous)
+		break
+	}
+
+	code, body := get(t, base+"/api/alertas", true)
+	require.Equal(t, http.StatusOK, code, body)
+	assert.Contains(t, body, `"nivel":"vermelho"`)
+	assert.Contains(t, body, `"email":{"ativo":false,"destinatarios":0}`)
+	code, _ = get(t, base+"/api/alertas", false)
+	assert.Equal(t, http.StatusUnauthorized, code)
 	cancel()
 	assert.NoError(t, waitDone(t, done))
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { statusKey, type Alert, type AlertStatus } from "../api/alerts";
 import type { Target } from "../api/targets";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
@@ -13,22 +14,28 @@ export type EngineName = "poller" | "sniffer" | "docker";
 export type PortStatus = {
   alvo_id: number;
   porta: number;
-  tipo: "http" | "tcp";
+  tipo: "http" | "tcp" | "dns" | "smtp";
   no_ar: boolean;
   status_http?: number;
   latencia_ms: number;
   erro?: string;
   hora: string;
+  degradado?: boolean; // DNS com RCODE de erro ou SMTP com comando recusado
+  detalhe?: string;
+  starttls?: boolean;
 };
 
 export type SystemMetrics = { cpu: number; memoria: number; disco: number; hora: string };
 
-export type Toast = { id: number; kind: "erro" | "ok"; title: string; body: string; link?: { to: string; label: string } };
+export type Toast = { id: number; kind: "erro" | "aviso" | "ok"; title: string; body: string; link?: { to: string; label: string } };
 
 // MAX_LOG_LINES limita as linhas guardadas do console de cada varredura.
 export const MAX_LOG_LINES = 5000;
 
 const MAX_TOASTS = 5;
+
+// MAX_ALERT_HISTORY acompanha o limite do histórico guardado pelo backend.
+export const MAX_ALERT_HISTORY = 200;
 
 export const portKey = (alvoId: number, porta: number) => `${alvoId}:${porta}`;
 
@@ -62,6 +69,11 @@ export type AppState = {
   toasts: Toast[];
   pushToast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: number) => void;
+  alertStatus: Record<string, AlertStatus>; // chave statusKey(regra, recurso)
+  alertHistory: Alert[]; // do mais novo para o mais antigo
+  alertsLoaded: boolean;
+  setAlertsOverview: (estado: AlertStatus[], historico: Alert[]) => void;
+  addAlert: (a: Alert) => void;
 };
 
 let nextToastId = 1;
@@ -113,4 +125,42 @@ export const useAppStore = create<AppState>()((set) => ({
   toasts: [],
   pushToast: (t) => set((st) => ({ toasts: [...st.toasts, { ...t, id: nextToastId++ }].slice(-MAX_TOASTS) })),
   dismissToast: (id) => set((st) => ({ toasts: st.toasts.filter((t) => t.id !== id) })),
+  alertStatus: {},
+  alertHistory: [],
+  alertsLoaded: false,
+  // O estado da API substitui o local; o histórico junta os dois, porque um
+  // ALERTA pode chegar pelo WebSocket enquanto a requisição está no caminho.
+  setAlertsOverview: (estado, historico) =>
+    set((st) => {
+      const next: Record<string, AlertStatus> = {};
+      for (const s of estado) next[statusKey(s.regra, s.recurso)] = s;
+      return { alertStatus: next, alertHistory: mergeAlerts(st.alertHistory, historico), alertsLoaded: true };
+    }),
+  addAlert: (a) =>
+    set((st) => {
+      const key = statusKey(a.regra, a.recurso);
+      const prev = st.alertStatus[key];
+      const status: AlertStatus = {
+        limite_amarelo: 0,
+        limite_vermelho: 0,
+        ...prev,
+        regra: a.regra,
+        servico: a.servico,
+        nome: a.nome,
+        recurso: a.recurso,
+        nivel: a.nivel,
+        valor: a.valor,
+        unidade: a.unidade,
+        desde: a.hora,
+        atualizado: a.hora,
+      };
+      return { alertStatus: { ...st.alertStatus, [key]: status }, alertHistory: mergeAlerts(st.alertHistory, [a]) };
+    }),
 }));
+
+// mergeAlerts junta listas de alertas sem repetir ids, do mais novo para o mais antigo.
+function mergeAlerts(a: Alert[], b: Alert[]): Alert[] {
+  const byId = new Map<number, Alert>();
+  for (const x of [...a, ...b]) byId.set(x.id, x);
+  return [...byId.values()].sort((x, y) => y.id - x.id).slice(0, MAX_ALERT_HISTORY);
+}
