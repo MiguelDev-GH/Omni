@@ -2,7 +2,7 @@
 
 Visão geral do que é feito em cada sprint da implementação básica. Cada sprint vira **um branch e um pull request**, aberto depois que a sprint anterior entra na `main`, e entrega um binário funcional e testado.
 
-Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja o [plano de implementação](superpowers/plans/2026-11-18-implementacao-basica.md). Para a arquitetura, veja o [README](../README.md).
+Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja o [plano de implementação básica](superpowers/plans/2026-11-18-implementacao-basica.md) (Sprints 1 a 8) e o [plano da Fase 4](superpowers/plans/2026-11-21-fase-4-arsenal-e-paginas.md) (Sprints 9 a 16). Para a arquitetura, veja o [README](../README.md).
 
 ## Resumo
 
@@ -12,11 +12,19 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [2](#sprint-2-poller-e-websocket) | Fundação | Poller, WebSocket e métricas do sistema | ✅ Concluída |
 | [3](#sprint-3-frontend-base) | Fundação | Frontend base embutido no binário | ✅ Concluída |
 | [4](#sprint-4-sniffer-camadas-3-e-4) | Observação passiva | Captura de tráfego e gráficos de banda e protocolos | ✅ Concluída |
-| [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | 🚧 Em andamento |
-| [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | 🚧 Em andamento |
-| [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | 🚧 Em andamento |
-| [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | 🚧 Em andamento |
-| [Expansão](#fase-4-expansão) | Expansão | Restante das pendências do README | 📋 Backlog |
+| [5](#sprint-5-decodificação-http) | Observação passiva | Requisições por rota e status HTTP | ✅ Concluída |
+| [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ✅ Concluída |
+| [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | ✅ Concluída |
+| [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | ✅ Concluída |
+| [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | ⏳ A fazer |
+| [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ⏳ A fazer |
+| [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | ⏳ A fazer |
+| [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ⏳ A fazer |
+| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ⏳ A fazer |
+| [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
+| [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
+| [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ⏳ A fazer |
+| [Backlog](#backlog) | Expansão | Restante das pendências do README | 📋 Backlog |
 
 Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 
@@ -161,17 +169,97 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 
 ## Fase 4: Expansão
 
-Itens fora do escopo básico. Cada um vira uma sprint própria quando entrar na fila:
+Já entregue fora das sprints numeradas: alertas com notificação por e-mail (PR #13), monitoramento de DNS e SMTP no Poller (PR #15) e a aplicação cobaia em `subjects/` (PR #12).
 
-- **Aplicação:** HTTP/2, MySQL, `pg_stat_statements`, Poller de DNS e SMTP, Nikto, SQLMap, ffuf, Amass, Gitleaks, agendamento de varreduras, alertas externos e relatório em PDF.
+As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 vem primeiro**, porque cria a base que as Sprints 11 a 13 usam; as Sprints 10, 14, 15 e 16 não dependem do Arsenal e podem entrar em qualquer ordem depois dela.
+
+**A ideia central das páginas do Arsenal:** hoje toda ferramenta reduz a saída a uma lista genérica de achados (título, severidade, evidência, porta). Isso continua existindo, porque alimenta a comparação entre scans e os alertas, mas cada ferramenta passa a guardar também um **relatório estruturado** e a ter uma página em `/arsenal/<ferramenta>` desenhada a partir do que ela faz. A saída bruta continua disponível, recolhida em "Saída da ferramenta".
+
+### Sprint 9: Base de relatórios e páginas de Nmap, Nuclei e testssl
+
+**Ao final:** cada ferramenta existente tem a sua página, e `/arsenal` vira a visão geral, que dispara várias ferramentas de uma vez e resume o último resultado de cada uma.
+
+- Cada ferramenta passa a aceitar **opções** validadas no backend e a produzir um **relatório** em JSON, guardado por varredura (`GET /api/varreduras/{id}/relatorio/{ferramenta}`).
+- **Nmap, mapa de portas:** todas as portas, inclusive fechadas e filtradas, com serviço, produto e versão, e o que abriu ou fechou desde a varredura anterior.
+- **Nuclei, o que os templates acharam:** filtros por severidade e tag, resultados agrupados por template, com descrição, URL casada e referências.
+- **testssl, boletim TLS:** a nota geral, os protocolos oferecidos (SSLv2 a TLS 1.3), os dias até o certificado vencer e a grade das vulnerabilidades testadas.
+- Varreduras antigas, sem relatório, abrem com a tabela de achados de hoje.
+
+**Branch:** `feat/arsenal-paginas` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+### Sprint 10: Página Sistema
+
+**Ao final:** `/sistema` mostra CPU, memória e disco dos últimos 15 minutos, da última hora ou das últimas 24 horas, com as linhas dos limites de alerta, e o estado dos motores.
+
+- As métricas que hoje só passam pelo WebSocket passam a ser gravadas, com retenção de 24 h (`GET /api/sistema`).
+
+**Branch:** `feat/pagina-sistema` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+### Sprint 11: ffuf e Nikto
+
+**Ao final:** o Arsenal descobre rotas escondidas da aplicação e falhas conhecidas do servidor web.
+
+- **ffuf, árvore de rotas:** os caminhos encontrados em árvore, com status, tamanho e redirecionamento, e a marcação "não aparece no tráfego real" para os que o sniffer nunca viu: são as rotas escondidas. Listas de palavras do SecLists embutidas no binário (pequena e média), enviadas ao container como arquivo.
+- **Nikto, checagens do servidor:** o servidor identificado e os itens agrupados em cabeçalhos, arquivos expostos, versão desatualizada e outros.
+
+**Branch:** `feat/arsenal-ffuf-nikto` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+### Sprint 12: SQLMap guiado pelo tráfego
+
+**Ao final:** o usuário escolhe uma rota que o sniffer já viu e o parâmetro a testar, e a página mostra se ele é injetável, por qual técnica e qual banco foi identificado.
+
+- Só nível 1 e risco 1, sem nenhuma opção de extração de dados (`--dump`, `--os-shell` e afins são proibidos e testados).
+- Rota e parâmetro validados no backend contra um padrão estrito.
+
+**Branch:** `feat/arsenal-sqlmap` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+### Sprint 13: Amass e Gitleaks
+
+**Ao final:** o Arsenal descobre subdomínios do domínio do alvo e procura segredos vazados no código-fonte da aplicação.
+
+- **Amass, subdomínios:** modo passivo (consulta fontes públicas, não manda tráfego ao alvo), com destaque para os que apontam para este servidor e aviso para os sem endereço. Só aparece habilitado para alvos com domínio.
+- **Vazamentos (Gitleaks), segredos no código:** o alvo ganha o campo opcional "Código-fonte", montado somente leitura no container. Vazamentos agrupados por arquivo, com regra, linha, commit e autor. **O valor do segredo nunca é gravado nem mostrado.**
+
+**Branch:** `feat/arsenal-amass-gitleaks` · **Labels:** `funcionalidade`, `docker`, `motor`, `visual`
+
+### Sprint 14: Inspetor de pacotes
+
+**Ao final:** `/inspetor` mostra os pacotes das portas dos alvos ao vivo, um por linha, com pausa e filtros por IP, porta e protocolo.
+
+- O navegador assina o fluxo pelo WebSocket só enquanto a página está aberta; os pacotes chegam em lotes limitados, e o excesso é contado como descartado, sem travar a captura.
+- Tabela virtualizada com no máximo 10 000 linhas; no HTTP, só método e rota, nunca cabeçalhos ou corpos.
+
+**Branch:** `feat/inspetor-pacotes` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+### Sprint 15: Capturas `.pcap`
+
+**Ao final:** `/capturas` grava capturas de 10 s a 5 min em `.pcap`, lista, baixa, apaga e abre cada uma na tabela do Inspetor.
+
+- Limites: 100 MiB por arquivo, 1 GiB no diretório, uma captura por vez, retenção configurável (`OMNI_RETENCAO_CAPTURAS`, padrão 24 h), arquivos com permissão `0600`.
+
+**Branch:** `feat/capturas-pcap` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+### Sprint 16: Exportação em PDF
+
+**Ao final:** em Relatórios, "Exportar PDF" monta um relatório do alvo e do período escolhidos (disponibilidade, alertas, gráficos e varreduras) e abre a janela de impressão do navegador, que salva em PDF.
+
+- O PDF é gerado pelo navegador, com uma página própria para impressão em A4; o backend só ganha filtro por período nas varreduras e nos alertas.
+
+**Branch:** `feat/relatorio-pdf` · **Labels:** `funcionalidade`, `visual`
+
+### Backlog
+
+Itens ainda sem sprint, planejados quando entrarem na fila:
+
+- **Aplicação:** HTTP/2, MySQL, `pg_stat_statements`, agendamento de varreduras e alertas externos além do e-mail (Telegram, Discord).
 - **TLS:** metadados do handshake (SNI, versão, cifra).
 - **Transporte:** RTT, retransmissões, RST, janela zero, conexões por estado e amplificação UDP.
-- **Rede:** ICMP, fragmentação e GeoIP.
+- **Rede:** top IPs por número de conexões, ICMP, fragmentação e GeoIP.
 - **Enlace:** detecção de ARP spoofing e interfaces virtuais do Docker.
-- **Sistema:** contadores da placa, captura de alto desempenho, Inspetor de Tráfego pacote a pacote e retenção das capturas.
+- **Sistema:** contadores da placa e captura de alto desempenho.
 
 ---
 
 ## Como atualizar este arquivo
 
-Ao abrir o PR de uma sprint, mude o status dela para 🚧 Em andamento; ao mesclar, para ✅ Concluída. Ao planejar uma sprint nova da Fase 4, adicione uma seção para ela neste arquivo e uma linha na tabela de resumo.
+Ao abrir o PR de uma sprint, mude o status dela para 🚧 Em andamento; ao mesclar, para ✅ Concluída. Ao planejar uma sprint nova a partir do backlog, adicione uma seção para ela neste arquivo, uma linha na tabela de resumo e as tarefas no plano da Fase 4.
