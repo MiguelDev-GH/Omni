@@ -72,6 +72,10 @@ type Tool struct {
 	// Report monta, a partir da saída padrão, o relatório estruturado que
 	// alimenta a página da ferramenta; nil quando ela não tem relatório.
 	Report func(stdout []byte) (json.RawMessage, error) `json:"-"`
+	// Files devolve os arquivos copiados para o container antes de ele
+	// iniciar (caminho absoluto → conteúdo), como a lista de palavras do
+	// ffuf; nil quando a ferramenta não precisa de nenhum.
+	Files func(Options) (map[string][]byte, error) `json:"-"`
 	// Volumes são volumes nomeados do Docker (nome → caminho no container),
 	// como o cache de templates do Nuclei.
 	Volumes map[string]string `json:"-"`

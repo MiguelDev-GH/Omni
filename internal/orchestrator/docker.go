@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
 	"context"
@@ -15,6 +16,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	"sort"
 	"strings"
 	"time"
 )
@@ -58,20 +61,28 @@ func NewDockerRunner() (*DockerRunner, error) {
 }
 
 func (d *DockerRunner) do(ctx context.Context, method, path string, body any) (*http.Response, error) {
+	if body == nil {
+		return d.send(ctx, method, path, "", nil)
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return d.send(ctx, method, path, "application/json", b)
+}
+
+// send faz a requisição com um corpo já pronto, do tipo contentType.
+func (d *DockerRunner) send(ctx context.Context, method, path, contentType string, body []byte) (*http.Response, error) {
 	var r io.Reader
 	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		r = bytes.NewReader(b)
+		r = bytes.NewReader(body)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, "http://docker"+path, r)
 	if err != nil {
 		return nil, err
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	resp, err := d.c.Do(req)
 	if err != nil {
@@ -115,6 +126,10 @@ func (d *DockerRunner) Available(ctx context.Context) error {
 // Run baixa a imagem se preciso, cria e inicia o container, copia stdout e
 // stderr para logs e devolve a saída padrão.
 func (d *DockerRunner) Run(ctx context.Context, s Spec, logs io.Writer) ([]byte, error) {
+	archive, err := tarFiles(s.Files)
+	if err != nil {
+		return nil, err
+	}
 	if err := d.ensureImage(ctx, s.Image, logs); err != nil {
 		return nil, err
 	}
@@ -123,6 +138,17 @@ func (d *DockerRunner) Run(ctx context.Context, s Spec, logs io.Writer) ([]byte,
 		return nil, err
 	}
 	defer d.remove(id)
+
+	if archive != nil {
+		resp, err := d.send(ctx, http.MethodPut, "/containers/"+id+"/archive?path=/", "application/x-tar", archive)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, apiError(resp, "copiar arquivos para o container")
+		}
+		_ = resp.Body.Close()
+	}
 
 	resp, err := d.do(ctx, http.MethodPost, "/containers/"+id+"/start", nil)
 	if err != nil {
@@ -284,6 +310,54 @@ func (d *DockerRunner) remove(id string) {
 	if err == nil {
 		_ = resp.Body.Close()
 	}
+}
+
+// tarFiles monta o tar extraído na raiz do container, com os diretórios
+// pais e os arquivos somente leitura; nil quando não há arquivos. Recusa
+// caminho relativo ou com "..".
+func tarFiles(files map[string][]byte) ([]byte, error) {
+	if len(files) == 0 {
+		return nil, nil
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		if !path.IsAbs(name) || path.Clean(name) != name || name == "/" || strings.Contains(name, "..") {
+			return nil, fmt.Errorf("caminho de arquivo inválido para o container: %q", name)
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	dirs := map[string]bool{}
+	for _, name := range names {
+		var parents []string
+		for dir := path.Dir(name); dir != "/"; dir = path.Dir(dir) {
+			parents = append([]string{dir}, parents...)
+		}
+		for _, dir := range parents {
+			if dirs[dir] {
+				continue
+			}
+			dirs[dir] = true
+			hdr := &tar.Header{Typeflag: tar.TypeDir, Name: dir[1:] + "/", Mode: 0o555, ModTime: time.Unix(0, 0)}
+			if err := tw.WriteHeader(hdr); err != nil {
+				return nil, err
+			}
+		}
+		b := files[name]
+		hdr := &tar.Header{Typeflag: tar.TypeReg, Name: name[1:], Mode: 0o444, Size: int64(len(b)), ModTime: time.Unix(0, 0)}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return nil, err
+		}
+		if _, err := tw.Write(b); err != nil {
+			return nil, err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func randomID() string {
