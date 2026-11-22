@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"testing"
 	"time"
 
@@ -16,9 +17,18 @@ const tok = "0123456789abcdef0123456789abcdef" // 32 caracteres
 func TestLoadDefaults(t *testing.T) {
 	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
 	require.NoError(t, err)
-	assert.Equal(t, Config{Addr: "127.0.0.1:8080", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second,
-		AllowedOrigins: []string{"http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"},
+	assert.Equal(t, Config{Addr: "127.0.0.1:0", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second,
+		AllowedOrigins: []string{"http://127.0.0.1:0", "http://localhost:0", "http://[::1]:0"},
 		Interface:      "any"}, c)
+}
+
+func TestBindUsesRealPort(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_ORIGENS": "http://localhost:9999"}))
+	require.NoError(t, err)
+	c = c.Bind(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 41234})
+	assert.Equal(t, "127.0.0.1:41234", c.Addr)
+	assert.Equal(t, []string{"http://127.0.0.1:41234", "http://localhost:41234", "http://[::1]:41234",
+		"http://localhost:9999"}, c.AllowedOrigins)
 }
 
 func TestLoadReadsOverrides(t *testing.T) {
@@ -88,15 +98,11 @@ func TestLoadOrigins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"http://127.0.0.1:9000", "http://localhost:9000", "http://[::1]:9000"}, c.AllowedOrigins)
 
-	c, err = load(map[string]string{"OMNI_DEV": "1"})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"http://localhost:5173", "http://127.0.0.1:5173"}, c.AllowedOrigins[3:])
-
 	c, err = load(map[string]string{"OMNI_ORIGENS": " http://localhost:9999 ,https://omni.exemplo.com"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"http://localhost:9999", "https://omni.exemplo.com"}, c.AllowedOrigins[3:])
 
-	c, err = load(map[string]string{"OMNI_ORIGENS": "http://localhost:8080"})
+	c, err = load(map[string]string{"OMNI_ADDR": "127.0.0.1:8080", "OMNI_ORIGENS": "http://localhost:8080"})
 	require.NoError(t, err)
 	assert.Len(t, c.AllowedOrigins, 3)
 
