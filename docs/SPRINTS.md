@@ -204,6 +204,13 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 
 **Branch:** `feat/arsenal-ffuf-nikto` · **Labels:** `funcionalidade`, `docker`, `visual`
 
+**Decisões da Sprint 11:**
+
+- O ffuf não publica imagem oficial; a imagem é `secsi/ffuf:2.3.0` (Alpine).
+- O ffuf roda a 100 requisições por segundo, o mesmo teto do Nuclei, em vez de 50: assim a lista média (43 mil palavras) termina em cerca de 7 minutos, dentro do limite de 10 minutos da varredura. `-maxtime 540` encerra o ffuf antes desse limite, e ele ainda grava o JSON.
+- A saída cortada antes do JSON final ainda gera achados, a partir das palavras que o modo `-s` escreve a cada caminho encontrado, mas sem status nem porta; o relatório fica indisponível.
+- A marcação "não aparece no tráfego real" compara com as rotas vistas pelo sniffer nas últimas 24 horas. Sem nenhuma rota registrada (sniffer sem permissão, por exemplo), a página não marca nada e explica o motivo.
+
 ### Sprint 12: SQLMap guiado pelo tráfego
 
 **Ao final:** o usuário escolhe uma rota que o sniffer já viu e o parâmetro a testar, e a página mostra se ele é injetável, por qual técnica e qual banco foi identificado.
