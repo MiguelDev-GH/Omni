@@ -19,8 +19,10 @@ test("shows sections and disables future items", () => {
   expect(screen.getByRole("link", { name: "Nmap" })).toHaveAttribute("href", "/arsenal/nmap");
   expect(screen.getByRole("link", { name: "Nuclei" })).toHaveAttribute("href", "/arsenal/nuclei");
   expect(screen.getByRole("link", { name: "testssl" })).toHaveAttribute("href", "/arsenal/testssl");
-  const nikto = screen.getByText("Nikto").closest("[aria-disabled]");
-  expect(nikto).toHaveAttribute("aria-disabled", "true");
-  expect(screen.queryByRole("link", { name: /Nikto/ })).toBeNull();
+  expect(screen.getByRole("link", { name: "Nikto" })).toHaveAttribute("href", "/arsenal/nikto");
+  expect(screen.getByRole("link", { name: "ffuf" })).toHaveAttribute("href", "/arsenal/ffuf");
+  const sqlmap = screen.getByText("SQLMap").closest("[aria-disabled]");
+  expect(sqlmap).toHaveAttribute("aria-disabled", "true");
+  expect(screen.queryByRole("link", { name: /SQLMap/ })).toBeNull();
   expect(screen.getAllByText("em breve").length).toBeGreaterThan(0);
 });

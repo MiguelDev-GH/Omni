@@ -1,4 +1,5 @@
 import type { Scan } from "../api/scans";
+import type { Target } from "../api/targets";
 import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 
@@ -29,6 +30,34 @@ export function TargetPicker({ id }: { id: string }) {
         value={selected}
         onChange={selectTarget}
         options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
+      />
+    </div>
+  );
+}
+
+// PortField escolhe a opção "porta" entre as portas de aplicação do alvo;
+// sem escolha, mostra a primeira, que é o padrão do backend.
+export function PortField({
+  id,
+  value,
+  onChange,
+  target,
+}: {
+  id: string;
+  value: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+  target: Target;
+}) {
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <label htmlFor={id} className="text-suave">
+        Porta
+      </label>
+      <Select
+        id={id}
+        value={value.porta ?? String(target.portas_app[0] ?? "")}
+        onChange={(porta) => onChange({ ...value, porta })}
+        options={target.portas_app.map((p) => ({ value: String(p), label: String(p) }))}
       />
     </div>
   );

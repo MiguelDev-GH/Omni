@@ -1,0 +1,99 @@
+{
+  "servidor": "Loja/0.1",
+  "itens": [
+    {
+      "id": "000287",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Retrieved x-powered-by header: Go.",
+      "referencias": [],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "013587",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Suggested security header missing: x-content-type-options.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "013587",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Suggested security header missing: strict-transport-security.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "013587",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Suggested security header missing: referrer-policy.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "013587",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Suggested security header missing: content-security-policy.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "013587",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "Suggested security header missing: permissions-policy.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "006609",
+      "metodo": "GET",
+      "url": "/.git/HEAD",
+      "mensagem": "Git HEAD file found. Full repo details may be present.",
+      "referencias": [],
+      "categoria": "arquivos"
+    },
+    {
+      "id": "007226",
+      "metodo": "GET",
+      "url": "/.env",
+      "mensagem": ".env file found. The .env file may contain credentials.",
+      "referencias": [],
+      "categoria": "arquivos"
+    },
+    {
+      "id": "007342",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "X-Frame-Options header is deprecated and was replaced with the Content-Security-Policy HTTP header with the frame-ancestors directive.",
+      "referencias": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/X-Frame-Options"
+      ],
+      "categoria": "cabecalhos"
+    },
+    {
+      "id": "007352",
+      "metodo": "GET",
+      "url": "/",
+      "mensagem": "The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type.",
+      "referencias": [
+        "https://www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/"
+      ],
+      "categoria": "cabecalhos"
+    }
+  ]
+}

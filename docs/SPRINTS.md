@@ -18,7 +18,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | ✅ Concluída |
 | [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | 🚧 Em andamento |
 | [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ⏳ A fazer |
-| [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | ⏳ A fazer |
+| [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | 🚧 Em andamento |
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ⏳ A fazer |
 | [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ⏳ A fazer |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
@@ -203,6 +203,16 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - **Nikto, checagens do servidor:** o servidor identificado e os itens agrupados em cabeçalhos, arquivos expostos, versão desatualizada e outros.
 
 **Branch:** `feat/arsenal-ffuf-nikto` · **Labels:** `funcionalidade`, `docker`, `visual`
+
+**Decisões da Sprint 11:**
+
+- O ffuf não publica imagem oficial; a imagem é `secsi/ffuf:2.3.0` (Alpine).
+- O ffuf roda a 100 requisições por segundo, o mesmo teto do Nuclei, em vez de 50: assim a lista média (43 mil palavras) termina em cerca de 7 minutos, dentro do limite de 10 minutos da varredura. `-maxtime 540` encerra o ffuf antes desse limite, e ele ainda grava o JSON.
+- A saída cortada antes do JSON final ainda gera achados, a partir das palavras que o modo `-s` escreve a cada caminho encontrado, mas sem status nem porta; o relatório fica indisponível.
+- O Nikto usa a imagem oficial `ghcr.io/sullo/nikto:2.6.1`. Ele só grava o JSON num arquivo com extensão `.json` (`-o -` e `/dev/stdout` não funcionam), por isso as ferramentas ganharam `OutputFile`: o runner lê `/tmp/nikto.json` do container depois que ele termina e entrega ao parser a saída padrão seguida do arquivo, separados por uma linha marcadora.
+- O JSON do Nikto 2.6.1 grava o banner do servidor sempre como `null`; o servidor vem da linha `+ Server:` do console. Sem o JSON, os achados vêm das linhas `+ [id] url: mensagem` do console, sem porta.
+- `-ask no` desliga a pergunta sobre enviar banners ao CIRT.net, que `-nointeractive` não desliga. As categorias do Nikto saem de palavras da mensagem, nesta ordem: `versao` ("outdated", "end of life"), `cabecalhos` ("header", "cookie"), `arquivos` ("file found", "directory indexing", "backup", "directory found") e `outros`.
+- A marcação "não aparece no tráfego real" compara com as rotas vistas pelo sniffer nas últimas 24 horas. Sem nenhuma rota registrada (sniffer sem permissão, por exemplo), a página não marca nada e explica o motivo.
 
 ### Sprint 12: SQLMap guiado pelo tráfego
 

@@ -51,7 +51,13 @@ type Spec struct {
 	Image   string
 	Args    []string
 	Volumes map[string]string
-	AnyExit bool
+	// Files são copiados para o container antes de ele iniciar (caminho
+	// absoluto → conteúdo), somente leitura.
+	Files map[string][]byte
+	// OutputFile é lido do container depois que ele termina e acrescentado
+	// à saída padrão depois de arsenal.OutputFileMarker; ausente, é ignorado.
+	OutputFile string
+	AnyExit    bool
 	// Memory é o limite de memória em bytes; zero usa o padrão de 512 MiB.
 	Memory int64
 }
@@ -143,7 +149,14 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 			saved[name] = opts[name]
 		}
 		tool := jobs[i].tool
-		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, AnyExit: tool.AnyExit, Memory: tool.Memory}
+		var files map[string][]byte
+		if tool.Files != nil {
+			if files, err = tool.Files(opts[name]); err != nil {
+				return 0, err
+			}
+		}
+		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, Files: files,
+			OutputFile: tool.OutputFile, AnyExit: tool.AnyExit, Memory: tool.Memory}
 	}
 	if err := o.runner.Available(ctx); err != nil {
 		o.setDocker(StateUnavailable)

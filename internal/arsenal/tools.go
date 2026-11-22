@@ -14,6 +14,11 @@ import (
 // fora do permitido.
 var ErrOpcaoInvalida = errors.New("opção inválida")
 
+// OutputFileMarker separa, na saída entregue ao parser, a saída padrão da
+// ferramenta do conteúdo do OutputFile, lido do container depois que ela
+// termina.
+const OutputFileMarker = "\n--- omni: arquivo de saída ---\n"
+
 // Options são as opções de uma ferramenta vindas da interface (chave →
 // valor). Cada ferramenta valida as suas contra uma lista fechada.
 type Options map[string]string
@@ -72,6 +77,14 @@ type Tool struct {
 	// Report monta, a partir da saída padrão, o relatório estruturado que
 	// alimenta a página da ferramenta; nil quando ela não tem relatório.
 	Report func(stdout []byte) (json.RawMessage, error) `json:"-"`
+	// Files devolve os arquivos copiados para o container antes de ele
+	// iniciar (caminho absoluto → conteúdo), como a lista de palavras do
+	// ffuf; nil quando a ferramenta não precisa de nenhum.
+	Files func(Options) (map[string][]byte, error) `json:"-"`
+	// OutputFile é o arquivo que a ferramenta grava no container em vez da
+	// saída padrão; o runner o lê depois que ela termina e o entrega ao
+	// parser depois da saída padrão, separado por OutputFileMarker.
+	OutputFile string `json:"-"`
 	// Volumes são volumes nomeados do Docker (nome → caminho no container),
 	// como o cache de templates do Nuclei.
 	Volumes map[string]string `json:"-"`
@@ -102,6 +115,24 @@ var Tools = []Tool{
 		Volumes:     map[string]string{nucleiTemplates: "/root/nuclei-templates"},
 		// Carregar os templates passa de 512 MiB: o pico medido é de cerca de 1 GiB.
 		Memory: 1536 << 20,
+	},
+	{
+		Name:        "nikto",
+		Description: "Falhas conhecidas e más configurações do servidor web",
+		Image:       NiktoImage,
+		Args:        NiktoArgs,
+		Parse:       ParseNiktoJSON,
+		Report:      NiktoReportFrom,
+		OutputFile:  niktoOutput,
+	},
+	{
+		Name:        "ffuf",
+		Description: "Rotas e arquivos escondidos da aplicação",
+		Image:       FfufImage,
+		Args:        FfufArgs,
+		Parse:       ParseFfufJSON,
+		Report:      FfufReportFrom,
+		Files:       FfufFiles,
 	},
 	{
 		Name:        "testssl",

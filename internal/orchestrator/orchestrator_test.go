@@ -205,6 +205,26 @@ func TestStartOptions(t *testing.T) {
 	assert.Empty(t, list)
 }
 
+func TestStartSendsToolFiles(t *testing.T) {
+	r := &fakeRunner{stdout: []byte(`{"commandline":"ffuf","results":[],"config":{"url":"http://127.0.0.1:3000/FUZZ"}}`)}
+	o, st, _, tg := setup(t, r)
+	ctx := context.Background()
+
+	_, err := o.Start(ctx, tg.ID, []string{"ffuf"}, map[string]arsenal.Options{"ffuf": {"lista": "../../etc/passwd"}})
+	var oe *arsenal.OptionError
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "opcoes.ffuf.lista", oe.Field())
+
+	id, err := o.Start(ctx, tg.ID, []string{"ffuf"}, map[string]arsenal.Options{"ffuf": {"lista": "media"}})
+	require.NoError(t, err)
+	waitStatus(t, st, id, store.ScanDone)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	require.Len(t, r.specs, 1)
+	assert.Contains(t, r.specs[0].Args, "/omni/lista.txt")
+	assert.Greater(t, len(r.specs[0].Files["/omni/lista.txt"]), 100_000, "lista média")
+}
+
 func TestRunnerErrorMarksScanFailed(t *testing.T) {
 	r := &fakeRunner{err: errors.New("a ferramenta terminou com código 1")}
 	o, st, pub, tg := setup(t, r)
