@@ -131,8 +131,8 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 **Conexão:** o cliente pede um ticket em `POST /api/ws/ticket`, com o token da API, e abre a conexão em `GET /ws?ticket=<ticket>`. O ticket vale por 30 s e só pode ser usado uma vez:
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $OMNI_TOKEN" 127.0.0.1:8080/api/ws/ticket
-# {"ticket":"..."}  →  ws://127.0.0.1:8080/ws?ticket=...
+curl -s -X POST -H "Authorization: Bearer $OMNI_TOKEN" 127.0.0.1:<porta>/api/ws/ticket
+# {"ticket":"..."}  →  ws://127.0.0.1:<porta>/ws?ticket=...
 ```
 
 Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta sprint:
@@ -168,14 +168,12 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 
 ## Interface (frontend)
 
-**Como rodar:** `make build` compila a interface (em `web/`) e gera o binário `./omni` com ela embutida; basta abrir `http://127.0.0.1:8080` e informar o token. Para desenvolver a interface com recarga automática, rode o backend num terminal e o Vite noutro, e abra `http://localhost:5173`:
+**Como rodar:** `make build` compila a interface (em `web/`) e gera o binário `./omni` com ela embutida. Sem `OMNI_ADDR`, o Omni escuta em `127.0.0.1` numa porta alta livre escolhida pelo sistema, diferente a cada execução; o endereço sai no log de início (`omni no ar ... painel=http://127.0.0.1:<porta>`). Abra esse endereço e informe o token. Para fixar a porta, defina `OMNI_ADDR` (ex.: `OMNI_ADDR=127.0.0.1:8080`).
+
+Para desenvolver a interface com recarga automática, `make dev` sobe o backend e o Vite, cada um numa porta alta livre, e imprime o endereço do painel:
 
 ```bash
-OMNI_DEV=1 OMNI_TOKEN=<token> go run ./cmd/omni
-```
-
-```bash
-cd web && npm run dev
+OMNI_TOKEN=<token> make dev
 ```
 
 **Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker) e notificações.
@@ -327,7 +325,7 @@ O Omni não roda completo direto no Windows. O binário compila e a interface ab
 | Sniffer | Inativo | A interface padrão `any` não existe no Npcap, e `OMNI_INTERFACE` só aceita nomes no estilo Linux (até 15 caracteres), o que recusa os nomes do Npcap (`\Device\NPF_...`) |
 | Arsenal (Docker) | Indisponível | O Omni só fala com o Docker por socket Unix (`unix://`), e o Docker Desktop atende no Windows por named pipe (`npipe://`) |
 
-**Caminho recomendado: WSL2.** O Omni roda dentro de uma distribuição Linux do WSL2, e a interface é aberta pelo navegador do Windows em `http://localhost:8080`, porque o WSL2 repassa as portas do loopback para o Windows. Dentro do WSL, o Omni se comporta como num servidor Linux: siga os requisitos acima (`libpcap-dev`, `setcap`, Docker pelo socket Unix).
+**Caminho recomendado: WSL2.** O Omni roda dentro de uma distribuição Linux do WSL2, e a interface é aberta pelo navegador do Windows no endereço do log de início (`http://localhost:<porta>`), porque o WSL2 repassa as portas do loopback para o Windows. Dentro do WSL, o Omni se comporta como num servidor Linux: siga os requisitos acima (`libpcap-dev`, `setcap`, Docker pelo socket Unix).
 
 Cuidados no WSL2:
 
@@ -404,10 +402,10 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 
 - **A API e o WebSocket escutam apenas em `127.0.0.1`.** O acesso remoto é feito por túnel SSH:
   ```bash
-  ssh -L 8080:127.0.0.1:8080 usuario@servidor
+  ssh -L <porta>:127.0.0.1:<porta> usuario@servidor
   ```
 - **Autenticação obrigatória** por token, mesmo em acesso local.
-- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente de 8080 exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`). Com `OMNI_DEV=1`, as origens do Vite (porta 5173) também são liberadas.
+- **Verificação de origem no WebSocket** (`CheckOrigin`), contra sequestro de WebSocket entre sites (CSWSH). Acesso por túnel numa porta local diferente da do Omni exige a origem em `OMNI_ORIGENS` (ex.: `OMNI_ORIGENS=http://localhost:9999`). O `make dev` coloca ali a origem do Vite.
 - **Descoberta de serviços sem segredos:** `GET /api/descoberta` exige o token e devolve só nome do processo, PID, host e portas, nunca a linha de comando, que costuma conter senhas. Sem root, processos de outros usuários aparecem sem nome.
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.

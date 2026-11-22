@@ -31,5 +31,5 @@ func start() error {
 	if err != nil {
 		return err
 	}
-	return run(ctx, cfg, ln)
+	return run(ctx, cfg.Bind(ln.Addr()), ln)
 }

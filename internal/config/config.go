@@ -48,12 +48,17 @@ type Config struct {
 
 	// Mail configura o envio de alertas por e-mail; desligado sem OMNI_SMTP_HOST.
 	Mail alerts.MailConfig
+
+	// extraOrigins guarda as origens de OMNI_ORIGENS já validadas, para Bind
+	// refazer AllowedOrigins com a porta real.
+	extraOrigins []string
 }
 
 // Load monta a Config usando getenv (normalmente os.Getenv).
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{
-		Addr:        withDefault(getenv("OMNI_ADDR"), "127.0.0.1:8080"),
+		// A porta 0 faz o sistema escolher uma porta alta livre a cada execução.
+		Addr:        withDefault(getenv("OMNI_ADDR"), "127.0.0.1:0"),
 		DBPath:      withDefault(getenv("OMNI_DB"), "omni.db"),
 		Token:       getenv("OMNI_TOKEN"),
 		AllowRemote: getenv("OMNI_PERMITIR_REMOTO") == "1",
@@ -72,7 +77,12 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	c.PollInterval = interval
-	origins, err := buildOrigins(c.Addr, getenv("OMNI_DEV") == "1", getenv("OMNI_ORIGENS"))
+	extra, err := parseOrigins(getenv("OMNI_ORIGENS"))
+	if err != nil {
+		return Config{}, err
+	}
+	c.extraOrigins = extra
+	origins, err := buildOrigins(c.Addr, extra)
 	if err != nil {
 		return Config{}, err
 	}
@@ -97,9 +107,35 @@ func parsePollInterval(v string) (time.Duration, error) {
 	return d, nil
 }
 
+// Bind ajusta a Config ao endereço em que o servidor de fato escuta. Com a
+// porta 0 é o sistema que a escolhe, e as origens aceitas dependem dela.
+func (c Config) Bind(addr net.Addr) Config {
+	c.Addr = addr.String()
+	// O host já passou por Load e a porta veio do sistema; não há erro possível.
+	c.AllowedOrigins, _ = buildOrigins(c.Addr, c.extraOrigins)
+	return c
+}
+
+// parseOrigins valida a lista de OMNI_ORIGENS, separada por vírgulas.
+func parseOrigins(extra string) ([]string, error) {
+	if strings.TrimSpace(extra) == "" {
+		return nil, nil
+	}
+	var origins []string
+	for _, item := range strings.Split(extra, ",") {
+		item = strings.TrimSpace(item)
+		origin, ok := normalizeOrigin(item)
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", ErrOrigemInvalida, item)
+		}
+		origins = append(origins, origin)
+	}
+	return origins, nil
+}
+
 // buildOrigins devolve as origens aceitas, sem repetição: loopback na porta
-// de addr, depois as do servidor de desenvolvimento e por fim as extras.
-func buildOrigins(addr string, dev bool, extra string) ([]string, error) {
+// de addr e depois as extras.
+func buildOrigins(addr string, extra []string) ([]string, error) {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrEnderecoRemoto, addr)
@@ -109,19 +145,7 @@ func buildOrigins(addr string, dev bool, extra string) ([]string, error) {
 		"http://localhost:" + port,
 		"http://[::1]:" + port,
 	}
-	if dev {
-		origins = append(origins, "http://localhost:5173", "http://127.0.0.1:5173")
-	}
-	if strings.TrimSpace(extra) != "" {
-		for _, item := range strings.Split(extra, ",") {
-			item = strings.TrimSpace(item)
-			origin, ok := normalizeOrigin(item)
-			if !ok {
-				return nil, fmt.Errorf("%w: %q", ErrOrigemInvalida, item)
-			}
-			origins = append(origins, origin)
-		}
-	}
+	origins = append(origins, extra...)
 	seen := make(map[string]bool, len(origins))
 	unique := origins[:0]
 	for _, o := range origins {

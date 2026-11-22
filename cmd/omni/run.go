@@ -152,7 +152,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	httpSrv.RegisterOnShutdown(hub.Close)
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- httpSrv.Serve(ln) }()
-	slog.Info("omni no ar", "endereco", ln.Addr().String())
+	slog.Info("omni no ar", "endereco", ln.Addr().String(), "painel", "http://"+ln.Addr().String())
 
 	select {
 	case err := <-serveErr:
