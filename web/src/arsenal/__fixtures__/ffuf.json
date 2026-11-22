@@ -1,0 +1,13 @@
+{
+  "base_url": "http://127.0.0.1:3000",
+  "resultados": [
+    { "caminho": "/.env", "status": 200, "tamanho": 165, "palavras": 1, "redirecionamento": "", "duracao_ms": 0 },
+    { "caminho": "/.git/HEAD", "status": 200, "tamanho": 21, "palavras": 2, "redirecionamento": "", "duracao_ms": 0 },
+    { "caminho": "/.git/config", "status": 200, "tamanho": 180, "palavras": 12, "redirecionamento": "", "duracao_ms": 0 },
+    { "caminho": "/admin", "status": 301, "tamanho": 0, "palavras": 1, "redirecionamento": "/admin/", "duracao_ms": 1 },
+    { "caminho": "/admin/login", "status": 200, "tamanho": 1530, "palavras": 120, "redirecionamento": "", "duracao_ms": 2 },
+    { "caminho": "/produtos", "status": 200, "tamanho": 4210, "palavras": 300, "redirecionamento": "", "duracao_ms": 3 },
+    { "caminho": "/produtos/7", "status": 200, "tamanho": 180, "palavras": 14, "redirecionamento": "", "duracao_ms": 1 },
+    { "caminho": "/erro", "status": 500, "tamanho": 30, "palavras": 4, "redirecionamento": "", "duracao_ms": 1 }
+  ]
+}
