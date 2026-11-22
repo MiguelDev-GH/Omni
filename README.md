@@ -176,6 +176,10 @@ Para desenvolver a interface com recarga automática, `make dev` sobe o backend 
 OMNI_TOKEN=<token> make dev
 ```
 
+Para subir só o backend com um token aleatório novo, `make backend` compila o binário, aplica `setcap` com `sudo` (para a captura de pacotes), gera o `OMNI_TOKEN`, imprime no terminal e inicia o Omni. Se `OMNI_TOKEN` já estiver no ambiente, ele é reaproveitado.
+
+Com o backend no ar, `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja` roda a demo da loja cobaia (token e porta saem no terminal do `make backend`).
+
 **Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker) e notificações.
 
 **Barra lateral:**
