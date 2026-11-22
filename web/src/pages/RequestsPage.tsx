@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { listRequests, listRoutes, type RouteStats } from "../api/requests";
 import CountChart from "../charts/CountChart";
 import StatusBars from "../charts/StatusBars";
-import { Card, Stat } from "../components/Card";
+import { Card, PageHeader, Stat } from "../components/Card";
+import Select from "../components/Select";
 import { emptyStatus, formatMs, l7Series, L7_POINTS, L7_STEP_MS, type StatusPoint } from "../lib/l7";
 import { useAppStore } from "../store/app";
 
@@ -66,21 +67,20 @@ export default function RequestsPage() {
   const errors = (routes ?? []).reduce((sum, r) => sum + r.erros, 0);
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Requisições na API</h1>
-      <p className="text-sm text-suave">
+    <div className="space-y-8">
+      <PageHeader title="Requisições na API">
         Decodificado do tráfego HTTP/1.1 das portas da aplicação. O tráfego do próprio Omni fica de fora, e cabeçalhos,
         query strings e corpos nunca são guardados.
-      </p>
+      </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-4 sm:gap-6">
         <Stat label="Requisições em 24 h" value={total.toLocaleString("pt-BR")} />
-        <Stat label="Erros 5xx em 24 h" value={errors.toLocaleString("pt-BR")} />
+        <Stat label="Erros 5xx em 24 h" value={errors.toLocaleString("pt-BR")} tone={errors > 0 ? "text-erro" : undefined} />
         <Stat label="Rotas distintas" value={(routes?.length ?? 0).toLocaleString("pt-BR")} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-2">
         <Card title="Requisições nos últimos 15 minutos">
           <CountChart id="req-page" points={requests} label="Requisições" empty="Sem requisições capturadas ainda." />
         </Card>
@@ -89,49 +89,54 @@ export default function RequestsPage() {
         </Card>
       </div>
 
-      <Card title="Rotas nas últimas 24 horas">
-        <div className="mb-3 flex items-center gap-2 text-sm">
-          <label htmlFor="ordem" className="text-suave">
-            Ordenar por
-          </label>
-          <select
-            id="ordem"
-            value={order}
-            onChange={(e) => setOrder(e.target.value as Order)}
-            className="rounded border border-borda bg-fundo px-2 py-1"
-          >
-            <option value="p95">Mais lentas (p95)</option>
-            <option value="volume">Mais acessadas</option>
-          </select>
-        </div>
+      <Card
+        title="Rotas nas últimas 24 horas"
+        plane
+        action={
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="ordem" className="text-suave">
+              Ordenar por
+            </label>
+            <Select
+              id="ordem"
+              value={order}
+              onChange={setOrder}
+              options={[
+                { value: "p95", label: "Mais lentas (p95)" },
+                { value: "volume", label: "Mais acessadas" },
+              ]}
+            />
+          </div>
+        }
+      >
         {routesError && <p className="text-sm text-erro">Não foi possível carregar as rotas.</p>}
         {routes !== null && routes.length === 0 ? (
           <p className="text-sm text-suave">Nenhuma requisição registrada nas últimas 24 horas.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table aria-label="Rotas" className="w-full text-sm">
-              <thead className="text-left text-xs text-suave">
+            <table aria-label="Rotas" className="tabela">
+              <thead>
                 <tr>
-                  <th className="pb-2 font-medium">Rota</th>
-                  <th className="pb-2 text-right font-medium">Requisições</th>
-                  <th className="pb-2 text-right font-medium">Erros 5xx</th>
-                  <th className="pb-2 text-right font-medium">p50</th>
-                  <th className="pb-2 text-right font-medium">p95</th>
+                  <th>Rota</th>
+                  <th className="text-right">Requisições</th>
+                  <th className="text-right">Erros 5xx</th>
+                  <th className="text-right">p50</th>
+                  <th className="text-right">p95</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={`${r.metodo} ${r.rota}`} className="border-t border-borda">
-                    <td className="py-1.5 font-mono text-xs break-all">
-                      <span className="mr-2 text-suave">{r.metodo}</span>
+                  <tr key={`${r.metodo} ${r.rota}`}>
+                    <td className="pr-3 font-mono text-xs break-all">
+                      <span className="mr-2 text-destaque-forte">{r.metodo}</span>
                       {r.rota}
                     </td>
-                    <td className="py-1.5 text-right tabular-nums">{r.requisicoes.toLocaleString("pt-BR")}</td>
-                    <td className={`py-1.5 text-right tabular-nums ${r.erros > 0 ? "text-erro" : ""}`}>
+                    <td className="text-right font-mono text-xs tabular-nums">{r.requisicoes.toLocaleString("pt-BR")}</td>
+                    <td className={`text-right font-mono text-xs tabular-nums ${r.erros > 0 ? "text-erro" : ""}`}>
                       {r.erros.toLocaleString("pt-BR")}
                     </td>
-                    <td className="py-1.5 text-right whitespace-nowrap tabular-nums">{formatMs(r.p50_ms)}</td>
-                    <td className="py-1.5 text-right whitespace-nowrap tabular-nums">{formatMs(r.p95_ms)}</td>
+                    <td className="text-right font-mono text-xs whitespace-nowrap tabular-nums">{formatMs(r.p50_ms)}</td>
+                    <td className="text-right font-mono text-xs whitespace-nowrap tabular-nums">{formatMs(r.p95_ms)}</td>
                   </tr>
                 ))}
               </tbody>

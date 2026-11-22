@@ -81,8 +81,8 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
     const error = errors[field];
     const describedBy = [hint && `${field}-dica`, error && `${field}-erro`].filter(Boolean).join(" ");
     return (
-      <div className="space-y-1">
-        <label htmlFor={field} className="block text-sm text-suave">
+      <div className="space-y-1.5">
+        <label htmlFor={field} className="block text-xs font-medium text-suave">
           {label}
         </label>
         <input
@@ -93,10 +93,10 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
           onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.value }))}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
-          className="w-full rounded border border-borda bg-fundo px-3 py-2 outline-none focus:border-destaque aria-invalid:border-erro"
+          className="campo"
         />
         {hint && (
-          <p id={`${field}-dica`} className="text-xs text-zinc-500">
+          <p id={`${field}-dica`} className="text-xs text-apagado">
             {hint}
           </p>
         )}
@@ -110,7 +110,7 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-borda bg-superficie p-4">
+    <form onSubmit={onSubmit} className="animate-entrada space-y-5 rounded-2xl bg-superficie/80 p-5">
       <h2 className="font-semibold">{initial ? `Editar ${initial.nome}` : "Novo alvo"}</h2>
       {formError && (
         <p role="alert" className="text-sm text-erro">
@@ -131,11 +131,11 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded bg-destaque px-3 py-1.5 font-medium text-zinc-950 disabled:opacity-60"
+          className="botao"
         >
           Salvar
         </button>
-        <button type="button" onClick={onCancel} className="rounded px-3 py-1.5 text-suave hover:text-texto">
+        <button type="button" onClick={onCancel} className="botao-leve">
           Cancelar
         </button>
       </div>

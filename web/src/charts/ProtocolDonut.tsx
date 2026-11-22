@@ -1,6 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatBytes } from "../lib/traffic";
-import { chartInk, protocolColor } from "./colors";
+import { chartInk, protocolColor, tooltipStyle } from "./colors";
 
 type Slice = { name: string; bytes: number };
 
@@ -23,10 +23,10 @@ export default function ProtocolDonut({ data }: { data: Slice[] }) {
               data={data}
               dataKey="bytes"
               nameKey="name"
-              innerRadius="62%"
+              innerRadius="74%"
               outerRadius="100%"
-              stroke={chartInk.surface}
-              strokeWidth={2}
+              stroke={chartInk.ground}
+              strokeWidth={3}
               isAnimationActive={false}
             >
               {data.map((d) => (
@@ -34,8 +34,7 @@ export default function ProtocolDonut({ data }: { data: Slice[] }) {
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{ background: chartInk.surface, border: `1px solid ${chartInk.grid}`, borderRadius: 6 }}
-              itemStyle={{ color: "#d4d4d8" }}
+              {...tooltipStyle}
               formatter={(v, name) => [`${formatBytes(Number(v))} (${percent(Number(v), total)})`, String(name)]}
             />
           </PieChart>
@@ -44,10 +43,10 @@ export default function ProtocolDonut({ data }: { data: Slice[] }) {
       <ul aria-label="Protocolos" className="w-full space-y-1.5 text-sm">
         {data.map((d) => (
           <li key={d.name} className="flex items-center gap-2">
-            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ background: protocolColor(d.name) }} />
+            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: protocolColor(d.name) }} />
             <span className="flex-1">{d.name}</span>
-            <span className="whitespace-nowrap text-suave tabular-nums">{formatBytes(d.bytes)}</span>
-            <span className="w-14 text-right tabular-nums">{percent(d.bytes, total)}</span>
+            <span className="whitespace-nowrap font-mono text-xs text-suave tabular-nums">{formatBytes(d.bytes)}</span>
+            <span className="w-14 text-right font-mono text-xs tabular-nums">{percent(d.bytes, total)}</span>
           </li>
         ))}
       </ul>

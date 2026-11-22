@@ -35,7 +35,7 @@ test("lists targets", async () => {
   const row = (await screen.findByRole("cell", { name: "api" })).closest("tr")!;
   expect(within(row).getByText("3000, 8080")).toBeInTheDocument();
   expect(within(row).getAllByText("—")).toHaveLength(3);
-  expect(screen.getByRole("combobox", { name: "Alvo" })).toHaveDisplayValue("api");
+  expect(screen.getByRole("combobox", { name: "Alvo" })).toHaveTextContent("api");
 });
 
 test("shows empty state", async () => {
@@ -44,7 +44,7 @@ test("shows empty state", async () => {
   expect(
     await screen.findByText("Nenhum alvo cadastrado. Cadastre o primeiro para começar o monitoramento."),
   ).toBeInTheDocument();
-  expect(screen.getByRole("combobox", { name: "Alvo" })).toHaveDisplayValue("Nenhum alvo");
+  expect(screen.getByRole("combobox", { name: "Alvo" })).toHaveTextContent("Nenhum alvo");
 });
 
 async function fillNew(fields: { nome?: string; host?: string; portas?: string }) {

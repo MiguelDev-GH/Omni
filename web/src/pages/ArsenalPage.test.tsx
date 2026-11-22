@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
@@ -44,7 +44,7 @@ test("starts a scan, streams the console and shows findings", async () => {
     return undefined;
   });
   await screen.findByLabelText(/nmap/);
-  await screen.findByRole("option", { name: "api (127.0.0.1)" });
+  await waitFor(() => expect(document.getElementById("alvo-arsenal")).toHaveTextContent("api"));
   await userEvent.click(screen.getByRole("button", { name: "Iniciar varredura" }));
 
   const post = calls.find((c) => c.method === "POST" && c.url === "/api/varreduras");
@@ -68,7 +68,7 @@ test("starts a scan, streams the console and shows findings", async () => {
 test("shows the API error when Docker is unavailable", async () => {
   renderPage((c) => (c.method === "POST" ? json(503, { erro: "Docker indisponível" }) : undefined));
   await screen.findByLabelText(/nmap/);
-  await screen.findByRole("option", { name: "api (127.0.0.1)" });
+  await waitFor(() => expect(document.getElementById("alvo-arsenal")).toHaveTextContent("api"));
   await userEvent.click(screen.getByRole("button", { name: "Iniciar varredura" }));
   expect(await screen.findByText("Docker indisponível", { selector: "p" })).toBeInTheDocument();
 });

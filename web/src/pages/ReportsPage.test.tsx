@@ -79,7 +79,8 @@ test("opening a scan shows new findings first by severity and resolved ones stru
 test("changing the target closes the opened scan", async () => {
   renderPage("/relatorios?varredura=9");
   await screen.findByRole("region", { name: "Achados novos" });
-  await userEvent.selectOptions(screen.getByLabelText("Alvo"), "1");
+  await userEvent.click(screen.getByLabelText("Alvo"));
+  await userEvent.click(screen.getByRole("option", { name: /^api/ }));
   expect(screen.queryByRole("region", { name: "Achados novos" })).toBeNull();
   expect(screen.getByRole("table", { name: "Varreduras" })).toHaveTextContent("#4");
 });

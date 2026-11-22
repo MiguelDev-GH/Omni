@@ -38,7 +38,8 @@ test("table lists the slowest routes first and can sort by volume", async () => 
   expect(screen.getByText("1,2 s")).toBeInTheDocument();
   expect(screen.getByText("Requisições em 24 h").nextElementSibling).toHaveTextContent("960");
 
-  await userEvent.selectOptions(screen.getByLabelText("Ordenar por"), "volume");
+  await userEvent.click(screen.getByLabelText("Ordenar por"));
+  await userEvent.click(screen.getByRole("option", { name: "Mais acessadas" }));
   expect(routeOrder()).toEqual(["GET/rapida", "GET/media/:id", "POST/lenta"]);
 });
 
