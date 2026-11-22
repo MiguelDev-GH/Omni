@@ -6,7 +6,7 @@ import FindingsDiff from "../components/FindingsDiff";
 import FindingsTable, { severityClasses } from "../components/FindingsTable";
 import Select from "../components/Select";
 import { useAppStore } from "../store/app";
-import { statusLabels } from "./ArsenalPage";
+import { statusLabels } from "../arsenal/common";
 
 const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 

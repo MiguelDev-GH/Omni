@@ -10,6 +10,8 @@ export type Target = {
   dominio?: string;
   porta_dns?: number;
   porta_smtp?: number;
+  // repositorio é o código-fonte do alvo, usado pelo Gitleaks (Sprint 13).
+  repositorio?: string;
 };
 
 // targetPorts lista todas as portas verificadas de um alvo.

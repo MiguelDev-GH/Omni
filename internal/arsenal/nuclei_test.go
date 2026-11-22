@@ -13,17 +13,17 @@ import (
 )
 
 func TestNucleiArgs(t *testing.T) {
-	args, err := NucleiArgs(target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000, 8080}, DBPort: 5432})
+	args, err := NucleiArgs(target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000, 8080}, DBPort: 5432}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"-jsonl", "-silent", "-nc", "-t", "http/", "-tags", "exposure,misconfig,tech,cve",
 		"-rl", "100", "-c", "10", "-bs", "10", "-timeout", "5", "-retries", "1", "-H", "User-Agent: Omni-Arsenal/1",
 		"-u", "http://127.0.0.1:3000", "-u", "http://127.0.0.1:8080"}, args)
 
-	v6, err := NucleiArgs(target.Target{Name: "v6", Host: "::1", AppPorts: []int{80}})
+	v6, err := NucleiArgs(target.Target{Name: "v6", Host: "::1", AppPorts: []int{80}}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "http://[::1]:80", v6[len(v6)-1])
 
-	_, err = NucleiArgs(target.Target{Name: "x", Host: "-u", AppPorts: []int{80}})
+	_, err = NucleiArgs(target.Target{Name: "x", Host: "-u", AppPorts: []int{80}}, nil)
 	assert.Error(t, err)
 }
 

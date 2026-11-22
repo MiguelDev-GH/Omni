@@ -24,8 +24,11 @@ const (
 // por porta de aplicação, saída JSONL, templates HTTP de exposição, má
 // configuração, tecnologias e CVEs, com limite de requisições e de
 // concorrência para não sobrecarregar a produção e o User-Agent do Omni.
-func NucleiArgs(t target.Target) ([]string, error) {
+func NucleiArgs(t target.Target, o Options) ([]string, error) {
 	if err := checkTarget(t); err != nil {
+		return nil, err
+	}
+	if err := noOptions("nuclei", o); err != nil {
 		return nil, err
 	}
 	args := []string{"-jsonl", "-silent", "-nc", "-t", "http/", "-tags", "exposure,misconfig,tech,cve",

@@ -18,8 +18,11 @@ const NmapImage = "instrumentisto/nmap:7.95"
 // NmapArgs devolve os argumentos do Nmap para as portas do alvo: detecção de
 // versão, sem ping e com o XML na saída padrão. O "--" impede que o host seja
 // lido como opção.
-func NmapArgs(t target.Target) ([]string, error) {
+func NmapArgs(t target.Target, o Options) ([]string, error) {
 	if err := checkTarget(t); err != nil {
+		return nil, err
+	}
+	if err := noOptions("nmap", o); err != nil {
 		return nil, err
 	}
 	ps := ports(t)

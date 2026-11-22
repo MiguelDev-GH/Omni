@@ -1,0 +1,208 @@
+{
+  "resultados": [
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "strict-transport-security",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "content-security-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "permissions-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "referrer-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "cross-origin-resource-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "x-frame-options",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "x-content-type-options",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "x-permitted-cross-domain-policies",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "cross-origin-embedder-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "http-missing-security-headers",
+      "nome": "HTTP Missing Security Headers",
+      "severidade": "info",
+      "tags": [
+        "misconfig",
+        "headers",
+        "generic",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "cross-origin-opener-policy",
+      "extraidos": [],
+      "descricao": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+      "referencias": []
+    },
+    {
+      "template": "tech-detect",
+      "nome": "Wappalyzer Technology Detection",
+      "severidade": "info",
+      "tags": [
+        "tech",
+        "discovery"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "simplehttp",
+      "extraidos": [],
+      "descricao": "",
+      "referencias": []
+    },
+    {
+      "template": "tech-detect",
+      "nome": "Wappalyzer Technology Detection",
+      "severidade": "info",
+      "tags": [
+        "tech",
+        "discovery"
+      ],
+      "url": "http://127.0.0.1:38082",
+      "matcher": "python",
+      "extraidos": [],
+      "descricao": "",
+      "referencias": []
+    },
+    {
+      "template": "git-config",
+      "nome": "Git Configuration - Detect",
+      "severidade": "media",
+      "tags": [
+        "config",
+        "git",
+        "exposure",
+        "vuln"
+      ],
+      "url": "http://127.0.0.1:38082/.git/config",
+      "matcher": "",
+      "extraidos": [],
+      "descricao": "Git configuration was detected via the pattern /.git/config and log file on passed URLs.",
+      "referencias": []
+    }
+  ]
+}

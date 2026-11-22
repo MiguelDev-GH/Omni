@@ -1,0 +1,36 @@
+{
+  "hosts": [
+    {
+      "endereco": "127.0.0.1",
+      "portas": [
+        {
+          "porta": 38080,
+          "protocolo": "tcp",
+          "estado": "open",
+          "servico": "http",
+          "produto": "SimpleHTTPServer",
+          "versao": "0.6",
+          "extra": "Python 3.14.10"
+        },
+        {
+          "porta": 39999,
+          "protocolo": "tcp",
+          "estado": "closed",
+          "servico": "",
+          "produto": "",
+          "versao": "",
+          "extra": ""
+        },
+        {
+          "porta": 55432,
+          "protocolo": "tcp",
+          "estado": "open",
+          "servico": "postgresql",
+          "produto": "PostgreSQL DB",
+          "versao": "9.6.0 or later",
+          "extra": ""
+        }
+      ]
+    }
+  ]
+}

@@ -18,8 +18,11 @@ const TestsslImage = "drwetter/testssl.sh:3.2"
 // TestsslArgs devolve os argumentos do testssl com o JSON na saída padrão. O
 // alvo é o domínio na porta 443, ou o host na porta 443 (se for uma porta de
 // aplicação) ou na primeira porta de aplicação.
-func TestsslArgs(t target.Target) ([]string, error) {
+func TestsslArgs(t target.Target, o Options) ([]string, error) {
 	if err := checkTarget(t); err != nil {
+		return nil, err
+	}
+	if err := noOptions("testssl", o); err != nil {
 		return nil, err
 	}
 	host, port := t.Host, t.AppPorts[0]

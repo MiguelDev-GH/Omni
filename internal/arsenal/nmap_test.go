@@ -13,18 +13,18 @@ import (
 )
 
 func TestNmapArgs(t *testing.T) {
-	args, err := NmapArgs(target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000, 8080}, DBPort: 5432})
+	args, err := NmapArgs(target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000, 8080}, DBPort: 5432}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"-sV", "-Pn", "-oX", "-", "-p", "3000,8080,5432", "--", "127.0.0.1"}, args)
 }
 
 func TestNmapArgsRejectsMaliciousHosts(t *testing.T) {
 	for _, host := range []string{"-oX", "127.0.0.1; rm -rf /", "$(id)", "127.0.0.1 -iL /etc/passwd", ""} {
-		args, err := NmapArgs(target.Target{Name: "x", Host: host, AppPorts: []int{80}})
+		args, err := NmapArgs(target.Target{Name: "x", Host: host, AppPorts: []int{80}}, nil)
 		assert.Error(t, err, host)
 		assert.Nil(t, args, host)
 	}
-	_, err := NmapArgs(target.Target{Name: "x", Host: "127.0.0.1", AppPorts: []int{70000}})
+	_, err := NmapArgs(target.Target{Name: "x", Host: "127.0.0.1", AppPorts: []int{70000}}, nil)
 	assert.Error(t, err)
 }
 

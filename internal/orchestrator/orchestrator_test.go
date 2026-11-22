@@ -115,7 +115,7 @@ func TestStartRecordsFindings(t *testing.T) {
 	r := &fakeRunner{stdout: nmapXML(t)}
 	o, st, pub, tg := setup(t, r)
 
-	id, err := o.Start(context.Background(), tg.ID, []string{"nmap", "nmap"})
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap", "nmap"}, nil)
 	require.NoError(t, err)
 	sc := waitStatus(t, st, id, store.ScanDone)
 	assert.Equal(t, []string{"nmap"}, sc.Tools)
@@ -142,17 +142,73 @@ func TestStartRecordsFindings(t *testing.T) {
 	assert.True(t, strings.HasPrefix(lines[0], "$ nmap -sV"))
 
 	// A segunda varredura igual não tem achados novos.
-	id2, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	id2, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 	waitStatus(t, st, id2, store.ScanDone)
 	require.Eventually(t, func() bool { return len(pub.ofType(EventDone)) == 2 }, time.Second, 5*time.Millisecond)
 	assert.Equal(t, 0, pub.ofType(EventDone)[1].Data.(map[string]any)["novos_desde_ultimo"])
 }
 
+func TestStartSavesReport(t *testing.T) {
+	r := &fakeRunner{stdout: nmapXML(t)}
+	o, st, _, tg := setup(t, r)
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
+	require.NoError(t, err)
+	waitStatus(t, st, id, store.ScanDone)
+	report, ok, err := st.Report(context.Background(), id, "nmap")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Contains(t, string(report), `"estado":"closed"`)
+}
+
+func TestReportErrorKeepsFindings(t *testing.T) {
+	// Saída do testssl cortada antes do fim: os achados são lidos, mas o
+	// relatório, que precisa do objeto final scanTime, não.
+	cut := `{"id": "cert_chain_of_trust", "port": "443", "severity": "CRITICAL", "finding": "failed (self signed)."}`
+	r := &fakeRunner{stdout: []byte(cut)}
+	o, st, pub, tg := setup(t, r)
+	id, err := o.Start(context.Background(), tg.ID, []string{"testssl"}, nil)
+	require.NoError(t, err)
+	sc := waitStatus(t, st, id, store.ScanDone)
+	assert.Equal(t, 1, sc.Counts[findings.Critical])
+	_, ok, err := st.Report(context.Background(), id, "testssl")
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	require.Eventually(t, func() bool {
+		for _, ev := range pub.ofType(EventLog) {
+			for _, l := range ev.Data.(map[string]any)["linhas"].([]string) {
+				if strings.HasPrefix(l, "relatório da ferramenta indisponível: ") {
+					return true
+				}
+			}
+		}
+		return false
+	}, time.Second, 5*time.Millisecond)
+}
+
+func TestStartOptions(t *testing.T) {
+	o, st, _, tg := setup(t, &fakeRunner{stdout: nmapXML(t)})
+	ctx := context.Background()
+	var oe *arsenal.OptionError
+
+	_, err := o.Start(ctx, tg.ID, []string{"nmap"}, map[string]arsenal.Options{"nmap": {"portas": "1-65535"}})
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "opcoes.nmap.portas", oe.Field())
+
+	_, err = o.Start(ctx, tg.ID, []string{"nmap"}, map[string]arsenal.Options{"nuclei": {}})
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "opcoes.nuclei", oe.Field())
+
+	list, err := st.ListScans(ctx, 0)
+	require.NoError(t, err)
+	assert.Empty(t, list)
+}
+
 func TestRunnerErrorMarksScanFailed(t *testing.T) {
 	r := &fakeRunner{err: errors.New("a ferramenta terminou com código 1")}
 	o, st, pub, tg := setup(t, r)
-	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 	sc := waitStatus(t, st, id, store.ScanFailed)
 	assert.Contains(t, sc.Error, "nmap: a ferramenta terminou com código 1")
@@ -162,7 +218,7 @@ func TestRunnerErrorMarksScanFailed(t *testing.T) {
 func TestParseErrorMarksScanFailed(t *testing.T) {
 	r := &fakeRunner{stdout: []byte("não é xml")}
 	o, st, _, tg := setup(t, r)
-	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 	sc := waitStatus(t, st, id, store.ScanFailed)
 	assert.Contains(t, sc.Error, "XML do nmap")
@@ -171,7 +227,7 @@ func TestParseErrorMarksScanFailed(t *testing.T) {
 func TestDockerUnavailableCreatesNoScan(t *testing.T) {
 	r := &fakeRunner{available: ErrDockerIndisponivel}
 	o, st, pub, tg := setup(t, r)
-	_, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	_, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.ErrorIs(t, err, ErrDockerIndisponivel)
 	list, err := st.ListScans(context.Background(), 0)
 	require.NoError(t, err)
@@ -187,16 +243,16 @@ func TestStartValidation(t *testing.T) {
 	o, st, _, tg := setup(t, r)
 	ctx := context.Background()
 
-	_, err := o.Start(ctx, tg.ID, nil)
+	_, err := o.Start(ctx, tg.ID, nil, nil)
 	assert.ErrorIs(t, err, ErrSemFerramentas)
-	_, err = o.Start(ctx, tg.ID, []string{"nmap", "rm -rf"})
+	_, err = o.Start(ctx, tg.ID, []string{"nmap", "rm -rf"}, nil)
 	assert.ErrorIs(t, err, ErrFerramentaDesconhecida)
-	_, err = o.Start(ctx, 999, []string{"nmap"})
+	_, err = o.Start(ctx, 999, []string{"nmap"}, nil)
 	assert.ErrorIs(t, err, store.ErrNotFound)
 
 	lan, err := st.CreateTarget(ctx, target.Target{Name: "lan", Host: "10.0.0.5", AppPorts: []int{80}})
 	require.NoError(t, err)
-	_, err = o.Start(ctx, lan.ID, []string{"nmap"})
+	_, err = o.Start(ctx, lan.ID, []string{"nmap"}, nil)
 	assert.NoError(t, err, "o host do próprio alvo está no escopo")
 
 	r.mu.Lock()
@@ -214,10 +270,10 @@ func TestOneScanPerTargetAndShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	o := New(ctx, r, st, &fakePub{})
 
-	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 	waitStatus(t, st, id, store.ScanRunning)
-	_, err = o.Start(context.Background(), tg.ID, []string{"nmap"})
+	_, err = o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	assert.ErrorIs(t, err, ErrVarreduraEmAndamento)
 
 	cancel()
@@ -230,7 +286,7 @@ func TestTimeout(t *testing.T) {
 	r := &fakeRunner{block: make(chan struct{})}
 	o, st, _, tg := setup(t, r)
 	o.timeout = 20 * time.Millisecond
-	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"})
+	id, err := o.Start(context.Background(), tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 	sc := waitStatus(t, st, id, store.ScanFailed)
 	assert.Contains(t, sc.Error, "tempo limite")

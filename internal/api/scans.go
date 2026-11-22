@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -16,22 +17,25 @@ import (
 
 // Scanner dispara varreduras; é o orquestrador.
 type Scanner interface {
-	Start(ctx context.Context, targetID int64, tools []string) (int64, error)
+	Start(ctx context.Context, targetID int64, tools []string, opts map[string]arsenal.Options) (int64, error)
 }
 
 type ScanStore interface {
 	GetScan(ctx context.Context, id int64) (store.Scan, error)
 	ListScans(ctx context.Context, targetID int64) ([]store.Scan, error)
 	ScanFindings(ctx context.Context, scanID int64) ([]findings.Finding, error)
+	Report(ctx context.Context, scanID int64, tool string) (json.RawMessage, bool, error)
 }
 
 type scanRequest struct {
-	TargetID int64    `json:"alvo_id"`
-	Tools    []string `json:"ferramentas"`
+	TargetID int64                      `json:"alvo_id"`
+	Tools    []string                   `json:"ferramentas"`
+	Options  map[string]arsenal.Options `json:"opcoes"`
 }
 
-// StartScanHandler responde POST /api/varreduras {"alvo_id", "ferramentas"}
-// com 202 e o id da varredura, que roda em segundo plano.
+// StartScanHandler responde POST /api/varreduras {"alvo_id", "ferramentas",
+// "opcoes"} com 202 e o id da varredura, que roda em segundo plano. As
+// opções vêm por ferramenta: {"<ferramenta>": {"<chave>": "<valor>"}}.
 func StartScanHandler(sc Scanner) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req scanRequest
@@ -43,11 +47,16 @@ func StartScanHandler(sc Scanner) http.Handler {
 			writeField(w, http.StatusBadRequest, "informe o alvo", "alvo_id")
 			return
 		}
-		id, err := sc.Start(r.Context(), req.TargetID, req.Tools)
-		var ve *target.ValidationError
+		id, err := sc.Start(r.Context(), req.TargetID, req.Tools, req.Options)
+		var (
+			ve *target.ValidationError
+			oe *arsenal.OptionError
+		)
 		switch {
 		case err == nil:
 			writeJSON(w, http.StatusAccepted, map[string]int64{"id": id})
+		case errors.As(err, &oe):
+			writeField(w, http.StatusBadRequest, err.Error(), oe.Field())
 		case errors.Is(err, orchestrator.ErrSemFerramentas), errors.Is(err, orchestrator.ErrFerramentaDesconhecida):
 			writeField(w, http.StatusBadRequest, err.Error(), "ferramentas")
 		case errors.As(err, &ve):
@@ -122,6 +131,31 @@ func ScanFindingsHandler(st ScanStore) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, list)
+	})
+}
+
+// ScanReportHandler responde GET /api/varreduras/{id}/relatorio/{ferramenta}
+// com o relatório estruturado da ferramenta, ou 404 quando não há.
+func ScanReportHandler(st ScanStore) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+		if _, err := st.GetScan(r.Context(), id); err != nil {
+			scanError(w, err)
+			return
+		}
+		report, ok, err := st.Report(r.Context(), id, r.PathValue("ferramenta"))
+		if err != nil {
+			storeError(w, err)
+			return
+		}
+		if !ok {
+			writeError(w, http.StatusNotFound, "relatório indisponível")
+			return
+		}
+		writeJSON(w, http.StatusOK, report)
 	})
 }
 
