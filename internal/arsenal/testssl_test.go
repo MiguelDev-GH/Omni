@@ -24,11 +24,11 @@ func TestTestsslArgs(t *testing.T) {
 		{target.Target{Name: "a", Host: "127.0.0.1", AppPorts: []int{3000}, Domain: "app.com"}, "app.com:443"},
 	}
 	for _, c := range cases {
-		args, err := TestsslArgs(c.t)
+		args, err := TestsslArgs(c.t, nil)
 		require.NoError(t, err)
 		assert.Equal(t, append(append([]string{}, base...), c.want), args)
 	}
-	_, err := TestsslArgs(target.Target{Name: "x", Host: "127.0.0.1; id", AppPorts: []int{443}})
+	_, err := TestsslArgs(target.Target{Name: "x", Host: "127.0.0.1; id", AppPorts: []int{443}}, nil)
 	assert.Error(t, err)
 }
 

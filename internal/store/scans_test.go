@@ -23,7 +23,7 @@ func TestScanRoundTrip(t *testing.T) {
 	s := openTest(t)
 	tg := newScanTarget(t, s)
 
-	sc, err := s.CreateScan(ctx, tg.ID, []string{"nmap"})
+	sc, err := s.CreateScan(ctx, tg.ID, []string{"nmap"}, map[string]map[string]string{"nmap": {"a": "b"}})
 	require.NoError(t, err)
 	assert.Equal(t, ScanQueued, sc.Status)
 	require.NoError(t, s.UpdateScanStatus(ctx, sc.ID, ScanRunning, ""))
@@ -37,6 +37,7 @@ func TestScanRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ScanDone, got.Status)
 	assert.Equal(t, []string{"nmap"}, got.Tools)
+	assert.Equal(t, map[string]map[string]string{"nmap": {"a": "b"}}, got.Options)
 	require.NotNil(t, got.StartedAt)
 	require.NotNil(t, got.FinishedAt)
 	assert.Equal(t, map[findings.Severity]int{findings.Info: 1, findings.Critical: 1}, got.Counts)
@@ -63,7 +64,7 @@ func TestPreviousScanAndInterrupted(t *testing.T) {
 	s := openTest(t)
 	tg := newScanTarget(t, s)
 	mk := func(tools []string, status string) int64 {
-		sc, err := s.CreateScan(ctx, tg.ID, tools)
+		sc, err := s.CreateScan(ctx, tg.ID, tools, nil)
 		require.NoError(t, err)
 		if status != ScanQueued {
 			require.NoError(t, s.UpdateScanStatus(ctx, sc.ID, status, ""))

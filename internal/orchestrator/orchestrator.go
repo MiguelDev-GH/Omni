@@ -5,6 +5,7 @@ package orchestrator
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -64,7 +65,8 @@ type Runner interface {
 // Store é o que o orquestrador usa do banco.
 type Store interface {
 	GetTarget(ctx context.Context, id int64) (target.Target, error)
-	CreateScan(ctx context.Context, targetID int64, tools []string) (store.Scan, error)
+	CreateScan(ctx context.Context, targetID int64, tools []string, opts map[string]map[string]string) (store.Scan, error)
+	SaveReport(ctx context.Context, scanID int64, tool string, report json.RawMessage) error
 	UpdateScanStatus(ctx context.Context, id int64, status, errMsg string) error
 	AddFindings(ctx context.Context, scanID int64, list []findings.Finding) error
 	ScanFindings(ctx context.Context, scanID int64) ([]findings.Finding, error)
@@ -104,10 +106,11 @@ type job struct {
 }
 
 // Start valida o pedido, confirma que o Docker responde, grava a varredura
-// e a roda em segundo plano. Erros de validação vêm como
-// ErrFerramentaDesconhecida, ErrSemFerramentas, *target.ValidationError ou
-// arsenal.ErrForaDoEscopo; alvo inexistente vem como store.ErrNotFound.
-func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string) (int64, error) {
+// e a roda em segundo plano. opts traz as opções de cada ferramenta pedida.
+// Erros de validação vêm como ErrFerramentaDesconhecida, ErrSemFerramentas,
+// *arsenal.OptionError, *target.ValidationError ou arsenal.ErrForaDoEscopo;
+// alvo inexistente vem como store.ErrNotFound.
+func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string, opts map[string]arsenal.Options) (int64, error) {
 	tools = dedupe(tools)
 	if len(tools) == 0 {
 		return 0, ErrSemFerramentas
@@ -120,14 +123,24 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 		}
 		jobs = append(jobs, job{tool: tool})
 	}
+	for name := range opts {
+		if !slices.Contains(tools, name) {
+			return 0, &arsenal.OptionError{Tool: name}
+		}
+	}
 	t, err := o.st.GetTarget(ctx, targetID)
 	if err != nil {
 		return 0, err
 	}
+	saved := map[string]map[string]string{}
 	for i := range jobs {
-		args, err := jobs[i].tool.Args(t)
+		name := jobs[i].tool.Name
+		args, err := jobs[i].tool.Args(t, opts[name])
 		if err != nil {
 			return 0, err
+		}
+		if len(opts[name]) > 0 {
+			saved[name] = opts[name]
 		}
 		tool := jobs[i].tool
 		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, AnyExit: tool.AnyExit, Memory: tool.Memory}
@@ -149,7 +162,7 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 	o.running[targetID] = true
 	o.mu.Unlock()
 
-	sc, err := o.st.CreateScan(ctx, targetID, tools)
+	sc, err := o.st.CreateScan(ctx, targetID, tools, saved)
 	if err != nil {
 		o.release(targetID)
 		return 0, err
@@ -209,7 +222,9 @@ func (o *Orchestrator) run(sc store.Scan, jobs []job) {
 	}})
 }
 
-// runTool roda uma ferramenta e grava os achados dela; devolve quantos foram.
+// runTool roda uma ferramenta e grava os achados e o relatório dela; devolve
+// quantos achados foram. Falha ao montar o relatório não falha a ferramenta:
+// os achados ficam gravados e o erro vai para a saída ao vivo.
 func (o *Orchestrator) runTool(ctx context.Context, sc store.Scan, j job) (int, error) {
 	if ctx.Err() != nil {
 		return 0, ctx.Err()
@@ -217,9 +232,9 @@ func (o *Orchestrator) runTool(ctx context.Context, sc store.Scan, j job) (int, 
 	ctx, cancel := context.WithTimeout(ctx, o.timeout)
 	defer cancel()
 	logs := newLogBatcher(o.pub, sc.ID, j.tool.Name, o.logEvery)
+	defer logs.Close()
 	_, _ = fmt.Fprintf(logs, "$ %s %s\n", j.tool.Name, strings.Join(j.spec.Args, " "))
 	stdout, err := o.runner.Run(ctx, j.spec, logs)
-	logs.Close()
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return 0, fmt.Errorf("tempo limite de %s esgotado", o.timeout)
@@ -233,7 +248,21 @@ func (o *Orchestrator) runTool(ctx context.Context, sc store.Scan, j job) (int, 
 	if err := o.st.AddFindings(ctx, sc.ID, list); err != nil {
 		return 0, err
 	}
+	if j.tool.Report != nil {
+		if err := o.saveReport(ctx, sc.ID, j.tool, stdout); err != nil {
+			slog.Warn("arsenal: relatório da ferramenta", "ferramenta", j.tool.Name, "erro", err)
+			logs.Line("relatório da ferramenta indisponível: " + err.Error())
+		}
+	}
 	return len(list), nil
+}
+
+func (o *Orchestrator) saveReport(ctx context.Context, scanID int64, tool arsenal.Tool, stdout []byte) error {
+	report, err := tool.Report(stdout)
+	if err != nil {
+		return err
+	}
+	return o.st.SaveReport(ctx, scanID, tool.Name, report)
 }
 
 // newSinceLast conta os achados da varredura que não existiam na varredura

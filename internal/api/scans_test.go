@@ -55,6 +55,7 @@ func newScanServer(t *testing.T, r orchestrator.Runner) (*Server, *store.Store, 
 	srv.Handle("GET /api/varreduras/{id}", GetScanHandler(st))
 	srv.Handle("GET /api/varreduras/{id}/achados", ScanFindingsHandler(st))
 	srv.Handle("GET /api/varreduras/{id}/comparacao", CompareScanHandler(st, st))
+	srv.Handle("GET /api/varreduras/{id}/relatorio/{ferramenta}", ScanReportHandler(st))
 	srv.Handle("GET /api/ferramentas", ToolsHandler())
 	return srv, st, tg
 }
@@ -84,6 +85,9 @@ func TestScanValidation(t *testing.T) {
 		{`{"ferramentas": ["nmap"]}`, http.StatusBadRequest, "alvo_id"},
 		{`{"alvo_id": 999, "ferramentas": ["nmap"]}`, http.StatusNotFound, ""},
 		{`{"alvo_id": "1; rm -rf /"}`, http.StatusBadRequest, ""},
+		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nmap": {"portas": "1-65535"}}}`, http.StatusBadRequest, "opcoes.nmap.portas"},
+		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nuclei": {}}}`, http.StatusBadRequest, "opcoes.nuclei"},
+		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nmap": {"x": 1}}}`, http.StatusBadRequest, ""},
 	}
 	for _, c := range cases {
 		rec := do(t, srv, "POST", "/api/varreduras", c.body, true)
@@ -124,6 +128,16 @@ func TestScanLifecycle(t *testing.T) {
 	found := decode[[]map[string]any](t, rec)
 	require.Len(t, found, 2)
 	assert.Equal(t, "nmap", found[0]["ferramenta"])
+
+	rec = do(t, srv, "GET", "/api/varreduras/"+itoa(scanID)+"/relatorio/nmap", "", true)
+	require.Equal(t, http.StatusOK, rec.Code)
+	report := decode[map[string][]map[string]any](t, rec)
+	require.Len(t, report["hosts"], 1)
+	rec = do(t, srv, "GET", "/api/varreduras/"+itoa(scanID)+"/relatorio/nuclei", "", true)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.JSONEq(t, `{"erro":"relatório indisponível"}`, rec.Body.String())
+	rec = do(t, srv, "GET", "/api/varreduras/999/relatorio/nmap", "", true)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 
 	rec = do(t, srv, "GET", "/api/varreduras/999", "", true)
 	assert.Equal(t, http.StatusNotFound, rec.Code)

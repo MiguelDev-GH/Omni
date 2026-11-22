@@ -40,7 +40,7 @@ func TestDockerRunnerNmap(t *testing.T) {
 	}()
 	port := ln.Addr().(*net.TCPAddr).Port
 
-	args, err := arsenal.NmapArgs(target.Target{Name: "t", Host: "127.0.0.1", AppPorts: []int{port}})
+	args, err := arsenal.NmapArgs(target.Target{Name: "t", Host: "127.0.0.1", AppPorts: []int{port}}, nil)
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

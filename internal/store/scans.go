@@ -26,29 +26,38 @@ const (
 
 // Scan é uma execução do Arsenal contra um alvo, com uma ou mais ferramentas.
 type Scan struct {
-	ID         int64                     `json:"id"`
-	TargetID   int64                     `json:"alvo_id"`
-	Tools      []string                  `json:"ferramentas"`
-	Status     string                    `json:"status"`
-	Error      string                    `json:"erro,omitempty"`
-	CreatedAt  time.Time                 `json:"criada_em"`
-	StartedAt  *time.Time                `json:"inicio,omitempty"`
-	FinishedAt *time.Time                `json:"fim,omitempty"`
-	Counts     map[findings.Severity]int `json:"achados"`
+	ID       int64    `json:"id"`
+	TargetID int64    `json:"alvo_id"`
+	Tools    []string `json:"ferramentas"`
+	// Options são as opções de cada ferramenta (ferramenta → chave → valor).
+	Options    map[string]map[string]string `json:"opcoes"`
+	Status     string                       `json:"status"`
+	Error      string                       `json:"erro,omitempty"`
+	CreatedAt  time.Time                    `json:"criada_em"`
+	StartedAt  *time.Time                   `json:"inicio,omitempty"`
+	FinishedAt *time.Time                   `json:"fim,omitempty"`
+	Counts     map[findings.Severity]int    `json:"achados"`
 }
 
-const scanColumns = "id, target_id, tools, status, error, created_ms, started_ms, finished_ms"
+const scanColumns = "id, target_id, tools, options, status, error, created_ms, started_ms, finished_ms"
 
-// CreateScan grava uma varredura na fila.
-func (s *Store) CreateScan(ctx context.Context, targetID int64, tools []string) (Scan, error) {
+// CreateScan grava uma varredura na fila, com as opções de cada ferramenta.
+func (s *Store) CreateScan(ctx context.Context, targetID int64, tools []string, opts map[string]map[string]string) (Scan, error) {
 	b, err := json.Marshal(tools)
+	if err != nil {
+		return Scan{}, err
+	}
+	if opts == nil {
+		opts = map[string]map[string]string{}
+	}
+	o, err := json.Marshal(opts)
 	if err != nil {
 		return Scan{}, err
 	}
 	now := time.Now().UTC()
 	res, err := s.db.ExecContext(ctx,
-		"INSERT INTO scans (target_id, tools, status, created_ms) VALUES (?, ?, ?, ?)",
-		targetID, string(b), ScanQueued, now.UnixMilli())
+		"INSERT INTO scans (target_id, tools, options, status, created_ms) VALUES (?, ?, ?, ?, ?)",
+		targetID, string(b), string(o), ScanQueued, now.UnixMilli())
 	if err != nil {
 		return Scan{}, err
 	}
@@ -56,7 +65,7 @@ func (s *Store) CreateScan(ctx context.Context, targetID int64, tools []string) 
 	if err != nil {
 		return Scan{}, err
 	}
-	return Scan{ID: id, TargetID: targetID, Tools: tools, Status: ScanQueued, CreatedAt: now.Truncate(time.Millisecond), Counts: map[findings.Severity]int{}}, nil
+	return Scan{ID: id, TargetID: targetID, Tools: tools, Options: opts, Status: ScanQueued, CreatedAt: now.Truncate(time.Millisecond), Counts: map[findings.Severity]int{}}, nil
 }
 
 // UpdateScanStatus muda o estado; "rodando" marca o início, e "concluida" ou
@@ -250,13 +259,16 @@ func (s *Store) severityCounts(ctx context.Context, ids []int64) (map[int64]map[
 func scanScan(r scanner) (Scan, error) {
 	var (
 		sc                         Scan
-		tools                      string
+		tools, options             string
 		created, started, finished int64
 	)
-	if err := r.Scan(&sc.ID, &sc.TargetID, &tools, &sc.Status, &sc.Error, &created, &started, &finished); err != nil {
+	if err := r.Scan(&sc.ID, &sc.TargetID, &tools, &options, &sc.Status, &sc.Error, &created, &started, &finished); err != nil {
 		return Scan{}, err
 	}
 	if err := json.Unmarshal([]byte(tools), &sc.Tools); err != nil {
+		return Scan{}, err
+	}
+	if err := json.Unmarshal([]byte(options), &sc.Options); err != nil {
 		return Scan{}, err
 	}
 	sc.CreatedAt = time.UnixMilli(created).UTC()

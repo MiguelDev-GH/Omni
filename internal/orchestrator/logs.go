@@ -60,6 +60,18 @@ func (l *logBatcher) Write(p []byte) (int, error) {
 	}
 }
 
+// Line acrescenta uma linha do próprio Omni, depois da linha parcial da
+// ferramenta, se houver.
+func (l *logBatcher) Line(line string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.partial) > 0 {
+		l.add(string(l.partial))
+		l.partial = nil
+	}
+	l.add(line)
+}
+
 // add guarda uma linha, cortando linhas longas e parando em maxLogLines.
 func (l *logBatcher) add(line string) {
 	if len(line) > maxLineLen {
