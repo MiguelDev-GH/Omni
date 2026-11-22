@@ -11,6 +11,7 @@ const routes: Record<string, string> = {
   Nmap: "/arsenal/nmap",
   Nuclei: "/arsenal/nuclei",
   Nikto: "/arsenal/nikto",
+  SQLMap: "/arsenal/sqlmap",
   ffuf: "/arsenal/ffuf",
   testssl: "/arsenal/testssl",
   Histórico: "/relatorios",

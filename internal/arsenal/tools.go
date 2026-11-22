@@ -126,6 +126,16 @@ var Tools = []Tool{
 		OutputFile:  niktoOutput,
 	},
 	{
+		Name:        "sqlmap",
+		Description: "Injeção de SQL em um parâmetro de uma rota vista no tráfego",
+		Image:       SqlmapImage,
+		Args:        SqlmapArgs,
+		Parse:       ParseSqlmap,
+		Report:      SqlmapReportFrom,
+		// O SQLMap sai com código diferente de zero quando não acha nada.
+		AnyExit: true,
+	},
+	{
 		Name:        "ffuf",
 		Description: "Rotas e arquivos escondidos da aplicação",
 		Image:       FfufImage,

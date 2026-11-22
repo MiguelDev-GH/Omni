@@ -24,7 +24,11 @@ func TestToolsRejectUnknownOptions(t *testing.T) {
 	tg := target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{443}}
 	for _, tool := range Tools {
 		_, err := tool.Args(tg, Options{})
-		require.NoError(t, err, tool.Name)
+		if tool.Name == "sqlmap" { // rota e parâmetro são obrigatórios
+			assert.ErrorIs(t, err, ErrOpcaoInvalida, tool.Name)
+		} else {
+			require.NoError(t, err, tool.Name)
+		}
 		args, err := tool.Args(tg, Options{"x": "1"})
 		assert.ErrorIs(t, err, ErrOpcaoInvalida, tool.Name)
 		assert.Nil(t, args, tool.Name)
