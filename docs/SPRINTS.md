@@ -19,7 +19,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | 🚧 Em andamento |
 | [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ⏳ A fazer |
 | [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | 🚧 Em andamento |
-| [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ⏳ A fazer |
+| [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | 🚧 Em andamento |
 | [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ⏳ A fazer |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
@@ -220,6 +220,13 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 
 - Só nível 1 e risco 1, sem nenhuma opção de extração de dados (`--dump`, `--os-shell` e afins são proibidos e testados).
 - Rota e parâmetro validados no backend contra um padrão estrito.
+
+**Decisões da Sprint 12:**
+
+- O SQLMap não publica imagem oficial; a imagem é `googlesky/sqlmap`, fixada pela tag do commit do upstream (`upstream-5db2e62884d91f3ed3b43ec55904737e4051e9d7`). **Não verificado:** a imagem não foi baixada nem executada nesta sprint, então o entrypoint e o formato exato da saída seguem a documentação do SQLMap e os fixtures são escritos à mão; rode o teste de integração com Docker antes de confiar no resultado.
+- Rota e parâmetro são opções obrigatórias: `Args` recusa a falta de qualquer uma com 400. Por isso o SQLMap só roda pela página dele; na visão geral aparece desabilitado, explicando o motivo.
+- Só parâmetros GET são testados; a página lista apenas as rotas `GET` vistas pelo sniffer nas últimas 24 horas. `:id` na rota vira `1` na URL testada.
+- O SQLMap sai com código diferente de zero quando não acha injeção, então a ferramenta usa `AnyExit`.
 
 **Branch:** `feat/arsenal-sqlmap` · **Labels:** `funcionalidade`, `docker`, `visual`
 
