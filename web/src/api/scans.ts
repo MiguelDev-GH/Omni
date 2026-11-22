@@ -25,6 +25,7 @@ export type Scan = {
   inicio?: string;
   fim?: string;
   achados: Partial<Record<Severity, number>>;
+  opcoes?: Record<string, Record<string, string>>;
 };
 
 export type Finding = {
@@ -36,7 +37,10 @@ export type Finding = {
   assinatura: string;
 };
 
-export type Tool = { nome: string; descricao: string; imagem: string };
+// requer é o dado opcional do alvo de que a ferramenta precisa.
+export type Tool = { nome: string; descricao: string; imagem: string; requer?: "dominio" | "repositorio" };
+
+export type ToolOptions = Record<string, Record<string, string>>;
 
 export type Comparison = { novos: Finding[]; resolvidos: Finding[]; anteriores: Record<string, number> };
 
@@ -44,11 +48,9 @@ export function listTools(): Promise<Tool[]> {
   return apiFetch<Tool[]>("/api/ferramentas");
 }
 
-export function startScan(alvoId: number, ferramentas: string[]): Promise<{ id: number }> {
-  return apiFetch<{ id: number }>("/api/varreduras", {
-    method: "POST",
-    body: JSON.stringify({ alvo_id: alvoId, ferramentas }),
-  });
+export function startScan(alvoId: number, ferramentas: string[], opcoes?: ToolOptions): Promise<{ id: number }> {
+  const body = opcoes && Object.keys(opcoes).length > 0 ? { alvo_id: alvoId, ferramentas, opcoes } : { alvo_id: alvoId, ferramentas };
+  return apiFetch<{ id: number }>("/api/varreduras", { method: "POST", body: JSON.stringify(body) });
 }
 
 export function listScans(alvoId?: number): Promise<Scan[]> {

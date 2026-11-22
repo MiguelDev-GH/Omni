@@ -1,27 +1,56 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { statusLabels, TargetPicker, when } from "../arsenal/common";
+import { missingRequirement, toolViews } from "../arsenal/registry";
 import { ApiError } from "../api/client";
+import { getReport } from "../api/reports";
 import { listScans, listTools, scanFindings, startScan, type Finding, type Scan, type Tool } from "../api/scans";
 import { Card, InternalBadge, Notice, PageHeader } from "../components/Card";
 import FindingsTable from "../components/FindingsTable";
 import ScanConsole from "../components/ScanConsole";
-import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 
-// statusLabels traduz o estado de uma varredura para a interface.
-export const statusLabels: Record<Scan["status"], string> = {
-  fila: "Na fila",
-  rodando: "Rodando",
-  concluida: "Concluída",
-  falhou: "Falhou",
-};
+type Latest = { scan: Scan; summary: string | null };
 
-const when = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" });
+// useLatest devolve, por ferramenta, a última varredura concluída dela e o
+// resumo do relatório; ferramenta sem varredura concluída fica de fora.
+function useLatest(scans: Scan[], tools: Tool[]): Record<string, Latest> {
+  const [summaries, setSummaries] = useState<Record<string, string | null>>({});
+  const latest: Record<string, Scan> = {};
+  for (const t of tools) {
+    const sc = scans.find((s) => s.status === "concluida" && s.ferramentas.includes(t.nome));
+    if (sc) latest[t.nome] = sc;
+  }
+  const key = Object.entries(latest)
+    .map(([tool, sc]) => `${tool}:${sc.id}`)
+    .join(",");
+
+  useEffect(() => {
+    let live = true;
+    for (const pair of key ? key.split(",") : []) {
+      const [tool, id] = pair.split(":") as [string, string];
+      if (pair in summaries) continue;
+      const view = toolViews[tool];
+      getReport(Number(id), tool).then(
+        (report) => live && setSummaries((m) => ({ ...m, [pair]: report && view ? view.summary(report) : null })),
+        () => live && setSummaries((m) => ({ ...m, [pair]: null })),
+      );
+    }
+    return () => {
+      live = false;
+    };
+    // summaries fica de fora: só os pares novos de key disparam uma busca.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const out: Record<string, Latest> = {};
+  for (const [tool, sc] of Object.entries(latest)) out[tool] = { scan: sc, summary: summaries[`${tool}:${sc.id}`] ?? null };
+  return out;
+}
 
 export default function ArsenalPage() {
   const targets = useAppStore((s) => s.targets);
   const selected = useAppStore((s) => s.selectedTargetId);
-  const selectTarget = useAppStore((s) => s.selectTarget);
   const docker = useAppStore((s) => s.engines.docker);
   const scanEvents = useAppStore((s) => s.scanEvents);
 
@@ -59,7 +88,7 @@ export default function ArsenalPage() {
     setBusy(true);
     setError(null);
     try {
-      const { id } = await startScan(selected, chosen);
+      const { id } = await startScan(selected, runnable);
       setCurrent(id);
       setScans(await listScans(selected));
     } catch (err) {
@@ -68,6 +97,13 @@ export default function ArsenalPage() {
       setBusy(false);
     }
   }
+
+  const target = targets.find((t) => t.id === selected);
+  const latest = useLatest(scans, tools);
+  const runnable = chosen.filter((n) => {
+    const t = tools.find((x) => x.nome === n);
+    return t && missingRequirement(t, target) === null;
+  });
 
   const toggle = (name: string) =>
     setChosen((c) => (c.includes(name) ? c.filter((n) => n !== name) : [...c, name]));
@@ -96,41 +132,56 @@ export default function ArsenalPage() {
           </p>
         ) : (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <label htmlFor="alvo-arsenal" className="text-suave">
-                Alvo
-              </label>
-              <Select
-                id="alvo-arsenal"
-                value={selected}
-                onChange={selectTarget}
-                options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
-              />
-            </div>
-            <fieldset className="grid gap-1 sm:grid-cols-2">
+            <TargetPicker id="alvo-arsenal" />
+            <fieldset className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <legend className="mb-2 text-sm text-suave">Ferramentas</legend>
-              {tools.map((t) => (
-                <label
-                  key={t.nome}
-                  className="flex cursor-pointer items-start gap-2.5 rounded-xl px-3 py-2.5 text-sm hover:bg-elevado/70 has-checked:bg-elevado"
-                >
-                  <input
-                    type="checkbox"
-                    checked={chosen.includes(t.nome)}
-                    onChange={() => toggle(t.nome)}
-                    className="mt-0.5 size-4"
-                  />
-                  <span>
-                    <span className="block font-mono font-medium">{t.nome}</span>
-                    <span className="block text-xs text-suave">{t.descricao}</span>
-                  </span>
-                </label>
-              ))}
+              {tools.map((t) => {
+                const missing = missingRequirement(t, target);
+                const last = latest[t.nome];
+                const page = toolViews[t.nome] ? `/arsenal/${t.nome}` : null;
+                return (
+                  <div
+                    key={t.nome}
+                    className="flex flex-col gap-2 rounded-xl px-3 py-3 text-sm hover:bg-elevado/70 has-checked:bg-elevado"
+                  >
+                    <label className={`flex items-start gap-2.5 ${missing ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                      <input
+                        type="checkbox"
+                        checked={missing === null && chosen.includes(t.nome)}
+                        disabled={missing !== null}
+                        onChange={() => toggle(t.nome)}
+                        className="mt-0.5 size-4"
+                      />
+                      <span>
+                        <span className="block font-mono font-medium">{t.nome}</span>
+                        <span className="block text-xs text-suave">{t.descricao}</span>
+                      </span>
+                    </label>
+                    <div className="space-y-0.5 pl-6.5 text-xs">
+                      {missing ? (
+                        <p className="text-aviso">{missing}</p>
+                      ) : last ? (
+                        <>
+                          <p className="text-texto">{last.summary ?? "Relatório indisponível"}</p>
+                          <p className="font-mono text-suave">Última: {when(last.scan.criada_em)}</p>
+                        </>
+                      ) : (
+                        <p className="text-suave">Nenhuma varredura concluída</p>
+                      )}
+                      {page && (
+                        <Link to={page} className="link inline-block pt-1">
+                          Abrir página do {toolViews[t.nome]!.title}
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </fieldset>
             <button
               type="button"
               onClick={() => void start()}
-              disabled={busy || chosen.length === 0 || selected === null}
+              disabled={busy || runnable.length === 0 || selected === null}
               className="botao"
             >
               {busy ? "Iniciando..." : "Iniciar varredura"}

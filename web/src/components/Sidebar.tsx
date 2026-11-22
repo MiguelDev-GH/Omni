@@ -7,9 +7,10 @@ const routes: Record<string, string> = {
   "Requisições na API": "/requisicoes",
   "Status HTTP": "/requisicoes",
   "Consultas no banco": "/consultas",
-  Nmap: "/arsenal",
-  Nuclei: "/arsenal",
-  testssl: "/arsenal",
+  "Visão geral": "/arsenal",
+  Nmap: "/arsenal/nmap",
+  Nuclei: "/arsenal/nuclei",
+  testssl: "/arsenal/testssl",
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",
 };
@@ -35,7 +36,7 @@ const linkClass =
 const sections = [
   { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
   { title: "Tráfego", items: ["Inspetor de pacotes", "Capturas"] },
-  { title: "Arsenal", items: ["Nmap", "Nuclei", "Nikto", "SQLMap", "ffuf", "Amass", "testssl", "Vazamentos"] },
+  { title: "Arsenal", items: ["Visão geral", "Nmap", "Nuclei", "Nikto", "SQLMap", "ffuf", "Amass", "testssl", "Vazamentos"] },
   { title: "Relatórios", items: ["Histórico", "Comparação entre scans", "Exportação em PDF"] },
 ];
 
@@ -52,7 +53,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             {s.items.map((item) => (
               <li key={item}>
                 {routes[item] ? (
-                  <NavLink to={routes[item]} onClick={onNavigate} className={linkClass(item)}>
+                  <NavLink to={routes[item]} end onClick={onNavigate} className={linkClass(item)}>
                     {item}
                   </NavLink>
                 ) : (

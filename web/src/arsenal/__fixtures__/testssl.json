@@ -1,0 +1,146 @@
+{
+  "nota": "T",
+  "protocolos": [
+    {
+      "nome": "SSLv2",
+      "oferecido": false
+    },
+    {
+      "nome": "SSLv3",
+      "oferecido": false
+    },
+    {
+      "nome": "TLS 1.0",
+      "oferecido": false
+    },
+    {
+      "nome": "TLS 1.1",
+      "oferecido": false
+    },
+    {
+      "nome": "TLS 1.2",
+      "oferecido": true
+    },
+    {
+      "nome": "TLS 1.3",
+      "oferecido": true
+    }
+  ],
+  "certificado": {
+    "assunto": "localhost",
+    "emissor": "localhost",
+    "valido_ate": "2026-11-23T16:15:00Z",
+    "dias_restantes": 2,
+    "confiavel": false
+  },
+  "vulnerabilidades": [
+    {
+      "id": "heartbleed",
+      "nome": "Heartbleed",
+      "vulneravel": false,
+      "cve": "CVE-2014-0160"
+    },
+    {
+      "id": "CCS",
+      "nome": "CCS injection",
+      "vulneravel": false,
+      "cve": "CVE-2014-0224"
+    },
+    {
+      "id": "ticketbleed",
+      "nome": "Ticketbleed",
+      "vulneravel": false,
+      "cve": "CVE-2016-9244"
+    },
+    {
+      "id": "ROBOT",
+      "nome": "ROBOT",
+      "vulneravel": false,
+      "cve": "CVE-2017-17382 CVE-2017-17427 CVE-2017-17428 CVE-2017-13098 CVE-2017-1000385 CVE-2017-13099 CVE-2016-6883 CVE-2012-5081 CVE-2017-6168"
+    },
+    {
+      "id": "secure_renego",
+      "nome": "Renegociação segura",
+      "vulneravel": false,
+      "cve": ""
+    },
+    {
+      "id": "secure_client_renego",
+      "nome": "Renegociação iniciada pelo cliente",
+      "vulneravel": false,
+      "cve": "CVE-2011-1473"
+    },
+    {
+      "id": "CRIME_TLS",
+      "nome": "CRIME",
+      "vulneravel": false,
+      "cve": "CVE-2012-4929"
+    },
+    {
+      "id": "BREACH",
+      "nome": "BREACH",
+      "vulneravel": false,
+      "cve": "CVE-2013-3587"
+    },
+    {
+      "id": "POODLE_SSL",
+      "nome": "POODLE",
+      "vulneravel": false,
+      "cve": "CVE-2014-3566"
+    },
+    {
+      "id": "fallback_SCSV",
+      "nome": "TLS_FALLBACK_SCSV",
+      "vulneravel": false,
+      "cve": ""
+    },
+    {
+      "id": "SWEET32",
+      "nome": "SWEET32",
+      "vulneravel": false,
+      "cve": "CVE-2016-2183 CVE-2016-6329"
+    },
+    {
+      "id": "FREAK",
+      "nome": "FREAK",
+      "vulneravel": false,
+      "cve": "CVE-2015-0204"
+    },
+    {
+      "id": "DROWN",
+      "nome": "DROWN",
+      "vulneravel": false,
+      "cve": "CVE-2016-0800 CVE-2016-0703"
+    },
+    {
+      "id": "LOGJAM",
+      "nome": "Logjam",
+      "vulneravel": false,
+      "cve": "CVE-2015-4000"
+    },
+    {
+      "id": "BEAST",
+      "nome": "BEAST",
+      "vulneravel": false,
+      "cve": "CVE-2011-3389"
+    },
+    {
+      "id": "LUCKY13",
+      "nome": "Lucky13",
+      "vulneravel": true,
+      "cve": "CVE-2013-0169"
+    },
+    {
+      "id": "winshock",
+      "nome": "Winshock",
+      "vulneravel": false,
+      "cve": "CVE-2014-6321"
+    },
+    {
+      "id": "RC4",
+      "nome": "RC4",
+      "vulneravel": false,
+      "cve": "CVE-2013-2566 CVE-2015-2808"
+    }
+  ]
+}

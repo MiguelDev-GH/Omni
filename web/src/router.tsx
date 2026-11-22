@@ -8,6 +8,7 @@ import QueriesPage from "./pages/QueriesPage";
 import ReportsPage from "./pages/ReportsPage";
 import RequestsPage from "./pages/RequestsPage";
 import TargetsPage from "./pages/TargetsPage";
+import ToolPage from "./pages/ToolPage";
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "/requisicoes", element: <RequestsPage /> },
       { path: "/consultas", element: <QueriesPage /> },
       { path: "/arsenal", element: <ArsenalPage /> },
+      { path: "/arsenal/:ferramenta", element: <ToolPage /> },
       { path: "/relatorios", element: <ReportsPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
