@@ -56,6 +56,9 @@ export type NiktoItem = {
 };
 export type NiktoReport = { servidor: string; itens: NiktoItem[] };
 
+export type SqlmapTechnique = { tipo: string; titulo: string; payload: string };
+export type SqlmapReport = { url: string; parametro: string; injetavel: boolean; sgbd: string; tecnicas: SqlmapTechnique[] };
+
 // getReport busca o relatório de uma ferramenta na varredura; sem relatório
 // (varredura antiga ou falha ao montá-lo), devolve null.
 export async function getReport(scanId: number, tool: string): Promise<unknown | null> {

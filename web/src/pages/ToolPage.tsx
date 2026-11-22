@@ -86,7 +86,8 @@ function ToolPageFor({ name }: { name: string }) {
     }
   }
 
-  const missing = tool ? missingRequirement(tool, target) : null;
+  const missing = tool ? (view.pageOnly ? null : missingRequirement(tool, target)) : null;
+  const blocked = view.blocked?.(options) ?? null;
   const running = isRunning(shown);
 
   return (
@@ -126,7 +127,7 @@ function ToolPageFor({ name }: { name: string }) {
             <button
               type="button"
               onClick={() => void start()}
-              disabled={busy || selected === null || missing !== null || running}
+              disabled={busy || selected === null || missing !== null || blocked !== null || running}
               className="botao"
             >
               {busy ? "Iniciando..." : running ? "Varredura em andamento" : "Iniciar varredura"}

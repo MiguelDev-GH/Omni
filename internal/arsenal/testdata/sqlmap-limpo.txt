@@ -1,0 +1,6 @@
+[12:00:01] [INFO] testing connection to the target URL
+[12:00:01] [INFO] testing URL 'http://127.0.0.1:3000/produtos/1?ordem=1'
+[12:00:02] [INFO] testing if GET parameter 'ordem' is dynamic
+[12:00:30] [WARNING] GET parameter 'ordem' does not appear to be dynamic
+[12:00:58] [WARNING] GET parameter 'ordem' does not seem to be injectable
+[12:00:58] [CRITICAL] all tested parameters do not appear to be injectable.
