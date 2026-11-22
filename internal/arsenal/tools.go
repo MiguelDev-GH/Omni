@@ -108,6 +108,15 @@ var Tools = []Tool{
 		Memory: 1536 << 20,
 	},
 	{
+		Name:        "ffuf",
+		Description: "Rotas e arquivos escondidos da aplicação",
+		Image:       FfufImage,
+		Args:        FfufArgs,
+		Parse:       ParseFfufJSON,
+		Report:      FfufReportFrom,
+		Files:       FfufFiles,
+	},
+	{
 		Name:        "testssl",
 		Description: "Certificado e força da criptografia TLS",
 		Image:       TestsslImage,
