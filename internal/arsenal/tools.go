@@ -14,6 +14,11 @@ import (
 // fora do permitido.
 var ErrOpcaoInvalida = errors.New("opção inválida")
 
+// OutputFileMarker separa, na saída entregue ao parser, a saída padrão da
+// ferramenta do conteúdo do OutputFile, lido do container depois que ela
+// termina.
+const OutputFileMarker = "\n--- omni: arquivo de saída ---\n"
+
 // Options são as opções de uma ferramenta vindas da interface (chave →
 // valor). Cada ferramenta valida as suas contra uma lista fechada.
 type Options map[string]string
@@ -76,6 +81,10 @@ type Tool struct {
 	// iniciar (caminho absoluto → conteúdo), como a lista de palavras do
 	// ffuf; nil quando a ferramenta não precisa de nenhum.
 	Files func(Options) (map[string][]byte, error) `json:"-"`
+	// OutputFile é o arquivo que a ferramenta grava no container em vez da
+	// saída padrão; o runner o lê depois que ela termina e o entrega ao
+	// parser depois da saída padrão, separado por OutputFileMarker.
+	OutputFile string `json:"-"`
 	// Volumes são volumes nomeados do Docker (nome → caminho no container),
 	// como o cache de templates do Nuclei.
 	Volumes map[string]string `json:"-"`

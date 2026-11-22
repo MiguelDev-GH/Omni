@@ -15,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/MiguelDev-GH/omni/internal/arsenal"
 )
 
 // fakeDocker imita a API do Docker Engine e guarda o tar recebido.
@@ -22,6 +24,8 @@ type fakeDocker struct {
 	mu      sync.Mutex
 	calls   []string
 	archive []byte
+	// output é o arquivo servido por GET /containers/c1/archive; nil dá 404.
+	output []byte
 }
 
 func (f *fakeDocker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +47,15 @@ func (f *fakeDocker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.archive = b
 		f.mu.Unlock()
+	case r.Method == http.MethodGet && r.URL.Path == "/containers/c1/archive":
+		if f.output == nil || r.URL.Query().Get("path") != "/tmp/saida.json" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		tw := tar.NewWriter(w)
+		_ = tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "saida.json", Mode: 0o644, Size: int64(len(f.output))})
+		_, _ = tw.Write(f.output)
+		_ = tw.Close()
 	case r.URL.Path == "/containers/c1/start":
 		w.WriteHeader(http.StatusNoContent)
 	case r.URL.Path == "/containers/c1/logs":
@@ -106,6 +119,24 @@ func TestRunWithoutFilesSkipsArchive(t *testing.T) {
 	fd.mu.Lock()
 	defer fd.mu.Unlock()
 	assert.NotContains(t, fd.calls, "PUT /containers/c1/archive")
+}
+
+func TestRunAppendsOutputFile(t *testing.T) {
+	d, fd := fakeRunnerFor(t)
+	fd.output = []byte(`[{"port":3000}]`)
+	out, err := d.Run(context.Background(), Spec{Image: "img:1", OutputFile: "/tmp/saida.json"}, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, "ok\n"+arsenal.OutputFileMarker+`[{"port":3000}]`, string(out))
+	fd.mu.Lock()
+	defer fd.mu.Unlock()
+	assert.Equal(t, "GET /containers/c1/archive", fd.calls[len(fd.calls)-2], "lido antes de remover o container")
+}
+
+func TestRunMissingOutputFileKeepsStdout(t *testing.T) {
+	d, _ := fakeRunnerFor(t)
+	out, err := d.Run(context.Background(), Spec{Image: "img:1", OutputFile: "/tmp/saida.json"}, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, "ok\n", string(out))
 }
 
 func TestRunRejectsBadFilePaths(t *testing.T) {

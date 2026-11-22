@@ -20,6 +20,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/MiguelDev-GH/omni/internal/arsenal"
 )
 
 const (
@@ -167,6 +169,15 @@ func (d *DockerRunner) Run(ctx context.Context, s Spec, logs io.Writer) ([]byte,
 	if err != nil {
 		return nil, err
 	}
+	if s.OutputFile != "" {
+		file, found, err := d.readFile(ctx, id, s.OutputFile, maxStdout-len(stdout))
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			stdout = append(append(stdout, arsenal.OutputFileMarker...), file...)
+		}
+	}
 	if code != 0 && !s.AnyExit {
 		return stdout, fmt.Errorf("a ferramenta terminou com código %d", code)
 	}
@@ -300,6 +311,41 @@ func (d *DockerRunner) wait(ctx context.Context, id string) (int, error) {
 		return 0, err
 	}
 	return out.StatusCode, nil
+}
+
+// readFile lê um arquivo do container parado pelo tar de GET
+// /containers/{id}/archive; found é falso quando o arquivo não existe.
+func (d *DockerRunner) readFile(ctx context.Context, id, name string, limit int) (b []byte, found bool, err error) {
+	resp, err := d.do(ctx, http.MethodGet, "/containers/"+id+"/archive?path="+url.QueryEscape(name), nil)
+	if err != nil {
+		return nil, false, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		_ = resp.Body.Close()
+		return nil, false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, false, apiError(resp, "ler arquivo de saída")
+	}
+	defer func() { _ = resp.Body.Close() }()
+	tr := tar.NewReader(resp.Body)
+	for {
+		hdr, err := tr.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, false, nil
+			}
+			return nil, false, err
+		}
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		if hdr.Size > int64(limit) {
+			return nil, false, errors.New("a saída da ferramenta passou de 32 MiB")
+		}
+		b, err := io.ReadAll(tr)
+		return b, err == nil, err
+	}
 }
 
 // remove apaga o container mesmo depois de ctx cancelado.
