@@ -2,6 +2,8 @@ import type { Finding, Scan, Tool } from "../api/scans";
 import type { Target } from "../api/targets";
 import FfufOptions from "./FfufOptions";
 import FfufView, { ffufSummary } from "./FfufView";
+import NiktoOptions from "./NiktoOptions";
+import NiktoView, { niktoSummary } from "./NiktoView";
 import NmapView, { nmapSummary } from "./NmapView";
 import NucleiView, { nucleiSummary } from "./NucleiView";
 import TestsslView, { testsslSummary } from "./TestsslView";
@@ -20,6 +22,7 @@ export type ToolView = {
 export const toolViews: Record<string, ToolView> = {
   nmap: { title: "Nmap", tagline: "Mapa de portas", summary: nmapSummary, Report: NmapView },
   nuclei: { title: "Nuclei", tagline: "O que os templates acharam", summary: nucleiSummary, Report: NucleiView },
+  nikto: { title: "Nikto", tagline: "Checagens do servidor", summary: niktoSummary, Report: NiktoView, Options: NiktoOptions },
   ffuf: { title: "ffuf", tagline: "Árvore de rotas", summary: ffufSummary, Report: FfufView, Options: FfufOptions },
   testssl: { title: "testssl", tagline: "Boletim TLS", summary: testsslSummary, Report: TestsslView },
 };

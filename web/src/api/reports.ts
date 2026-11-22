@@ -45,6 +45,17 @@ export type FfufResult = {
 };
 export type FfufReport = { base_url: string; resultados: FfufResult[] };
 
+export type NiktoCategory = "cabecalhos" | "arquivos" | "versao" | "outros";
+export type NiktoItem = {
+  id: string;
+  metodo: string;
+  url: string;
+  mensagem: string;
+  referencias: string[];
+  categoria: NiktoCategory;
+};
+export type NiktoReport = { servidor: string; itens: NiktoItem[] };
+
 // getReport busca o relatório de uma ferramenta na varredura; sem relatório
 // (varredura antiga ou falha ao montá-lo), devolve null.
 export async function getReport(scanId: number, tool: string): Promise<unknown | null> {
