@@ -90,6 +90,40 @@ func TestDockerRunnerFfuf(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestDockerRunnerNikto roda o Nikto de verdade contra um servidor no
+// loopback que expõe /.env e lê o JSON que ele grava no container.
+func TestDockerRunnerNikto(t *testing.T) {
+	r, err := NewDockerRunner()
+	require.NoError(t, err)
+	if err := r.Available(context.Background()); err != nil {
+		t.Skip(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Server", "Teste/1.0")
+		if req.URL.Path != "/" && req.URL.Path != "/.env" {
+			http.NotFound(w, req)
+			return
+		}
+		_, _ = w.Write([]byte("SEGREDO=1\n"))
+	}))
+	defer srv.Close()
+	port := srv.Listener.Addr().(*net.TCPAddr).Port
+
+	tool, _ := arsenal.Lookup("nikto")
+	args, err := tool.Args(target.Target{Name: "t", Host: "127.0.0.1", AppPorts: []int{port}}, nil)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	var logs bytes.Buffer
+	out, err := r.Run(ctx, Spec{Image: tool.Image, Args: args, OutputFile: tool.OutputFile}, &logs)
+	require.NoError(t, err, logs.String())
+	require.Contains(t, string(out), arsenal.OutputFileMarker, logs.String())
+	raw, err := tool.Report(out)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `"servidor":"Teste/1.0"`)
+	assert.Contains(t, string(raw), `"url":"/.env"`)
+}
+
 func TestDockerRunnerExitCodeAndCleanup(t *testing.T) {
 	r, err := NewDockerRunner()
 	require.NoError(t, err)

@@ -48,15 +48,25 @@ func ffufOptions(t target.Target, o Options) (list string, port int, err error) 
 	if err != nil {
 		return "", 0, err
 	}
-	port = t.AppPorts[0]
-	if v, ok := o["porta"]; ok {
-		p, err := strconv.Atoi(v)
-		if err != nil || !slices.Contains(t.AppPorts, p) {
-			return "", 0, &OptionError{Tool: "ffuf", Key: "porta"}
-		}
-		port = p
+	port, err = appPort("ffuf", t, o)
+	if err != nil {
+		return "", 0, err
 	}
 	return list, port, nil
+}
+
+// appPort lê a opção "porta", que precisa ser uma das portas de aplicação
+// do alvo; sem ela, usa a primeira.
+func appPort(tool string, t target.Target, o Options) (int, error) {
+	v, ok := o["porta"]
+	if !ok {
+		return t.AppPorts[0], nil
+	}
+	p, err := strconv.Atoi(v)
+	if err != nil || !slices.Contains(t.AppPorts, p) {
+		return 0, &OptionError{Tool: tool, Key: "porta"}
+	}
+	return p, nil
 }
 
 func ffufList(o Options) (string, error) {

@@ -117,6 +117,15 @@ var Tools = []Tool{
 		Memory: 1536 << 20,
 	},
 	{
+		Name:        "nikto",
+		Description: "Falhas conhecidas e más configurações do servidor web",
+		Image:       NiktoImage,
+		Args:        NiktoArgs,
+		Parse:       ParseNiktoJSON,
+		Report:      NiktoReportFrom,
+		OutputFile:  niktoOutput,
+	},
+	{
 		Name:        "ffuf",
 		Description: "Rotas e arquivos escondidos da aplicação",
 		Image:       FfufImage,
