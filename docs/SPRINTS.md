@@ -209,6 +209,9 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - O ffuf não publica imagem oficial; a imagem é `secsi/ffuf:2.3.0` (Alpine).
 - O ffuf roda a 100 requisições por segundo, o mesmo teto do Nuclei, em vez de 50: assim a lista média (43 mil palavras) termina em cerca de 7 minutos, dentro do limite de 10 minutos da varredura. `-maxtime 540` encerra o ffuf antes desse limite, e ele ainda grava o JSON.
 - A saída cortada antes do JSON final ainda gera achados, a partir das palavras que o modo `-s` escreve a cada caminho encontrado, mas sem status nem porta; o relatório fica indisponível.
+- O Nikto usa a imagem oficial `ghcr.io/sullo/nikto:2.6.1`. Ele só grava o JSON num arquivo com extensão `.json` (`-o -` e `/dev/stdout` não funcionam), por isso as ferramentas ganharam `OutputFile`: o runner lê `/tmp/nikto.json` do container depois que ele termina e entrega ao parser a saída padrão seguida do arquivo, separados por uma linha marcadora.
+- O JSON do Nikto 2.6.1 grava o banner do servidor sempre como `null`; o servidor vem da linha `+ Server:` do console. Sem o JSON, os achados vêm das linhas `+ [id] url: mensagem` do console, sem porta.
+- `-ask no` desliga a pergunta sobre enviar banners ao CIRT.net, que `-nointeractive` não desliga. As categorias do Nikto saem de palavras da mensagem, nesta ordem: `versao` ("outdated", "end of life"), `cabecalhos` ("header", "cookie"), `arquivos` ("file found", "directory indexing", "backup", "directory found") e `outros`.
 - A marcação "não aparece no tráfego real" compara com as rotas vistas pelo sniffer nas últimas 24 horas. Sem nenhuma rota registrada (sniffer sem permissão, por exemplo), a página não marca nada e explica o motivo.
 
 ### Sprint 12: SQLMap guiado pelo tráfego
