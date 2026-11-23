@@ -21,6 +21,12 @@ const DefaultInterval = 5 * time.Second
 // EventMetrics é o tipo do evento publicado a cada coleta.
 const EventMetrics = "METRICAS_SISTEMA"
 
+const (
+	// Retention é por quanto tempo as leituras ficam no banco.
+	Retention  = 24 * time.Hour
+	pruneEvery = time.Minute
+)
+
 // Snapshot é uma leitura dos recursos do servidor, em percentual de uso.
 type Snapshot struct {
 	CPUPercent  float64   `json:"cpu"`
@@ -59,16 +65,35 @@ func Sample(ctx context.Context, diskPath string) (Snapshot, error) {
 	}, nil
 }
 
-// Run publica um Snapshot a cada interval até ctx ser cancelado. Falhas de
-// coleta são registradas e o ciclo segue.
-func Run(ctx context.Context, pub ws.Publisher, diskPath string, interval time.Duration) {
+// Sink guarda as leituras para o histórico.
+type Sink interface {
+	AddSystemSample(ctx context.Context, snap Snapshot) error
+	// PruneSystem apaga as leituras anteriores a before.
+	PruneSystem(ctx context.Context, before time.Time) error
+}
+
+// Run coleta um Snapshot a cada interval até ctx ser cancelado, grava no sink
+// e publica. Falhas de coleta ou de gravação são registradas e o ciclo segue;
+// uma falha ao gravar não impede a publicação. Uma vez por minuto, apaga as
+// leituras mais antigas que Retention.
+func Run(ctx context.Context, pub ws.Publisher, sink Sink, diskPath string, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	var lastPrune time.Time
 	for {
 		snap, err := Sample(ctx, diskPath)
 		switch {
 		case err == nil:
+			if err := sink.AddSystemSample(ctx, snap); err != nil && ctx.Err() == nil {
+				slog.Error("gravar métricas do sistema", "erro", err)
+			}
 			pub.Publish(ws.Event{Type: EventMetrics, Data: snap})
+			if snap.At.Sub(lastPrune) >= pruneEvery {
+				lastPrune = snap.At
+				if err := sink.PruneSystem(ctx, snap.At.Add(-Retention)); err != nil && ctx.Err() == nil {
+					slog.Error("apagar métricas antigas do sistema", "erro", err)
+				}
+			}
 		case !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded):
 			slog.Error("coletar métricas do sistema", "erro", err)
 		}
