@@ -20,7 +20,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ✅ Concluída |
 | [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | ✅ Concluída |
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ✅ Concluída |
-| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento (Amass pronto, Gitleaks a fazer) |
+| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ✅ Concluída |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | 🚧 Em andamento |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
 | [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ✅ Concluída |
@@ -252,6 +252,16 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - No modo passivo o Amass não resolve os nomes: na execução real contra `nmap.org`, todos os 95 subdomínios vieram com `addresses: null`. Por isso a falta de endereço **não** vira achado `baixa` de "possível risco de takeover", como o plano previa: seria um alerta para cada subdomínio. Todo subdomínio vira um achado `info`, e a página explica por que eles vêm sem endereço. Rodar sem `-passive` resolveria os nomes, mas consulta o DNS do domínio e só devolve os nomes que resolvem (7 dos 95 no mesmo domínio), o que contraria o "o alvo não recebe tráfego".
 - `neste_servidor` continua sendo marcado quando alguma fonte informa um endereço de loopback ou igual ao host do alvo. Para isso, `Tool.Report` passou a receber o alvo varrido, além da saída padrão.
 - O Amass precisa do domínio do alvo: `Args` recusa alvo sem domínio com erro no campo `dominio`, e o host do alvo nunca entra nos argumentos.
+
+**Decisões da Sprint 13 (Gitleaks):**
+
+- A imagem é a oficial `zricethezav/gitleaks:v8.30.0`. Com histórico do git (existe `<código-fonte>/.git`), o modo é `git` e o relatório traz commit, autor e data; sem histórico, o modo é `dir` e o caminho vem com `/repo/`, que o parser tira. Argumentos: `<git|dir> /repo --report-format json --report-path - --redact --exit-code 0 --no-banner --log-level warn`, sem nenhuma opção.
+- `--report-path -` em vez de `/dev/stdout`, como o plano previa: na execução real com `/dev/stdout` o relatório saía vazio.
+- O segredo é tirado em duas camadas: `--redact` já troca o valor por `REDACTED` na saída, e o parser decodifica num tipo sem `Secret`, `Match`, `Email` e `Message`. O fixture `testdata/gitleaks.json` traz `Secret` e `Match` preenchidos de propósito, e `TestGitleaksDropsSecrets` confere que nada disso sobra no relatório nem nos achados. O teste de integração (`-tags integration`) gera um token na hora e confere que ele não aparece na saída.
+- O código-fonte entra no container por `Spec.Binds`, montado em `/repo` com `ReadOnly: true`. O orquestrador só aceita o `Repo` do alvo nesse destino (`checkBinds`), e o `DockerRunner` recusa de novo qualquer montagem fora de `/repo` ou com caminho relativo, não limpo ou `/`.
+- O campo `repositorio` do alvo (migração `018_target_repo.sql`) precisa ser um caminho absoluto, já limpo e de um diretório existente. A raiz e `/proc`, `/sys`, `/dev`, `/etc`, `/boot` e `/root`, com tudo dentro deles, são recusados, também depois de seguir links simbólicos.
+- Ferramenta pedida sem o dado de que precisa (Amass sem domínio, Gitleaks sem código-fonte) agora responde 400 com `campo: "ferramentas"`, como o plano pede; antes o Amass respondia com `alvo_id`.
+- A página fica em `/arsenal/vazamentos` (o registro do frontend ganhou `slug`), com o título "Vazamentos" e o Gitleaks citado no cabeçalho. Cada vazamento mostra só "valor ocultado" no lugar do segredo.
 
 ### Sprint 14: Inspetor de pacotes
 
