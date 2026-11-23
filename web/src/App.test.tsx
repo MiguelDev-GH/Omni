@@ -16,6 +16,7 @@ async function submitToken(token: string) {
 test("shows token page without token", () => {
   render(<App />);
   expect(screen.getByLabelText("Token de acesso")).toHaveAttribute("type", "password");
+  expect(screen.getByRole("switch", { name: "Tema escuro" })).toBeInTheDocument();
 });
 
 test("rejects short token locally", async () => {
