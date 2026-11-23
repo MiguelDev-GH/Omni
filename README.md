@@ -178,7 +178,7 @@ OMNI_TOKEN=<token> make dev
 
 Para subir só o backend com um token aleatório novo, `make backend` compila o binário, aplica `setcap` com `sudo` (para a captura de pacotes), gera o `OMNI_TOKEN`, imprime no terminal e inicia o Omni. Se `OMNI_TOKEN` já estiver no ambiente, ele é reaproveitado.
 
-Com o backend no ar, `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja` roda a demo da loja cobaia (token e porta saem no terminal do `make backend`).
+`make loja` sobe a loja cobaia (PostgreSQL, Caddy, API e carga) até Ctrl+C, sem credenciais: ela não conhece o Omni. `make loja port=3001` troca a porta da API (padrão 3000) e o Caddy acompanha. Para cadastrar os alvos no Omni, rode `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja-cadastrar` (token e porta saem no terminal do `make backend`) ou use a página de Alvos.
 
 **Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker) e notificações.
 

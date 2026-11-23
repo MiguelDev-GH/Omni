@@ -22,6 +22,8 @@ services:
   caddy:
     image: caddy:2.10.2-alpine
     network_mode: host
+    environment:
+      LOJA_PORTA: ${LOJA_PORTA:-3000}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - loja-caddy:/data

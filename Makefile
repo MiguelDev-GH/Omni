@@ -1,4 +1,4 @@
-.PHONY: build web dev backend loja check
+.PHONY: build web dev backend loja loja-cadastrar check
 
 # build compila o frontend, copia para internal/web/static e gera o binário.
 build: web
@@ -24,12 +24,18 @@ backend:
 	echo "OMNI_TOKEN=$$OMNI_TOKEN"; \
 	exec ./omni
 
-# loja roda a demo da loja cobaia (containers, API, cadastro dos alvos e carga).
-# Precisa de OMNI_TOKEN e, como o backend usa porta aleatória, de OMNI_URL.
+# loja sobe a loja cobaia (containers, API e carga) até Ctrl+C, na porta de
+# port= (padrão 3000). Não precisa de credenciais: ela não conhece o Omni.
+port ?= 3000
 loja:
+	$(MAKE) -C subjects/loja app PORTA=$(port)
+
+# loja-cadastrar registra os alvos da loja no Omni. Precisa de OMNI_TOKEN e,
+# como o backend usa porta aleatória, de OMNI_URL.
+loja-cadastrar:
 	@: "$${OMNI_TOKEN:?defina OMNI_TOKEN (o que o make backend imprimiu)}"
 	@: "$${OMNI_URL:?defina OMNI_URL (o painel= do log do backend, ex.: http://127.0.0.1:39755)}"
-	$(MAKE) -C subjects/loja demo
+	$(MAKE) -C subjects/loja cadastrar
 
 # check roda as verificações da skill convencoes-omni, parando na primeira falha.
 check:
