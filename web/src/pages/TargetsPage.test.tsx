@@ -209,3 +209,34 @@ test("shows DNS and SMTP ports and a degraded server", async () => {
   expect(within(row).getByText("DNS 1053 · SMTP 1025")).toBeInTheDocument();
   expect(within(row).getByText("Com erro (porta 1053)")).toBeInTheDocument();
 });
+
+test("creates target with the source code folder and shows its server error", async () => {
+  const calls = backend([], (c) =>
+    JSON.parse(c.body ?? "{}").repositorio === "/etc"
+      ? json(400, { erro: "repositorio: o código-fonte não pode estar na raiz nem em um diretório do sistema", campo: "repositorio" })
+      : json(201, { ...JSON.parse(c.body ?? "{}"), id: 1 }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Novo alvo" }));
+  await user.type(screen.getByLabelText("Nome"), "loja");
+  await user.type(screen.getByLabelText("Host"), "127.0.0.1");
+  await user.type(screen.getByLabelText("Portas da aplicação"), "3000");
+  const repo = screen.getByLabelText("Código-fonte (opcional)");
+  await user.type(repo, "/etc");
+  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  expect(await screen.findByText(/diretório do sistema/)).toBeInTheDocument();
+  expect(repo).toHaveAttribute("aria-invalid", "true");
+
+  await user.clear(repo);
+  await user.type(repo, " /srv/loja ");
+  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  const isCreate = (c: FetchCall) => c.method === "POST" && c.url === "/api/alvos";
+  await waitFor(() => expect(calls.filter(isCreate)).toHaveLength(2));
+  expect(JSON.parse(calls.filter(isCreate)[1]!.body ?? "{}")).toEqual({
+    nome: "loja",
+    host: "127.0.0.1",
+    portas_app: [3000],
+    repositorio: "/srv/loja",
+  });
+});

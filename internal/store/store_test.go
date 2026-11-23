@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,9 +45,11 @@ func TestOpenIsIdempotent(t *testing.T) {
 
 	var version int
 	require.NoError(t, s.db.QueryRow("PRAGMA user_version").Scan(&version))
-	entries, err := fs.ReadDir(migrationsFS, "migrations")
+	// A numeração pode ter lacunas (um número reservado a outro branch),
+	// então a versão final é a da última migração, não a contagem.
+	all, err := pendingMigrations(0)
 	require.NoError(t, err)
-	assert.Equal(t, len(entries), version)
+	assert.Equal(t, all[len(all)-1].version, version)
 }
 
 func TestOpenUsesPathWithSpecialCharsVerbatim(t *testing.T) {

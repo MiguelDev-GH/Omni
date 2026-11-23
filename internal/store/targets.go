@@ -11,7 +11,7 @@ import (
 
 var ErrNotFound = errors.New("alvo não encontrado")
 
-const targetColumns = "id, name, host, app_ports, db_port, domain, dns_port, smtp_port"
+const targetColumns = "id, name, host, app_ports, db_port, domain, dns_port, smtp_port, repo"
 
 // CreateTarget ignora t.ID e devolve o alvo com o ID gerado.
 func (s *Store) CreateTarget(ctx context.Context, t target.Target) (target.Target, error) {
@@ -20,8 +20,8 @@ func (s *Store) CreateTarget(ctx context.Context, t target.Target) (target.Targe
 		return target.Target{}, err
 	}
 	res, err := s.db.ExecContext(ctx,
-		"INSERT INTO targets (name, host, app_ports, db_port, domain, dns_port, smtp_port) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		t.Name, t.Host, string(ports), t.DBPort, t.Domain, t.DNSPort, t.SMTPPort)
+		"INSERT INTO targets (name, host, app_ports, db_port, domain, dns_port, smtp_port, repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		t.Name, t.Host, string(ports), t.DBPort, t.Domain, t.DNSPort, t.SMTPPort, t.Repo)
 	if err != nil {
 		return target.Target{}, err
 	}
@@ -66,8 +66,8 @@ func (s *Store) UpdateTarget(ctx context.Context, t target.Target) error {
 		return err
 	}
 	res, err := s.db.ExecContext(ctx,
-		"UPDATE targets SET name = ?, host = ?, app_ports = ?, db_port = ?, domain = ?, dns_port = ?, smtp_port = ? WHERE id = ?",
-		t.Name, t.Host, string(ports), t.DBPort, t.Domain, t.DNSPort, t.SMTPPort, t.ID)
+		"UPDATE targets SET name = ?, host = ?, app_ports = ?, db_port = ?, domain = ?, dns_port = ?, smtp_port = ?, repo = ? WHERE id = ?",
+		t.Name, t.Host, string(ports), t.DBPort, t.Domain, t.DNSPort, t.SMTPPort, t.Repo, t.ID)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ type scanner interface{ Scan(dest ...any) error }
 func scanTarget(sc scanner) (target.Target, error) {
 	var t target.Target
 	var ports string
-	if err := sc.Scan(&t.ID, &t.Name, &t.Host, &ports, &t.DBPort, &t.Domain, &t.DNSPort, &t.SMTPPort); err != nil {
+	if err := sc.Scan(&t.ID, &t.Name, &t.Host, &ports, &t.DBPort, &t.Domain, &t.DNSPort, &t.SMTPPort, &t.Repo); err != nil {
 		return target.Target{}, err
 	}
 	if err := json.Unmarshal([]byte(ports), &t.AppPorts); err != nil {
