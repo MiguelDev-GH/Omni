@@ -20,7 +20,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ⏳ A fazer |
 | [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | 🚧 Em andamento |
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | 🚧 Em andamento |
-| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ⏳ A fazer |
+| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
 | [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ⏳ A fazer |
@@ -238,6 +238,13 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - **Vazamentos (Gitleaks), segredos no código:** o alvo ganha o campo opcional "Código-fonte", montado somente leitura no container. Vazamentos agrupados por arquivo, com regra, linha, commit e autor. **O valor do segredo nunca é gravado nem mostrado.**
 
 **Branch:** `feat/arsenal-amass-gitleaks` · **Labels:** `funcionalidade`, `docker`, `motor`, `visual`
+
+**Decisões da Sprint 13 (Amass):**
+
+- A imagem é a oficial `caffix/amass:v3.23.3`: a 3.x é a última que escreve o resultado em JSON (`-json /dev/stdout`); a 4.x só grava texto e o banco de grafos. Argumentos: `enum -passive -d <domínio> -silent -nocolor -json /dev/stdout -timeout 8`, sem nenhuma opção; `-timeout` (em minutos) encerra o Amass antes do limite de 10 minutos da varredura.
+- No modo passivo o Amass não resolve os nomes: na execução real contra `nmap.org`, todos os 95 subdomínios vieram com `addresses: null`. Por isso a falta de endereço **não** vira achado `baixa` de "possível risco de takeover", como o plano previa: seria um alerta para cada subdomínio. Todo subdomínio vira um achado `info`, e a página explica por que eles vêm sem endereço. Rodar sem `-passive` resolveria os nomes, mas consulta o DNS do domínio e só devolve os nomes que resolvem (7 dos 95 no mesmo domínio), o que contraria o "o alvo não recebe tráfego".
+- `neste_servidor` continua sendo marcado quando alguma fonte informa um endereço de loopback ou igual ao host do alvo. Para isso, `Tool.Report` passou a receber o alvo varrido, além da saída padrão.
+- O Amass precisa do domínio do alvo: `Args` recusa alvo sem domínio com erro no campo `dominio`, e o host do alvo nunca entra nos argumentos.
 
 ### Sprint 14: Inspetor de pacotes
 

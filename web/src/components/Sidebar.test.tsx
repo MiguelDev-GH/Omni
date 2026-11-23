@@ -22,8 +22,9 @@ test("shows sections and disables future items", () => {
   expect(screen.getByRole("link", { name: "Nikto" })).toHaveAttribute("href", "/arsenal/nikto");
   expect(screen.getByRole("link", { name: "ffuf" })).toHaveAttribute("href", "/arsenal/ffuf");
   expect(screen.getByRole("link", { name: "SQLMap" })).toHaveAttribute("href", "/arsenal/sqlmap");
-  const amass = screen.getByText("Amass").closest("[aria-disabled]");
-  expect(amass).toHaveAttribute("aria-disabled", "true");
-  expect(screen.queryByRole("link", { name: /Amass/ })).toBeNull();
+  expect(screen.getByRole("link", { name: "Amass" })).toHaveAttribute("href", "/arsenal/amass");
+  const leaks = screen.getByText("Vazamentos").closest("[aria-disabled]");
+  expect(leaks).toHaveAttribute("aria-disabled", "true");
+  expect(screen.queryByRole("link", { name: /Vazamentos/ })).toBeNull();
   expect(screen.getAllByText("em breve").length).toBeGreaterThan(0);
 });

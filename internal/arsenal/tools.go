@@ -74,9 +74,10 @@ type Tool struct {
 	Args func(target.Target, Options) ([]string, error) `json:"-"`
 	// Parse lê a saída padrão da ferramenta.
 	Parse func(io.Reader) ([]findings.Finding, error) `json:"-"`
-	// Report monta, a partir da saída padrão, o relatório estruturado que
-	// alimenta a página da ferramenta; nil quando ela não tem relatório.
-	Report func(stdout []byte) (json.RawMessage, error) `json:"-"`
+	// Report monta, a partir do alvo varrido e da saída padrão, o relatório
+	// estruturado que alimenta a página da ferramenta; nil quando ela não
+	// tem relatório.
+	Report func(t target.Target, stdout []byte) (json.RawMessage, error) `json:"-"`
 	// Files devolve os arquivos copiados para o container antes de ele
 	// iniciar (caminho absoluto → conteúdo), como a lista de palavras do
 	// ffuf; nil quando a ferramenta não precisa de nenhum.
@@ -103,7 +104,7 @@ var Tools = []Tool{
 		Image:       NmapImage,
 		Args:        NmapArgs,
 		Parse:       ParseNmapXML,
-		Report:      NmapReportFrom,
+		Report:      fromStdout(NmapReportFrom),
 	},
 	{
 		Name:        "nuclei",
@@ -111,7 +112,7 @@ var Tools = []Tool{
 		Image:       NucleiImage,
 		Args:        NucleiArgs,
 		Parse:       ParseNucleiJSONL,
-		Report:      NucleiReportFrom,
+		Report:      fromStdout(NucleiReportFrom),
 		Volumes:     map[string]string{nucleiTemplates: "/root/nuclei-templates"},
 		// Carregar os templates passa de 512 MiB: o pico medido é de cerca de 1 GiB.
 		Memory: 1536 << 20,
@@ -122,7 +123,7 @@ var Tools = []Tool{
 		Image:       NiktoImage,
 		Args:        NiktoArgs,
 		Parse:       ParseNiktoJSON,
-		Report:      NiktoReportFrom,
+		Report:      fromStdout(NiktoReportFrom),
 		OutputFile:  niktoOutput,
 	},
 	{
@@ -131,7 +132,7 @@ var Tools = []Tool{
 		Image:       SqlmapImage,
 		Args:        SqlmapArgs,
 		Parse:       ParseSqlmap,
-		Report:      SqlmapReportFrom,
+		Report:      fromStdout(SqlmapReportFrom),
 		// O SQLMap sai com código diferente de zero quando não acha nada.
 		AnyExit: true,
 	},
@@ -141,8 +142,17 @@ var Tools = []Tool{
 		Image:       FfufImage,
 		Args:        FfufArgs,
 		Parse:       ParseFfufJSON,
-		Report:      FfufReportFrom,
+		Report:      fromStdout(FfufReportFrom),
 		Files:       FfufFiles,
+	},
+	{
+		Name:        "amass",
+		Description: "Subdomínios do domínio do alvo, em fontes públicas",
+		Image:       AmassImage,
+		Requires:    "dominio",
+		Args:        AmassArgs,
+		Parse:       ParseAmassJSON,
+		Report:      AmassReportFrom,
 	},
 	{
 		Name:        "testssl",
@@ -150,9 +160,14 @@ var Tools = []Tool{
 		Image:       TestsslImage,
 		Args:        TestsslArgs,
 		Parse:       ParseTestsslJSON,
-		Report:      TestsslReportFrom,
+		Report:      fromStdout(TestsslReportFrom),
 		AnyExit:     true,
 	},
+}
+
+// fromStdout adapta um relatório que só depende da saída padrão.
+func fromStdout(f func([]byte) (json.RawMessage, error)) func(target.Target, []byte) (json.RawMessage, error) {
+	return func(_ target.Target, out []byte) (json.RawMessage, error) { return f(out) }
 }
 
 // Lookup devolve a ferramenta pelo nome.

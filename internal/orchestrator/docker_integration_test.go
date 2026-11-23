@@ -118,7 +118,7 @@ func TestDockerRunnerNikto(t *testing.T) {
 	out, err := r.Run(ctx, Spec{Image: tool.Image, Args: args, OutputFile: tool.OutputFile}, &logs)
 	require.NoError(t, err, logs.String())
 	require.Contains(t, string(out), arsenal.OutputFileMarker, logs.String())
-	raw, err := tool.Report(out)
+	raw, err := tool.Report(target.Target{}, out)
 	require.NoError(t, err)
 	assert.Contains(t, string(raw), `"servidor":"Teste/1.0"`)
 	assert.Contains(t, string(raw), `"url":"/.env"`)

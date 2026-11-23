@@ -1,0 +1,62 @@
+{
+  "dominio": "nmap.org",
+  "subdominios": [
+    {
+      "nome": "echo.nmap.org",
+      "enderecos": [],
+      "fontes": [
+        "Maltiverse"
+      ],
+      "neste_servidor": false
+    },
+    {
+      "nome": "es.nmap.org",
+      "enderecos": [],
+      "fontes": [
+        "RapidDNS"
+      ],
+      "neste_servidor": false
+    },
+    {
+      "nome": "issues.nmap.org",
+      "enderecos": [],
+      "fontes": [
+        "Maltiverse",
+        "HackerTarget",
+        "CertSpotter"
+      ],
+      "neste_servidor": false
+    },
+    {
+      "nome": "scanme.nmap.org",
+      "enderecos": [
+        "45.33.32.156",
+        "2600:3c01::f03c:91ff:fe18:bb2f"
+      ],
+      "fontes": [
+        "HackerTarget"
+      ],
+      "neste_servidor": true
+    },
+    {
+      "nome": "support.nmap.org",
+      "enderecos": [],
+      "fontes": [
+        "RapidDNS"
+      ],
+      "neste_servidor": false
+    },
+    {
+      "nome": "www.nmap.org",
+      "enderecos": [
+        "2600:3c01:e000:3e6::6d4e:7061",
+        "50.116.1.184"
+      ],
+      "fontes": [
+        "CertSpotter",
+        "Bing"
+      ],
+      "neste_servidor": false
+    }
+  ]
+}
