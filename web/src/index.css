@@ -27,7 +27,6 @@
 
   --animate-entrada: entrada 320ms var(--ease-suave) both;
   --animate-pulso: pulso 2.4s ease-out infinite;
-  --animate-cursor: cursor 1.1s steps(1) infinite;
   --animate-desenho: desenho 2.4s var(--ease-suave) 300ms both;
 
   @keyframes desenho {
@@ -52,11 +51,6 @@
     70%,
     100% {
       box-shadow: 0 0 0 6px transparent;
-    }
-  }
-  @keyframes cursor {
-    50% {
-      opacity: 0;
     }
   }
 }

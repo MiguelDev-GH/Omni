@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { verifyToken } from "../api/client";
+import logo from "../assets/logo.png";
 import { useAppStore } from "../store/app";
 
 const MIN_TOKEN_LEN = 32;
@@ -63,12 +64,8 @@ export default function TokenPage() {
     <main className="relative flex min-h-screen flex-col overflow-hidden">
       <div className="mx-auto grid w-full max-w-6xl flex-1 content-center gap-16 px-6 py-16 md:grid-cols-[1.25fr_1fr] md:items-end md:gap-24 md:px-12">
         <section>
-          <h1 className="flex animate-entrada items-baseline font-mono text-6xl font-semibold tracking-tighter md:text-8xl">
-            Omni
-            <span
-              aria-hidden="true"
-              className="ml-1 inline-block h-12 w-5 translate-y-1 animate-cursor bg-destaque md:h-[4.5rem] md:w-7"
-            />
+          <h1 className="animate-entrada">
+            <img src={logo} alt="Omni" className="h-20 w-auto md:h-28" />
           </h1>
           <ul className="mt-8 space-y-2.5 text-sm">
             {watches.map((w, i) => (

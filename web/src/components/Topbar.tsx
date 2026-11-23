@@ -1,3 +1,4 @@
+import logo from "../assets/logo.png";
 import { useAppStore } from "../store/app";
 import EngineBadge, { engineNames } from "./EngineBadge";
 import Select from "./Select";
@@ -42,9 +43,8 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
             <path d="M2 4.5h12M2 8h12M2 11.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
-        <span className="flex items-baseline font-mono text-lg font-semibold tracking-tight md:w-48">
-          Omni
-          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-cursor bg-destaque" />
+        <span className="flex items-center md:w-48">
+          <img src={logo} alt="Omni" className="h-8 w-auto" />
         </span>
         <Select
           label="Alvo"
