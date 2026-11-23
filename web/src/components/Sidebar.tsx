@@ -17,6 +17,7 @@ const routes: Record<string, string> = {
   testssl: "/arsenal/testssl",
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",
+  Sistema: "/sistema",
 };
 
 // Só o primeiro item de cada rota acende como ativo, para a seção atual
