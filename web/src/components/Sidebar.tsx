@@ -13,6 +13,7 @@ const routes: Record<string, string> = {
   Nikto: "/arsenal/nikto",
   SQLMap: "/arsenal/sqlmap",
   ffuf: "/arsenal/ffuf",
+  Amass: "/arsenal/amass",
   testssl: "/arsenal/testssl",
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",

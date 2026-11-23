@@ -1,5 +1,6 @@
 import type { Finding, Scan, Tool } from "../api/scans";
 import type { Target } from "../api/targets";
+import AmassView, { amassSummary } from "./AmassView";
 import FfufOptions from "./FfufOptions";
 import FfufView, { ffufSummary } from "./FfufView";
 import NiktoOptions from "./NiktoOptions";
@@ -41,6 +42,7 @@ export const toolViews: Record<string, ToolView> = {
     pageOnly: "Escolha a rota e o parâmetro na página do SQLMap",
   },
   ffuf: { title: "ffuf", tagline: "Árvore de rotas", summary: ffufSummary, Report: FfufView, Options: FfufOptions },
+  amass: { title: "Amass", tagline: "Subdomínios", summary: amassSummary, Report: AmassView },
   testssl: { title: "testssl", tagline: "Boletim TLS", summary: testsslSummary, Report: TestsslView },
 };
 

@@ -59,6 +59,9 @@ export type NiktoReport = { servidor: string; itens: NiktoItem[] };
 export type SqlmapTechnique = { tipo: string; titulo: string; payload: string };
 export type SqlmapReport = { url: string; parametro: string; injetavel: boolean; sgbd: string; tecnicas: SqlmapTechnique[] };
 
+export type Subdomain = { nome: string; enderecos: string[]; fontes: string[]; neste_servidor: boolean };
+export type AmassReport = { dominio: string; subdominios: Subdomain[] };
+
 // getReport busca o relatório de uma ferramenta na varredura; sem relatório
 // (varredura antiga ou falha ao montá-lo), devolve null.
 export async function getReport(scanId: number, tool: string): Promise<unknown | null> {
