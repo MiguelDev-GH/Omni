@@ -3,6 +3,7 @@ import type { Target } from "../api/targets";
 import AmassView, { amassSummary } from "./AmassView";
 import FfufOptions from "./FfufOptions";
 import FfufView, { ffufSummary } from "./FfufView";
+import GitleaksView, { gitleaksSummary } from "./GitleaksView";
 import NiktoOptions from "./NiktoOptions";
 import NiktoView, { niktoSummary } from "./NiktoView";
 import NmapView, { nmapSummary } from "./NmapView";
@@ -26,6 +27,12 @@ export type ToolView = {
   // pageOnly explica por que a ferramenta só roda na página dela, e não na
   // visão geral: ela precisa de opções que só a página pede.
   pageOnly?: string;
+  // slug é o caminho da página quando não é o nome da ferramenta, como
+  // /arsenal/vazamentos para o Gitleaks.
+  slug?: string;
+  // tool é o nome da ferramenta nas frases da página quando o título é o
+  // assunto ("Vazamentos") e não ela.
+  tool?: string;
 };
 
 export const toolViews: Record<string, ToolView> = {
@@ -47,8 +54,30 @@ export const toolViews: Record<string, ToolView> = {
   },
   ffuf: { title: "ffuf", tagline: "Árvore de rotas", summary: ffufSummary, Report: FfufView, Options: FfufOptions },
   amass: { title: "Amass", tagline: "Subdomínios", summary: amassSummary, Report: AmassView },
+  gitleaks: {
+    title: "Vazamentos",
+    tagline: "Segredos no código",
+    summary: gitleaksSummary,
+    Report: GitleaksView,
+    slug: "vazamentos",
+    tool: "Gitleaks",
+  },
   testssl: { title: "testssl", tagline: "Boletim TLS", summary: testsslSummary, Report: TestsslView },
 };
+
+// toolPath é a página da ferramenta no Arsenal.
+export function toolPath(name: string): string {
+  return `/arsenal/${toolViews[name]?.slug ?? name}`;
+}
+
+// toolBySlug devolve a ferramenta da página /arsenal/:ferramenta, ou null.
+// Uma ferramenta com slug só abre por ele.
+export function toolBySlug(slug: string): string | null {
+  for (const [name, view] of Object.entries(toolViews)) {
+    if ((view.slug ?? name) === slug) return name;
+  }
+  return null;
+}
 
 // missingRequirement diz por que a ferramenta não roda no alvo, ou null.
 export function missingRequirement(tool: Tool, target: Target | undefined): string | null {

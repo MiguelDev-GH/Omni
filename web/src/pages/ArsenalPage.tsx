@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { statusLabels, TargetPicker, when } from "../arsenal/common";
-import { missingRequirement, toolViews } from "../arsenal/registry";
+import { missingRequirement, toolPath, toolViews } from "../arsenal/registry";
 import { ApiError } from "../api/client";
 import { getReport } from "../api/reports";
 import { listScans, listTools, scanFindings, startScan, type Finding, type Scan, type Tool } from "../api/scans";
@@ -138,7 +138,7 @@ export default function ArsenalPage() {
               {tools.map((t) => {
                 const missing = missingRequirement(t, target);
                 const last = latest[t.nome];
-                const page = toolViews[t.nome] ? `/arsenal/${t.nome}` : null;
+                const page = toolViews[t.nome] ? toolPath(t.nome) : null;
                 return (
                   <div
                     key={t.nome}
@@ -170,7 +170,7 @@ export default function ArsenalPage() {
                       )}
                       {page && (
                         <Link to={page} className="link inline-block pt-1">
-                          Abrir página do {toolViews[t.nome]!.title}
+                          Abrir página do {toolViews[t.nome]!.tool ?? toolViews[t.nome]!.title}
                         </Link>
                       )}
                     </div>

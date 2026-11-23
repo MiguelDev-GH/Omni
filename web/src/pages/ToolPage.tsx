@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { isRunning, statusLabels, TargetPicker, when } from "../arsenal/common";
-import { missingRequirement, toolViews } from "../arsenal/registry";
+import { missingRequirement, toolBySlug, toolViews } from "../arsenal/registry";
 import { ApiError } from "../api/client";
 import { getReport } from "../api/reports";
 import { listScans, listTools, scanFindings, startScan, type Finding, type Scan, type Tool } from "../api/scans";
@@ -17,9 +17,9 @@ type Loaded = { scanId: number; report: unknown | null; findings: Finding[] };
 // do alvo selecionado e a visualização própria do relatório dela.
 export default function ToolPage() {
   const { ferramenta = "" } = useParams();
-  const view = toolViews[ferramenta];
+  const name = toolBySlug(ferramenta);
   // A key zera o estado ao trocar de ferramenta pelo menu.
-  return view ? <ToolPageFor key={ferramenta} name={ferramenta} /> : <NotFoundPage />;
+  return name ? <ToolPageFor key={name} name={name} /> : <NotFoundPage />;
 }
 
 function ToolPageFor({ name }: { name: string }) {
@@ -97,7 +97,7 @@ function ToolPageFor({ name }: { name: string }) {
         {tool && (
           <>
             {" "}
-            · roda em container Docker efêmero (<span className="font-mono text-xs">{tool.imagem}</span>).{" "}
+            {view.tool && <> · feito com o {view.tool}</>} · roda em container Docker efêmero (<span className="font-mono text-xs">{tool.imagem}</span>).{" "}
             <Link to="/arsenal" className="link">
               Ver todas as ferramentas
             </Link>
@@ -152,7 +152,7 @@ function ToolPageFor({ name }: { name: string }) {
         }
       >
         {!shown ? (
-          <p className="text-sm text-suave">Nenhuma varredura do {view.title} para este alvo.</p>
+          <p className="text-sm text-suave">Nenhuma varredura do {view.tool ?? view.title} para este alvo.</p>
         ) : running ? (
           <p className="text-sm text-suave">A varredura ainda está rodando; acompanhe a saída abaixo.</p>
         ) : data === null ? (
@@ -193,7 +193,7 @@ function ToolPageFor({ name }: { name: string }) {
       )}
 
       {scans.length > 1 && (
-        <Card title={`Varreduras do ${view.title} neste alvo`} plane>
+        <Card title={`Varreduras do ${view.tool ?? view.title} neste alvo`} plane>
           <ul className="-mx-2 space-y-px text-sm">
             {scans.slice(0, 10).map((s) => (
               <li key={s.id}>

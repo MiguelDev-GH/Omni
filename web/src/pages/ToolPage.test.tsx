@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { Finding, Scan, Tool } from "../api/scans";
+import gitleaks from "../arsenal/__fixtures__/gitleaks.json";
 import nmap from "../arsenal/__fixtures__/nmap.json";
 import Layout from "../components/Layout";
 import { useAppStore } from "../store/app";
@@ -15,6 +16,7 @@ const target = { id: 1, nome: "api", host: "127.0.0.1", portas_app: [3000] };
 const tools: Tool[] = [
   { nome: "nmap", descricao: "Portas abertas e versões dos serviços", imagem: "instrumentisto/nmap:7.95" },
   { nome: "amass", descricao: "Subdomínios", imagem: "x", requer: "dominio" },
+  { nome: "gitleaks", descricao: "Segredos vazados no código-fonte", imagem: "zricethezav/gitleaks:v8.30.0", requer: "repositorio" },
 ];
 const done: Scan = { id: 5, alvo_id: 1, ferramentas: ["nmap"], status: "concluida", criada_em: "2026-11-21T12:00:00Z", achados: { info: 1 } };
 const finding: Finding = { ferramenta: "nmap", titulo: "Porta 3000/tcp aberta: http", evidencia: "", severidade: "info", porta: 3000, assinatura: "a" };
@@ -104,4 +106,26 @@ test("overview disables a tool that needs the target domain", async () => {
   expect(screen.getByText("Precisa do domínio do alvo")).toBeInTheDocument();
   expect(await screen.findByText("2 portas abertas de 3")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Abrir página do Nmap" })).toHaveAttribute("href", "/arsenal/nmap");
+});
+
+test("/arsenal/vazamentos is the Gitleaks page", async () => {
+  const leaks: Scan = { ...done, id: 6, ferramentas: ["gitleaks"] };
+  renderAt(
+    "/arsenal/vazamentos",
+    (c) => {
+      if (c.url === "/api/varreduras/6/relatorio/gitleaks") return json(200, gitleaks);
+      if (c.url === "/api/varreduras/6/achados") return json(200, []);
+      if (c.url === "/api/varreduras/6/comparacao") return json(200, noChanges);
+      return undefined;
+    },
+    [leaks],
+  );
+  expect(await screen.findByRole("heading", { level: 1, name: "Vazamentos" })).toBeInTheDocument();
+  expect(await screen.findByText(/feito com o Gitleaks/)).toBeInTheDocument();
+  expect(await screen.findByRole("listitem", { name: "config/aws.env" })).toBeInTheDocument();
+});
+
+test("/arsenal/gitleaks shows the not found page", async () => {
+  renderAt("/arsenal/gitleaks");
+  expect(await screen.findByText(/não encontrada|não existe/i)).toBeInTheDocument();
 });
