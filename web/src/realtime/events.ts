@@ -4,6 +4,7 @@ import type { DNSWindow, QueueSnapshot, SMTPWindow } from "../api/dnsSmtp";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
+import { handlePackets } from "./inspector";
 import { portKey, useAppStore, type EngineState, type PortStatus, type SystemMetrics } from "../store/app";
 
 type Transition = { alvo_id: number; alvo: string; porta: number; erro?: string; hora: string };
@@ -193,6 +194,9 @@ export function handleEvent(raw: string): void {
           link: { to: "/alertas", label: "Ver alertas" },
         });
       }
+      break;
+    case "PACOTES":
+      handlePackets(dados);
       break;
     case "SCAN_INICIADO":
       if (isObject(dados) && typeof dados.scan_id === "number") st.bumpScanEvents();

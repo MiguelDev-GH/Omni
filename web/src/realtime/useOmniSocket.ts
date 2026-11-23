@@ -5,6 +5,7 @@ import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { ApiError, apiFetch } from "../api/client";
 import { useAppStore } from "../store/app";
 import { handleEvent } from "./events";
+import { bindInspectorSocket } from "./inspector";
 
 const MAX_BACKOFF_MS = 30_000;
 
@@ -44,15 +45,28 @@ export function useOmniSocket(options: Options = {}): void {
     }
   }, [interval]);
 
-  useWebSocket(getUrl, {
+  const { sendMessage } = useWebSocket(getUrl, {
     retryOnError: false,
     shouldReconnect: () => true,
     reconnectAttempts: Infinity,
     reconnectInterval: interval,
-    onOpen: () => setEngine("poller", "ativo"),
-    onClose: () => setEngine("poller", "indisponivel"),
+    onOpen: () => {
+      setEngine("poller", "ativo");
+      bindInspectorSocket((msg) => sendRef.current(msg));
+    },
+    onClose: () => {
+      setEngine("poller", "indisponivel");
+      bindInspectorSocket(null);
+    },
     onMessage: (ev: MessageEvent) => {
       if (typeof ev.data === "string") handleEvent(ev.data);
     },
   });
+  // onOpen roda antes de sendMessage ficar disponível neste render; a ref
+  // sempre aponta para a versão atual.
+  const sendRef = useRef(sendMessage);
+  useEffect(() => {
+    sendRef.current = sendMessage;
+  });
+  useEffect(() => () => bindInspectorSocket(null), []);
 }
