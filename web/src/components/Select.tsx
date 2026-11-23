@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
-export type Option<T extends string | number> = { value: T; label: string; hint?: string };
+export type Option<T extends string | number> = { value: T; label: string; hint?: string; description?: string };
 
 type Props<T extends string | number> = {
   id?: string;
@@ -146,14 +146,24 @@ export default function Select<T extends string | number>({
             data-active={i === active}
             onPointerMove={() => setActive(i)}
             onClick={() => choose(i)}
-            className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 whitespace-nowrap data-[active=true]:bg-fundo"
+            className="flex cursor-pointer items-start gap-2 rounded-lg px-2.5 py-1.5 data-[active=true]:bg-fundo"
           >
             <span
               aria-hidden="true"
-              className={`size-1.5 shrink-0 rounded-full ${o.value === value ? "bg-destaque" : "bg-transparent"}`}
+              className={`mt-1.5 size-1.5 shrink-0 rounded-full ${o.value === value ? "bg-destaque" : "bg-transparent"}`}
             />
-            <span className={o.value === value ? "font-medium" : ""}>{o.label}</span>
-            {o.hint && <span className="ml-auto pl-4 font-mono text-xs text-apagado">{o.hint}</span>}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span className={`whitespace-nowrap ${o.value === value ? "font-medium" : ""}`}>{o.label}</span>
+                {o.hint && <span className="ml-auto pl-4 font-mono text-xs text-apagado">{o.hint}</span>}
+              </span>
+              {/* description é o resumo do que a opção faz, sem citar a flag. */}
+              {o.description && (
+                <span aria-hidden="true" className="mt-0.5 block max-w-xs text-xs leading-snug text-apagado">
+                  {o.description}
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>

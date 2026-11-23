@@ -39,6 +39,16 @@ func TestSqlmapRejectsBadOptions(t *testing.T) {
 		{Options{"parametro": "id"}, "opcoes.sqlmap.rota"},
 		{Options{"rota": "/a", "parametro": "id", "porta": "5433"}, "opcoes.sqlmap.porta"},
 		{Options{"rota": "/a", "parametro": "id", "dump": "1"}, "opcoes.sqlmap.dump"},
+		{Options{"rota": "/a", "parametro": "id", "nivel": "6"}, "opcoes.sqlmap.nivel"},
+		{Options{"rota": "/a", "parametro": "id", "risco": "0"}, "opcoes.sqlmap.risco"},
+		{Options{"rota": "/a", "parametro": "id", "threads": "11"}, "opcoes.sqlmap.threads"},
+		{Options{"rota": "/a", "parametro": "id", "tecnica": "Z"}, "opcoes.sqlmap.tecnica"},
+		{Options{"rota": "/a", "parametro": "id", "sgbd": "Mongo"}, "opcoes.sqlmap.sgbd"},
+		{Options{"rota": "/a", "parametro": "id", "tamper": "rm -rf"}, "opcoes.sqlmap.tamper"},
+		{Options{"rota": "/a", "parametro": "id", "acao": "apagar"}, "opcoes.sqlmap.acao"},
+		{Options{"rota": "/a", "parametro": "id", "acao": "ler-arquivo"}, "opcoes.sqlmap.arquivo"},
+		{Options{"rota": "/a", "parametro": "id", "acao": "ler-arquivo", "arquivo": "passwd"}, "opcoes.sqlmap.arquivo"},
+		{Options{"rota": "/a", "parametro": "id", "arquivo": "/etc/passwd"}, "opcoes.sqlmap.arquivo"},
 	} {
 		args, err := SqlmapArgs(ffufTarget, tc.opts)
 		assert.Nil(t, args, tc.opts)
@@ -48,15 +58,51 @@ func TestSqlmapRejectsBadOptions(t *testing.T) {
 	}
 }
 
-func TestSqlmapArgsNeverExtractData(t *testing.T) {
+func TestSqlmapDefaultIsDetectionOnly(t *testing.T) {
 	args, err := SqlmapArgs(ffufTarget, Options{"rota": "/busca", "parametro": "q"})
 	require.NoError(t, err)
 	for _, a := range args {
-		for _, bad := range []string{"--dump", "--os-", "--file-", "--sql-shell", "--eval", "--proxy", "--passwords", "--dbs", "--tables", "--users"} {
-			assert.False(t, strings.HasPrefix(a, bad), "argumento proibido: %s", a)
+		for _, bad := range []string{"--dump", "--os-", "--file-", "--sql-shell", "--eval", "--proxy", "--passwords", "--dbs", "--tables", "--users", "--fingerprint", "--banner", "--columns"} {
+			assert.False(t, strings.HasPrefix(a, bad), "argumento proibido no padrão: %s", a)
 		}
 	}
-	assert.NotContains(t, args, "--level=5")
+	assert.NotContains(t, args, "--technique")
+	assert.NotContains(t, args, "--dbms")
+	assert.NotContains(t, args, "--tamper")
+}
+
+func TestSqlmapTuning(t *testing.T) {
+	args, err := SqlmapArgs(ffufTarget, Options{
+		"rota": "/busca", "parametro": "q", "nivel": "5", "risco": "3", "threads": "10",
+		"tecnica": "T", "sgbd": "PostgreSQL", "tamper": "space2comment",
+	})
+	require.NoError(t, err)
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, "--level 5")
+	assert.Contains(t, joined, "--risk 3")
+	assert.Contains(t, joined, "--threads 10")
+	assert.Contains(t, joined, "--technique T")
+	assert.Contains(t, joined, "--dbms PostgreSQL")
+	assert.Contains(t, joined, "--tamper space2comment")
+}
+
+func TestSqlmapActions(t *testing.T) {
+	base := Options{"rota": "/busca", "parametro": "q"}
+	for acao, want := range map[string]string{
+		"dump":     "--dump",
+		"dump-all": "--dump-all",
+		"bancos":   "--dbs",
+		"os-shell": "--os-shell",
+	} {
+		o := Options{"rota": base["rota"], "parametro": base["parametro"], "acao": acao}
+		args, err := SqlmapArgs(ffufTarget, o)
+		require.NoError(t, err, acao)
+		assert.Contains(t, args, want, acao)
+	}
+
+	args, err := SqlmapArgs(ffufTarget, Options{"rota": "/busca", "parametro": "q", "acao": "ler-arquivo", "arquivo": "/etc/passwd"})
+	require.NoError(t, err)
+	assert.Contains(t, args, "--file-read=/etc/passwd")
 }
 
 func TestSqlmapInjectable(t *testing.T) {

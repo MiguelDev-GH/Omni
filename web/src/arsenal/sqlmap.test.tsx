@@ -71,3 +71,25 @@ test("sqlmap options pick a GET route, a valid parameter and an app port", async
   expect(last).toEqual({ rota: "/busca", parametro: "q", porta: "8443" });
   expect(toolViews.sqlmap!.blocked!(last)).toBeNull();
 });
+
+test("sqlmap options pick an offensive action and show the file field when reading a file", async () => {
+  mockFetch(() => json(200, [route("GET", "/busca")]));
+  let last: Record<string, string> = {};
+  render(<Harness onValue={(v) => (last = v)} />);
+  await userEvent.click(await screen.findByRole("combobox", { name: "Rota" }));
+  await userEvent.click(screen.getByRole("option", { name: "/busca" }));
+  await userEvent.type(screen.getByLabelText("Parâmetro"), "q");
+
+  await userEvent.click(screen.getByRole("combobox", { name: "Ação" }));
+  await userEvent.click(screen.getByRole("option", { name: "Shell no sistema" }));
+  expect(last.acao).toBe("os-shell");
+  expect(screen.queryByLabelText("Arquivo")).toBeNull();
+
+  await userEvent.click(screen.getByRole("combobox", { name: "Ação" }));
+  await userEvent.click(screen.getByRole("option", { name: "Ler um arquivo" }));
+  expect(last.arquivo, "sem caminho a ação de ler arquivo não libera").toBeUndefined();
+  expect(toolViews.sqlmap!.blocked!(last)).not.toBeNull();
+  await userEvent.type(screen.getByLabelText("Arquivo"), "/etc/passwd");
+  expect(last).toMatchObject({ rota: "/busca", parametro: "q", acao: "ler-arquivo", arquivo: "/etc/passwd" });
+  expect(toolViews.sqlmap!.blocked!(last)).toBeNull();
+});
