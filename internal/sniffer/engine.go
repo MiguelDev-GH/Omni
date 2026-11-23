@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
@@ -69,6 +70,8 @@ type Engine struct {
 	state     string
 	lastPrune time.Time
 	onHTTP    func(l7.HTTPExchange)
+
+	tap atomic.Pointer[func(PacketSummary)]
 }
 
 // OnHTTP registra uma função chamada a cada requisição HTTP decodificada,
@@ -87,6 +90,16 @@ func NewEngine(open Opener, st TrafficStore, pub ws.Publisher) *Engine {
 func (e *Engine) WithRetention(d time.Duration) *Engine {
 	e.retention = d
 	return e
+}
+
+// SetTap passa a chamar tap com o resumo de cada pacote capturado, na
+// goroutine da captura; tap não pode bloquear. nil desliga o tap.
+func (e *Engine) SetTap(tap func(PacketSummary)) {
+	if tap == nil {
+		e.tap.Store(nil)
+		return
+	}
+	e.tap.Store(&tap)
 }
 
 // State devolve "ativo", "sem-permissao" ou "inativo".
@@ -196,6 +209,9 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, roles PortRoles, d
 			pgAsm.Add(p)
 			dnsTracker.Add(p)
 			smtpAsm.Add(p)
+			if tap := e.tap.Load(); tap != nil {
+				(*tap)(Summarize(p, roles, db))
+			}
 		case now := <-winT.C:
 			flush(now)
 		case now := <-l7T.C:

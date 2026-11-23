@@ -65,6 +65,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 
 	hub := ws.NewHub(clientBuffer)
 	tickets := ws.NewTickets(ticketTTL)
+	inspector := ws.NewInspector(hub)
 
 	// Os motores publicam por pub: cada evento vai ao hub e uma cópia vai ao
 	// observador de alertas, que avalia as regras e avisa as mudanças de nível.
@@ -140,6 +141,11 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		defer wg.Done()
 		watcher.Run(bgCtx)
 	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		inspector.Run(bgCtx)
+	}()
 	if mailer != nil {
 		wg.Add(1)
 		go func() {
@@ -159,9 +165,17 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	go func() {
 		defer wg.Done()
 		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
-		eng := sniffer.NewEngine(open, st, pub).WithRetention(cfg.CheckRetention)
-		eng.OnHTTP(sec.observeHTTP)
-		_ = eng.Run(bgCtx)
+		snif := sniffer.NewEngine(open, st, pub).WithRetention(cfg.CheckRetention)
+		snif.OnHTTP(sec.observeHTTP)
+		// O tap do Inspetor só fica ligado enquanto algum cliente o assina.
+		inspector.OnActive(func(on bool) {
+			if on {
+				snif.SetTap(func(p sniffer.PacketSummary) { inspector.Tap(p) })
+			} else {
+				snif.SetTap(nil)
+			}
+		})
+		_ = snif.Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()
