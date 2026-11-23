@@ -18,11 +18,16 @@ describe("Topbar: tema", () => {
         <Topbar menuOpen={false} onToggleMenu={() => {}} />
       </MemoryRouter>,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Usar tema escuro" }));
+    const toggle = screen.getByRole("switch", { name: "Tema escuro" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(document.documentElement.dataset.tema).toBe("escuro");
     expect(localStorage.getItem("omni.tema")).toBe("escuro");
 
-    await userEvent.click(screen.getByRole("button", { name: "Usar tema claro" }));
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
     expect(document.documentElement.dataset.tema).toBe("claro");
     expect(localStorage.getItem("omni.tema")).toBe("claro");
   });
