@@ -37,7 +37,11 @@ export const toolViews: Record<string, ToolView> = {
     summary: sqlmapSummary,
     Report: SqlmapView,
     Options: SqlmapOptions,
-    blocked: (o) => (o.rota && o.parametro ? null : "Escolha a rota e informe o parâmetro"),
+    blocked: (o) => {
+      if (!o.rota || !o.parametro) return "Escolha a rota e informe o parâmetro";
+      if ((o.acao ?? "detectar") === "ler-arquivo" && !o.arquivo) return "Informe o caminho do arquivo a ler";
+      return null;
+    },
     pageOnly: "Escolha a rota e o parâmetro na página do SQLMap",
   },
   ffuf: { title: "ffuf", tagline: "Árvore de rotas", summary: ffufSummary, Report: FfufView, Options: FfufOptions },

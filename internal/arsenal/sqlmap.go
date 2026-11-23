@@ -25,52 +25,181 @@ var (
 	sqlmapRoute = regexp.MustCompile(`^/[A-Za-z0-9/_.:-]*$`)
 	// sqlmapParam é o nome do parâmetro a testar.
 	sqlmapParam = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
+	// sqlmapFile é um caminho absoluto no servidor alvo, para a ação de ler
+	// um arquivo.
+	sqlmapFile = regexp.MustCompile(`^/[A-Za-z0-9/_.-]{1,255}$`)
 )
 
-// sqlmapOptions valida as opções do SQLMap: rota, parâmetro e porta. A rota
-// vem normalizada pelo sniffer (":id" no lugar dos identificadores) e cada
-// ":id" vira 1 na URL testada.
-func sqlmapOptions(t target.Target, o Options) (route, param string, port int, err error) {
+// sqlmapKeys são as opções aceitas; qualquer outra chave é recusada.
+var sqlmapKeys = map[string]bool{
+	"rota": true, "parametro": true, "porta": true, "nivel": true, "risco": true,
+	"tecnica": true, "sgbd": true, "threads": true, "tamper": true, "acao": true, "arquivo": true,
+}
+
+// Conjuntos fechados das opções do SQLMap. A interface manda rótulos em
+// linguagem comum; aqui cada valor vira a flag correspondente.
+
+// sqlmapTechnique é a técnica de injeção; "" deixa o SQLMap usar todas.
+var sqlmapTechnique = map[string]bool{"": true, "B": true, "E": true, "U": true, "S": true, "T": true, "Q": true}
+
+// sqlmapDBMS restringe a varredura a um banco; "" deixa o SQLMap detectar.
+var sqlmapDBMS = map[string]bool{
+	"": true, "MySQL": true, "PostgreSQL": true, "MariaDB": true, "Microsoft SQL Server": true,
+	"Oracle": true, "SQLite": true, "IBM DB2": true, "Firebird": true, "Sybase": true,
+	"Microsoft Access": true, "SAP MaxDB": true,
+}
+
+// sqlmapTamper é o script de evasão de WAF; "" não usa nenhum.
+var sqlmapTamper = map[string]bool{
+	"": true, "space2comment": true, "between": true, "charencode": true, "randomcase": true,
+	"apostrophemask": true, "base64encode": true, "equaltolike": true, "percentage": true,
+}
+
+// sqlmapAction é o que fazer depois de detectar a injeção, da só-detecção à
+// extração de dados e ao shell. Cada ação vira as flags do SQLMap; a ação
+// "ler-arquivo" usa à parte o caminho da opção "arquivo".
+var sqlmapAction = map[string][]string{
+	"detectar":    {},
+	"fingerprint": {"--fingerprint"},
+	"banner":      {"--banner", "--current-user", "--current-db", "--is-dba", "--hostname"},
+	"bancos":      {"--dbs"},
+	"tabelas":     {"--tables"},
+	"colunas":     {"--columns"},
+	"dump":        {"--dump"},
+	"dump-all":    {"--dump-all"},
+	"sql-shell":   {"--sql-shell"},
+	"os-shell":    {"--os-shell"},
+	"ler-arquivo": {},
+}
+
+// sqlmapConfig é o conjunto validado das opções, pronto para virar argumentos.
+type sqlmapConfig struct {
+	route, param         string
+	port                 int
+	level, risk, threads int
+	technique, dbms      string
+	tamper, action, file string
+}
+
+// sqlmapNumber lê uma opção numérica dentro de uma faixa fechada; ausente usa
+// o padrão def.
+func sqlmapNumber(o Options, key, def string, min, max int) (int, bool) {
+	v := o[key]
+	if v == "" {
+		v = def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < min || n > max {
+		return 0, false
+	}
+	return n, true
+}
+
+// sqlmapOptions valida todas as opções do SQLMap. A rota vem normalizada pelo
+// sniffer (":id" no lugar dos identificadores) e cada ":id" vira 1 na URL
+// testada.
+func sqlmapOptions(t target.Target, o Options) (sqlmapConfig, error) {
+	var c sqlmapConfig
+	bad := func(key string) (sqlmapConfig, error) { return sqlmapConfig{}, &OptionError{Tool: "sqlmap", Key: key} }
 	for k := range o {
-		if k != "rota" && k != "parametro" && k != "porta" {
-			return "", "", 0, &OptionError{Tool: "sqlmap", Key: k}
+		if !sqlmapKeys[k] {
+			return bad(k)
 		}
 	}
-	route = o["rota"]
-	if !sqlmapRoute.MatchString(route) || strings.Contains(route, "..") || strings.Contains(route, "//") {
-		return "", "", 0, &OptionError{Tool: "sqlmap", Key: "rota"}
+	c.route = o["rota"]
+	if !sqlmapRoute.MatchString(c.route) || strings.Contains(c.route, "..") || strings.Contains(c.route, "//") {
+		return bad("rota")
 	}
-	param = o["parametro"]
-	if !sqlmapParam.MatchString(param) {
-		return "", "", 0, &OptionError{Tool: "sqlmap", Key: "parametro"}
+	c.param = o["parametro"]
+	if !sqlmapParam.MatchString(c.param) {
+		return bad("parametro")
 	}
-	port, err = appPort("sqlmap", t, o)
+	port, err := appPort("sqlmap", t, o)
 	if err != nil {
-		return "", "", 0, err
+		return sqlmapConfig{}, err
 	}
-	segs := strings.Split(route, "/")
+	c.port = port
+
+	var ok bool
+	if c.level, ok = sqlmapNumber(o, "nivel", "1", 1, 5); !ok {
+		return bad("nivel")
+	}
+	if c.risk, ok = sqlmapNumber(o, "risco", "1", 1, 3); !ok {
+		return bad("risco")
+	}
+	if c.threads, ok = sqlmapNumber(o, "threads", "1", 1, 10); !ok {
+		return bad("threads")
+	}
+	c.technique = o["tecnica"]
+	if !sqlmapTechnique[c.technique] {
+		return bad("tecnica")
+	}
+	c.dbms = o["sgbd"]
+	if !sqlmapDBMS[c.dbms] {
+		return bad("sgbd")
+	}
+	c.tamper = o["tamper"]
+	if !sqlmapTamper[c.tamper] {
+		return bad("tamper")
+	}
+	c.action = o["acao"]
+	if c.action == "" {
+		c.action = "detectar"
+	}
+	if _, known := sqlmapAction[c.action]; !known {
+		return bad("acao")
+	}
+	c.file = o["arquivo"]
+	if c.action == "ler-arquivo" {
+		if !sqlmapFile.MatchString(c.file) {
+			return bad("arquivo")
+		}
+	} else if c.file != "" {
+		return bad("arquivo")
+	}
+
+	segs := strings.Split(c.route, "/")
 	for i, s := range segs {
 		if s == ":id" {
 			segs[i] = "1"
 		}
 	}
-	return strings.Join(segs, "/"), param, port, nil
+	c.route = strings.Join(segs, "/")
+	return c, nil
 }
 
 // SqlmapArgs devolve os argumentos do SQLMap para testar um parâmetro GET de
-// uma rota: só nível 1 e risco 1, uma thread, sessão sempre nova e nenhuma
-// opção de extração de dados, de shell ou de arquivos.
+// uma rota. Sem opções, roda só a detecção (nível 1, risco 1, uma thread,
+// sessão sempre nova e nada de extração, shell ou arquivos). As opções da
+// interface sobem nível e risco, escolhem técnica, banco, threads e evasão, e
+// a ação pode escalar para enumerar, extrair dados, abrir shell ou ler um
+// arquivo do servidor.
 func SqlmapArgs(t target.Target, o Options) ([]string, error) {
 	if err := checkTarget(t); err != nil {
 		return nil, err
 	}
-	route, param, port, err := sqlmapOptions(t, o)
+	c, err := sqlmapOptions(t, o)
 	if err != nil {
 		return nil, err
 	}
-	u := "http://" + net.JoinHostPort(t.Host, strconv.Itoa(port)) + route + "?" + param + "=1"
-	return []string{"-u", u, "-p", param, "--batch", "--level", "1", "--risk", "1", "--threads", "1",
-		"--flush-session", "--disable-coloring", "--user-agent", UserAgent}, nil
+	u := "http://" + net.JoinHostPort(t.Host, strconv.Itoa(c.port)) + c.route + "?" + c.param + "=1"
+	args := []string{"-u", u, "-p", c.param, "--batch",
+		"--level", strconv.Itoa(c.level), "--risk", strconv.Itoa(c.risk),
+		"--threads", strconv.Itoa(c.threads), "--flush-session", "--disable-coloring", "--user-agent", UserAgent}
+	if c.technique != "" {
+		args = append(args, "--technique", c.technique)
+	}
+	if c.dbms != "" {
+		args = append(args, "--dbms", c.dbms)
+	}
+	if c.tamper != "" {
+		args = append(args, "--tamper", c.tamper)
+	}
+	args = append(args, sqlmapAction[c.action]...)
+	if c.action == "ler-arquivo" {
+		args = append(args, "--file-read="+c.file)
+	}
+	return args, nil
 }
 
 // SqlmapReport é o veredito do SQLMap para o parâmetro testado.
