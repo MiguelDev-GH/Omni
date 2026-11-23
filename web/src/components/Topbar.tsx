@@ -1,6 +1,6 @@
-import logo from "../assets/logo.png";
 import { useAppStore } from "../store/app";
 import EngineBadge, { engineNames } from "./EngineBadge";
+import Logo from "./Logo";
 import Select from "./Select";
 
 // Meter é um uso de recurso em barra fina, com o número ao lado.
@@ -17,6 +17,33 @@ function Meter({ label, value }: { label: string; value: number }) {
       </span>
       <span className="w-8 text-texto tabular-nums">{v}%</span>
     </span>
+  );
+}
+
+// ThemeToggle troca entre o tema claro e o escuro; o ícone mostra o destino.
+function ThemeToggle() {
+  const tema = useAppStore((s) => s.tema);
+  const setTema = useAppStore((s) => s.setTema);
+  const toDark = tema === "claro";
+  return (
+    <button
+      type="button"
+      onClick={() => setTema(toDark ? "escuro" : "claro")}
+      aria-label={toDark ? "Usar tema escuro" : "Usar tema claro"}
+      title={toDark ? "Tema escuro" : "Tema claro"}
+      className="botao-leve px-2"
+    >
+      <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        {toDark ? (
+          <path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7Z" />
+        ) : (
+          <>
+            <circle cx="8" cy="8" r="2.75" />
+            <path d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M12.6 3.4l-.9.9M4.3 11.7l-.9.9" />
+          </>
+        )}
+      </svg>
+    </button>
   );
 }
 
@@ -44,7 +71,7 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
           </svg>
         </button>
         <span className="flex items-center md:w-48">
-          <img src={logo} alt="Omni" className="h-8 w-auto" />
+          <Logo className="h-8 w-auto" />
         </span>
         <Select
           label="Alvo"
@@ -69,9 +96,12 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
               <Meter label="Disco" value={system.disco} />
             </p>
           )}
-          <button type="button" onClick={() => clearToken(false)} className="botao-leve">
-            Sair
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <button type="button" onClick={() => clearToken(false)} className="botao-leve">
+              Sair
+            </button>
+          </div>
         </div>
       </div>
     </header>

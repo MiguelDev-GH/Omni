@@ -2,9 +2,12 @@
 @import "@fontsource-variable/hanken-grotesk";
 @import "@fontsource-variable/jetbrains-mono";
 
-/* Tema claro: as superfícies quase não se distinguem do fundo e se separam por
-   espaço e tom, não por bordas. O "cibernético" fica nos detalhes mínimos: a
-   malha de pontos do fundo, o cursor da marca e o pulso de "ao vivo". */
+/* As superfícies quase não se distinguem do fundo e se separam por espaço e
+   tom, não por bordas. O "cibernético" fica nos detalhes mínimos: o cursor da
+   marca e o pulso de "ao vivo". Os valores abaixo são do tema claro; o escuro
+   troca os mesmos tokens em html[data-tema="escuro"], mais adiante. */
+@custom-variant dark (&:where([data-tema="escuro"], [data-tema="escuro"] *));
+
 @theme {
   --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
@@ -22,6 +25,16 @@
   --color-erro: #c2352b;
   --color-aviso: #a8650c;
   --color-aviso-tinta: #fbf0dc;
+  --color-console: #16211e;
+  --color-console-texto: #b9d8cf;
+  --color-critica-tinta: #fee2e2;
+  --color-critica-texto: #991b1b;
+  --color-alta-tinta: #ffedd5;
+  --color-alta-texto: #9a3412;
+  --color-media-tinta: #fef3c7;
+  --color-media-texto: #92400e;
+  --color-baixa-tinta: #e0f2fe;
+  --color-baixa-texto: #075985;
 
   --ease-suave: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -55,17 +68,79 @@
   }
 }
 
+/* Tema escuro: o mesmo desenho com a escala invertida. Texto claro sobre fundo
+   escuro, realces mais vivos para manter o contraste, sombras sem tinta. */
+html[data-tema="escuro"] {
+  color-scheme: dark;
+
+  --color-fundo: #0c1210;
+  --color-superficie: #121a17;
+  --color-elevado: #19231f;
+  --color-borda: #26332e;
+  --color-texto: #e4ece9;
+  --color-suave: #9aaba4;
+  --color-apagado: #66766f;
+  --color-destaque: #2fc4a8;
+  --color-destaque-forte: #4fdcc1;
+  --color-destaque-tinta: #123a32;
+  --color-erro: #ff7468;
+  --color-aviso: #e5a94a;
+  --color-aviso-tinta: #382a0e;
+  --color-console: #070b0a;
+  --color-console-texto: #a9cfc3;
+  --color-critica-tinta: #4a1a1a;
+  --color-critica-texto: #fca5a5;
+  --color-alta-tinta: #4a2410;
+  --color-alta-texto: #fdba74;
+  --color-media-tinta: #3f2e0b;
+  --color-media-texto: #fcd34d;
+  --color-baixa-tinta: #0c2d44;
+  --color-baixa-texto: #7dd3fc;
+
+  --sombra-flutuante: 0 12px 32px -12px rgb(0 0 0 / 0.65), 0 0 0 1px rgb(255 255 255 / 0.08);
+  --grafico-eixo: #66766f;
+  --grafico-grade: #2a3834;
+  --grafico-http: #6aa6f2;
+  --grafico-postgresql: #f08a5d;
+  --grafico-https: #2fc4a8;
+  --grafico-dns: #d9a63a;
+  --grafico-mysql: #e777a1;
+  --grafico-smtp: #7cc65a;
+  --grafico-tcp: #9d90f0;
+  --grafico-udp: #f07a7a;
+  --grafico-outro: #66766f;
+  --grafico-2xx: #2fc4a8;
+  --grafico-3xx: #6aa6f2;
+  --grafico-4xx: #e0a93a;
+  --grafico-5xx: #f07a7a;
+}
+
+/* Valores do tema claro que não viram utilitário do Tailwind: sombra flutuante
+   e as cores dos gráficos, lidas por var() nos atributos SVG. */
 html {
   color-scheme: light;
+
+  --sombra-flutuante: 0 12px 32px -12px rgb(22 33 30 / 0.25), 0 0 0 1px rgb(22 33 30 / 0.06);
+  --grafico-eixo: #93a09b;
+  --grafico-grade: #d3dad7;
+  --grafico-http: #2f74d0;
+  --grafico-postgresql: #c94f1d;
+  --grafico-https: #0b8a76;
+  --grafico-dns: #a86d00;
+  --grafico-mysql: #c4416f;
+  --grafico-smtp: #2f7d16;
+  --grafico-tcp: #6f5fd6;
+  --grafico-udp: #d24848;
+  --grafico-outro: #93a09b;
+  --grafico-2xx: #0b8a76;
+  --grafico-3xx: #2f74d0;
+  --grafico-4xx: #c98a00;
+  --grafico-5xx: #d24848;
 }
 
 body {
   @apply bg-fundo font-sans text-texto antialiased;
   font-feature-settings: "ss01", "cv11";
-  /* Malha de pontos quase invisível, presa à janela. */
-  background-image: radial-gradient(color-mix(in oklab, var(--color-texto) 9%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-attachment: fixed;
 }
 
 * {
@@ -113,6 +188,10 @@ input[type="checkbox"] {
 }
 
 @layer components {
+  /* Menus e avisos que flutuam sobre a página. */
+  .flutuante {
+    box-shadow: var(--sombra-flutuante);
+  }
   /* Campos de texto: um plano branco sem borda, com anel só no foco. */
   .campo {
     @apply w-full rounded-lg bg-elevado px-3 py-2 text-sm ring-1 ring-borda/70 outline-none ring-inset placeholder:text-apagado focus:ring-2 focus:ring-destaque aria-invalid:ring-erro;

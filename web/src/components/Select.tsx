@@ -135,7 +135,7 @@ export default function Select<T extends string | number>({
         role="listbox"
         aria-labelledby={buttonId}
         data-open={open}
-        className="invisible absolute top-full left-0 z-40 mt-1.5 max-h-72 min-w-full origin-top -translate-y-1 scale-[0.98] overflow-auto rounded-xl bg-elevado p-1 text-sm opacity-0 shadow-[0_12px_32px_-12px_rgb(22_33_30/0.25),0_0_0_1px_rgb(22_33_30/0.06)] transition-[opacity,transform,visibility] duration-200 ease-(--ease-suave) data-[open=true]:visible data-[open=true]:translate-y-0 data-[open=true]:scale-100 data-[open=true]:opacity-100"
+        className="invisible absolute top-full left-0 z-40 mt-1.5 max-h-72 min-w-full origin-top -translate-y-1 scale-[0.98] overflow-auto rounded-xl bg-elevado p-1 text-sm opacity-0 flutuante transition-[opacity,transform,visibility] duration-200 ease-(--ease-suave) data-[open=true]:visible data-[open=true]:translate-y-0 data-[open=true]:scale-100 data-[open=true]:opacity-100"
       >
         {options.map((o, i) => (
           <li

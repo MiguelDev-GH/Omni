@@ -97,7 +97,7 @@ export default function TestsslView({ report }: { report: unknown; findings: Fin
         <ol aria-label="Protocolos" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {rep.protocolos.map((p) => {
             const problem = p.oferecido && insecure.has(p.nome);
-            const tone = problem ? "bg-red-100 text-red-800" : p.oferecido ? "bg-destaque-tinta text-destaque-forte" : "bg-texto/5 text-suave";
+            const tone = problem ? "bg-critica-tinta text-critica-texto" : p.oferecido ? "bg-destaque-tinta text-destaque-forte" : "bg-texto/5 text-suave";
             return (
               <li key={p.nome} className={`rounded-xl px-3 py-2.5 ${tone}`}>
                 <p className="font-mono text-sm font-medium">{p.nome}</p>

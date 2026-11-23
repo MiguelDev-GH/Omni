@@ -28,7 +28,7 @@ export default function StatusBars({ points }: { points: (StatusPoint & { t: num
             />
             <YAxis allowDecimals={false} tick={axisTick} tickLine={false} axisLine={false} width={48} />
             <Tooltip
-              cursor={{ fill: "rgb(22 33 30 / 0.04)" }}
+              cursor={{ fill: "color-mix(in oklab, var(--color-texto) 5%, transparent)" }}
               {...tooltipStyle}
               labelFormatter={(t) => clockSec(Number(t))}
             />
