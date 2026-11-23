@@ -88,6 +88,8 @@ func TestScanValidation(t *testing.T) {
 		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nmap": {"portas": "1-65535"}}}`, http.StatusBadRequest, "opcoes.nmap.portas"},
 		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nuclei": {}}}`, http.StatusBadRequest, "opcoes.nuclei"},
 		{`{"alvo_id": ` + id + `, "ferramentas": ["nmap"], "opcoes": {"nmap": {"x": 1}}}`, http.StatusBadRequest, ""},
+		{`{"alvo_id": ` + id + `, "ferramentas": ["gitleaks"]}`, http.StatusBadRequest, "ferramentas"},
+		{`{"alvo_id": ` + id + `, "ferramentas": ["amass"]}`, http.StatusBadRequest, "ferramentas"},
 	}
 	for _, c := range cases {
 		rec := do(t, srv, "POST", "/api/varreduras", c.body, true)

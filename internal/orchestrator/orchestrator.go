@@ -44,13 +44,29 @@ var (
 	ErrFerramentaDesconhecida = errors.New("ferramenta desconhecida")
 	ErrSemFerramentas         = errors.New("escolha ao menos uma ferramenta")
 	ErrVarreduraEmAndamento   = errors.New("já existe uma varredura em andamento para este alvo")
+	ErrFaltaDadoDoAlvo        = errors.New("o alvo não tem o dado de que a ferramenta precisa")
 )
+
+// missingRequirement diz se falta ao alvo o dado opcional que a ferramenta
+// exige (Tool.Requires).
+func missingRequirement(tool arsenal.Tool, t target.Target) bool {
+	switch tool.Requires {
+	case "dominio":
+		return t.Domain == ""
+	case "repositorio":
+		return t.Repo == ""
+	}
+	return false
+}
 
 // Spec descreve um container: imagem com versão fixa e argumentos em lista.
 type Spec struct {
 	Image   string
 	Args    []string
 	Volumes map[string]string
+	// Binds são diretórios do host montados sempre como somente leitura; o
+	// único permitido é o código-fonte do alvo em arsenal.RepoMount.
+	Binds []Bind
 	// Files são copiados para o container antes de ele iniciar (caminho
 	// absoluto → conteúdo), somente leitura.
 	Files map[string][]byte
@@ -60,6 +76,26 @@ type Spec struct {
 	AnyExit    bool
 	// Memory é o limite de memória em bytes; zero usa o padrão de 512 MiB.
 	Memory int64
+}
+
+// Bind monta o diretório Source do host em Target, no container.
+type Bind struct {
+	Source string
+	Target string
+}
+
+// ErrBindInvalido indica uma montagem que não é o código-fonte do alvo.
+var ErrBindInvalido = errors.New("montagem não permitida")
+
+// checkBinds aceita só o Repo do alvo, já validado, montado em
+// arsenal.RepoMount.
+func checkBinds(t target.Target, binds []Bind) error {
+	for _, b := range binds {
+		if t.Repo == "" || b.Source != t.Repo || b.Target != arsenal.RepoMount {
+			return fmt.Errorf("%w: %s em %s", ErrBindInvalido, b.Source, b.Target)
+		}
+	}
+	return nil
 }
 
 // Runner roda um container até ele terminar e devolve a saída padrão.
@@ -115,6 +151,7 @@ type job struct {
 // Start valida o pedido, confirma que o Docker responde, grava a varredura
 // e a roda em segundo plano. opts traz as opções de cada ferramenta pedida.
 // Erros de validação vêm como ErrFerramentaDesconhecida, ErrSemFerramentas,
+// ErrFaltaDadoDoAlvo,
 // *arsenal.OptionError, *target.ValidationError ou arsenal.ErrForaDoEscopo;
 // alvo inexistente vem como store.ErrNotFound.
 func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string, opts map[string]arsenal.Options) (int64, error) {
@@ -142,6 +179,9 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 	saved := map[string]map[string]string{}
 	for i := range jobs {
 		name := jobs[i].tool.Name
+		if missingRequirement(jobs[i].tool, t) {
+			return 0, fmt.Errorf("%w: %s precisa de %s", ErrFaltaDadoDoAlvo, name, jobs[i].tool.Requires)
+		}
 		args, err := jobs[i].tool.Args(t, opts[name])
 		if err != nil {
 			return 0, err
@@ -156,8 +196,15 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 				return 0, err
 			}
 		}
+		var binds []Bind
+		if tool.MountsRepo {
+			binds = []Bind{{Source: t.Repo, Target: arsenal.RepoMount}}
+		}
+		if err := checkBinds(t, binds); err != nil {
+			return 0, err
+		}
 		jobs[i].target = t
-		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, Files: files,
+		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, Binds: binds, Files: files,
 			OutputFile: tool.OutputFile, AnyExit: tool.AnyExit, Memory: tool.Memory}
 	}
 	if err := o.runner.Available(ctx); err != nil {

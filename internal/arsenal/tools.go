@@ -89,6 +89,9 @@ type Tool struct {
 	// Volumes são volumes nomeados do Docker (nome → caminho no container),
 	// como o cache de templates do Nuclei.
 	Volumes map[string]string `json:"-"`
+	// MountsRepo monta o código-fonte do alvo (Target.Repo) em RepoMount,
+	// somente leitura; é o único caminho do host que entra num container.
+	MountsRepo bool `json:"-"`
 	// AnyExit aceita código de saída diferente de zero (o testssl usa o
 	// código para contar problemas).
 	AnyExit bool `json:"-"`
@@ -153,6 +156,16 @@ var Tools = []Tool{
 		Args:        AmassArgs,
 		Parse:       ParseAmassJSON,
 		Report:      AmassReportFrom,
+	},
+	{
+		Name:        "gitleaks",
+		Description: "Segredos vazados no código-fonte e no histórico do git",
+		Image:       GitleaksImage,
+		Requires:    "repositorio",
+		Args:        GitleaksArgs,
+		Parse:       ParseGitleaksJSON,
+		Report:      fromStdout(GitleaksReportFrom),
+		MountsRepo:  true,
 	},
 	{
 		Name:        "testssl",

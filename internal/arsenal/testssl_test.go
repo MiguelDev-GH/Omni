@@ -65,7 +65,7 @@ func TestToolsRegistry(t *testing.T) {
 		assert.Contains(t, tool.Image, ":", "imagem com versão fixa")
 		assert.NotContains(t, tool.Image, ":latest")
 	}
-	assert.Equal(t, []string{"nmap", "nuclei", "nikto", "sqlmap", "ffuf", "amass", "testssl"}, names)
+	assert.Equal(t, []string{"nmap", "nuclei", "nikto", "sqlmap", "ffuf", "amass", "gitleaks", "testssl"}, names)
 	nuclei, _ := Lookup("nuclei")
 	assert.Equal(t, int64(1536<<20), nuclei.Memory)
 }

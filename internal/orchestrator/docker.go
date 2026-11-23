@@ -215,15 +215,24 @@ func (d *DockerRunner) ensureImage(ctx context.Context, image string, logs io.Wr
 }
 
 type mount struct {
-	Type   string `json:"Type"`
-	Source string `json:"Source"`
-	Target string `json:"Target"`
+	Type     string `json:"Type"`
+	Source   string `json:"Source"`
+	Target   string `json:"Target"`
+	ReadOnly bool   `json:"ReadOnly,omitempty"`
 }
 
 func (d *DockerRunner) create(ctx context.Context, s Spec) (string, error) {
 	mounts := []mount{}
 	for name, path := range s.Volumes {
 		mounts = append(mounts, mount{Type: "volume", Source: name, Target: path})
+	}
+	for _, b := range s.Binds {
+		// Segunda barreira, depois da checkBinds do orquestrador: só um
+		// caminho absoluto e limpo, só em /repo e sempre somente leitura.
+		if !path.IsAbs(b.Source) || path.Clean(b.Source) != b.Source || b.Source == "/" || b.Target != arsenal.RepoMount {
+			return "", fmt.Errorf("%w: %s em %s", ErrBindInvalido, b.Source, b.Target)
+		}
+		mounts = append(mounts, mount{Type: "bind", Source: b.Source, Target: b.Target, ReadOnly: true})
 	}
 	mem := s.Memory
 	if mem <= 0 {

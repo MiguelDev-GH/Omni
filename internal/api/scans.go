@@ -57,7 +57,8 @@ func StartScanHandler(sc Scanner) http.Handler {
 			writeJSON(w, http.StatusAccepted, map[string]int64{"id": id})
 		case errors.As(err, &oe):
 			writeField(w, http.StatusBadRequest, err.Error(), oe.Field())
-		case errors.Is(err, orchestrator.ErrSemFerramentas), errors.Is(err, orchestrator.ErrFerramentaDesconhecida):
+		case errors.Is(err, orchestrator.ErrSemFerramentas), errors.Is(err, orchestrator.ErrFerramentaDesconhecida),
+			errors.Is(err, orchestrator.ErrFaltaDadoDoAlvo):
 			writeField(w, http.StatusBadRequest, err.Error(), "ferramentas")
 		case errors.As(err, &ve):
 			writeField(w, http.StatusBadRequest, "alvo inválido: "+ve.Error(), "alvo_id")
