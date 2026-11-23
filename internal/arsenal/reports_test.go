@@ -21,7 +21,7 @@ func fixture(t *testing.T, name string) []byte {
 }
 
 func TestToolsRejectUnknownOptions(t *testing.T) {
-	tg := target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{443}}
+	tg := target.Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{443}, Domain: "api.test"}
 	for _, tool := range Tools {
 		_, err := tool.Args(tg, Options{})
 		if tool.Name == "sqlmap" { // rota e parâmetro são obrigatórios

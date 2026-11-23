@@ -107,8 +107,9 @@ func New(ctx context.Context, r Runner, st Store, pub ws.Publisher) *Orchestrato
 func (o *Orchestrator) Wait() { o.wg.Wait() }
 
 type job struct {
-	tool arsenal.Tool
-	spec Spec
+	tool   arsenal.Tool
+	spec   Spec
+	target target.Target
 }
 
 // Start valida o pedido, confirma que o Docker responde, grava a varredura
@@ -155,6 +156,7 @@ func (o *Orchestrator) Start(ctx context.Context, targetID int64, tools []string
 				return 0, err
 			}
 		}
+		jobs[i].target = t
 		jobs[i].spec = Spec{Image: tool.Image, Args: args, Volumes: tool.Volumes, Files: files,
 			OutputFile: tool.OutputFile, AnyExit: tool.AnyExit, Memory: tool.Memory}
 	}
@@ -262,7 +264,7 @@ func (o *Orchestrator) runTool(ctx context.Context, sc store.Scan, j job) (int, 
 		return 0, err
 	}
 	if j.tool.Report != nil {
-		if err := o.saveReport(ctx, sc.ID, j.tool, stdout); err != nil {
+		if err := o.saveReport(ctx, sc.ID, j, stdout); err != nil {
 			slog.Warn("arsenal: relatório da ferramenta", "ferramenta", j.tool.Name, "erro", err)
 			logs.Line("relatório da ferramenta indisponível: " + err.Error())
 		}
@@ -270,12 +272,12 @@ func (o *Orchestrator) runTool(ctx context.Context, sc store.Scan, j job) (int, 
 	return len(list), nil
 }
 
-func (o *Orchestrator) saveReport(ctx context.Context, scanID int64, tool arsenal.Tool, stdout []byte) error {
-	report, err := tool.Report(stdout)
+func (o *Orchestrator) saveReport(ctx context.Context, scanID int64, j job, stdout []byte) error {
+	report, err := j.tool.Report(j.target, stdout)
 	if err != nil {
 		return err
 	}
-	return o.st.SaveReport(ctx, scanID, tool.Name, report)
+	return o.st.SaveReport(ctx, scanID, j.tool.Name, report)
 }
 
 // newSinceLast conta os achados da varredura que não existiam na varredura
