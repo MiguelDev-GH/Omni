@@ -26,7 +26,7 @@ export default function ScanConsole({ scanId, finished = false }: { scanId: numb
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
-      className="h-72 overflow-auto rounded-2xl bg-[#16211e] p-4 font-mono text-xs leading-5 text-[#b9d8cf] selection:bg-destaque/40 selection:text-white"
+      className="h-72 overflow-auto rounded-2xl bg-console p-4 font-mono text-xs leading-5 text-console-texto dark:ring-1 dark:ring-borda selection:bg-destaque/40 selection:text-white"
     >
       {scanId === null
         ? "Nenhuma varredura iniciada nesta sessão."

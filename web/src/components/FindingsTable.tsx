@@ -1,10 +1,10 @@
 import { severityLabels, sortFindings, type Finding, type Severity } from "../api/scans";
 
 export const severityClasses: Record<Severity, string> = {
-  critica: "bg-red-100 text-red-800",
-  alta: "bg-orange-100 text-orange-800",
-  media: "bg-amber-100 text-amber-800",
-  baixa: "bg-sky-100 text-sky-800",
+  critica: "bg-critica-tinta text-critica-texto",
+  alta: "bg-alta-tinta text-alta-texto",
+  media: "bg-media-tinta text-media-texto",
+  baixa: "bg-baixa-tinta text-baixa-texto",
   info: "bg-texto/5 text-suave",
 };
 

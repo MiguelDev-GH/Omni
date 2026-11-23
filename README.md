@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-escuro.png" />
+    <img src="docs/img/logo-claro.png" alt="Omni" width="360" />
+  </picture>
+</p>
+
 # Omni
 
 Plataforma de **monitoramento e segurança** que roda **na mesma máquina do servidor** que observa. Ela une três visões em um único painel:

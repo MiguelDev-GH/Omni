@@ -23,7 +23,7 @@ function ToastItem({ toast }: { toast: Toast }) {
   return (
     <li
       role={isError ? "alert" : "status"}
-      className="relative flex animate-entrada items-start gap-3 overflow-hidden rounded-xl bg-elevado py-3 pr-3 pl-4 shadow-[0_16px_40px_-16px_rgb(22_33_30/0.3),0_0_0_1px_rgb(22_33_30/0.05)]"
+      className="relative flex animate-entrada items-start gap-3 flutuante overflow-hidden rounded-xl bg-elevado py-3 pr-3 pl-4"
     >
       <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${style.bar}`} />
       <div className="min-w-0 flex-1">

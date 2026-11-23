@@ -6,6 +6,7 @@ import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
 import { mergeL7 } from "../lib/l7";
 import { mergeWindows } from "../lib/traffic";
+import { applyTema, initialTema, saveTema, type Tema } from "../lib/tema";
 import { readToken, removeToken, writeToken } from "../lib/session";
 
 export type EngineState = "ativo" | "inativo" | "sem-permissao" | "indisponivel";
@@ -40,6 +41,8 @@ export const MAX_ALERT_HISTORY = 200;
 export const portKey = (alvoId: number, porta: number) => `${alvoId}:${porta}`;
 
 export type AppState = {
+  tema: Tema;
+  setTema: (t: Tema) => void;
   token: string | null;
   sessionExpired: boolean;
   setToken: (t: string) => void;
@@ -79,6 +82,12 @@ export type AppState = {
 let nextToastId = 1;
 
 export const useAppStore = create<AppState>()((set) => ({
+  tema: initialTema(),
+  setTema: (t) => {
+    applyTema(t);
+    saveTema(t);
+    set({ tema: t });
+  },
   token: readToken(),
   sessionExpired: false,
   setToken: (t) => {

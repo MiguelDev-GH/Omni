@@ -1,6 +1,8 @@
 import { useAppStore } from "../store/app";
 import EngineBadge, { engineNames } from "./EngineBadge";
+import Logo from "./Logo";
 import Select from "./Select";
+import ThemeSwitch from "./ThemeSwitch";
 
 // Meter é um uso de recurso em barra fina, com o número ao lado.
 function Meter({ label, value }: { label: string; value: number }) {
@@ -42,9 +44,8 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
             <path d="M2 4.5h12M2 8h12M2 11.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
-        <span className="flex items-baseline font-mono text-lg font-semibold tracking-tight md:w-48">
-          omni
-          <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-cursor bg-destaque" />
+        <span className="flex items-center md:w-48">
+          <Logo className="h-8 w-auto" />
         </span>
         <Select
           label="Alvo"
@@ -69,9 +70,12 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
               <Meter label="Disco" value={system.disco} />
             </p>
           )}
-          <button type="button" onClick={() => clearToken(false)} className="botao-leve">
-            Sair
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeSwitch />
+            <button type="button" onClick={() => clearToken(false)} className="botao-leve">
+              Sair
+            </button>
+          </div>
         </div>
       </div>
     </header>
