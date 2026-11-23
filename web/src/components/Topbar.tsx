@@ -43,7 +43,7 @@ export default function Topbar({ menuOpen, onToggleMenu }: { menuOpen: boolean; 
           </svg>
         </button>
         <span className="flex items-baseline font-mono text-lg font-semibold tracking-tight md:w-48">
-          omni
+          Omni
           <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-cursor bg-destaque" />
         </span>
         <Select
