@@ -17,7 +17,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | ✅ Concluída |
 | [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | ✅ Concluída |
 | [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | 🚧 Em andamento |
-| [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ⏳ A fazer |
+| [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | 🚧 Em andamento |
 | [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | 🚧 Em andamento |
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | 🚧 Em andamento |
 | [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento |
@@ -194,6 +194,12 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - As métricas que hoje só passam pelo WebSocket passam a ser gravadas, com retenção de 24 h (`GET /api/sistema`).
 
 **Branch:** `feat/pagina-sistema` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+**Decisões da Sprint 10:**
+
+- A limpeza das leituras com mais de 24 h roda no próprio `sysmetrics.Run`, uma vez por minuto, e não na limpeza do tráfego: a do tráfego só roda enquanto o sniffer captura, e sem `CAP_NET_RAW` a tabela `system_metrics` cresceria sem limite. Por isso o `Sink` tem `AddSystemSample` e `PruneSystem`.
+- Acima de 1 h, cada ponto é a média das leituras de um minuto, contado a partir de `desde`, com a hora da primeira leitura do minuto. Até 1 h, todas as leituras (uma a cada 5 s, no máximo 720) saem sem média.
+- A tela guarda o histórico do período anterior na tela enquanto o novo carrega, e os pontos ao vivo de `METRICAS_SISTEMA` entram em qualquer período, inclusive no de 24 h, que mistura médias por minuto com as leituras de 5 s mais recentes.
 
 ### Sprint 11: ffuf e Nikto
 
