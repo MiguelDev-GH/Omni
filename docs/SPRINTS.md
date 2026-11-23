@@ -21,7 +21,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | ✅ Concluída |
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ✅ Concluída |
 | [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento (Amass pronto, Gitleaks a fazer) |
-| [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
+| [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | 🚧 Em andamento |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
 | [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ✅ Concluída |
 | [Backlog](#backlog) | Expansão | Restante das pendências do README | 📋 Backlog |
@@ -260,6 +260,17 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - Tabela virtualizada com no máximo 10 000 linhas; no HTTP, só método e rota, nunca cabeçalhos ou corpos.
 
 **Branch:** `feat/inspetor-pacotes` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+**Decisões da Sprint 14:**
+
+- O `ws.Inspector` não importa o sniffer: recebe qualquer `ws.Inspectable` (um tipo com `MatchesFilter`), e o `sniffer.PacketSummary` implementa essa interface. O pacote `sniffer` já importava `ws`, então o contrário criaria um ciclo.
+- O tap só fica ligado enquanto algum cliente assina: o hub conta os clientes com `ativo: true` e avisa o `run.go`, que chama `SetTap` com o tap ou com `nil`. O aviso roda com o hub travado, para chegar na mesma ordem das assinaturas.
+- A cada 250 ms o Inspetor esvazia a fila e cada cliente recebe no máximo os 500 pacotes **mais recentes** do seu filtro. `descartados` soma os pacotes que não couberam na fila de 4096 e os que passaram do limite do lote daquele cliente.
+- No HTTP, `info` lê só a primeira linha do pacote: `POST /login` (rota normalizada, sem query string) na requisição, `HTTP 404` na resposta e vazio nos pacotes de continuação. No PostgreSQL, só o nome da primeira mensagem do pacote (`Query`, `ReadyForQuery`, `SSLRequest`...).
+- `Summarize` recebe os `PortRoles` do sniffer, e não só as portas de aplicação: as portas DNS e SMTP dos alvos aparecem no Inspetor com o nome do serviço, como nos gráficos.
+- Comando com IP que não é um endereço, porta fora de 0 a 65535 ou outro `tipo` é ignorado; o handler continua lendo as mensagens seguintes.
+- `@tanstack/react-virtual` fixado em 3.14.26, a última versão com mais de duas semanas de publicada; as 3.14.27 e 3.14.28 saíram na véspera.
+- Numa reconexão do WebSocket, o frontend reenvia a assinatura ativa, porque o servidor esquece o estado do cliente quando a conexão cai.
 
 ### Sprint 15: Capturas `.pcap`
 
