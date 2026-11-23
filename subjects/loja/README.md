@@ -28,7 +28,8 @@ O `demo` sobe o PostgreSQL e o Caddy, compila e inicia a loja, cadastra os alvos
 | `rodar` | Sobe só a API (`go run ./cmd/loja`) |
 | `carga` | Gera tráfego; flags em `ARGS`, por exemplo `ARGS="-taxa 50 -duracao 1m"` |
 | `cadastrar` | Cria os alvos `loja` (portas 3000 e banco 5433) e `loja-tls` (porta 8443) no Omni, sem duplicar |
-| `demo` | Tudo acima, em sequência |
+| `app` | Sobe containers, loja e carga, sem falar com o Omni (não pede credenciais); `PORTA=3001` troca a porta da loja e o Caddy acompanha |
+| `demo` | Tudo acima, em sequência, incluindo o `cadastrar` |
 | `teste` | `go vet`, `golangci-lint` e `go test -race` |
 
 Variáveis: `LOJA_ADDR` (padrão `127.0.0.1:3000`, só loopback), `LOJA_BANCO` (padrão `postgres://loja:loja-cobaia@127.0.0.1:5433/loja?sslmode=disable`), `OMNI_URL` (padrão `http://127.0.0.1:8080`), `OMNI_TOKEN`. Os testes de integração com o banco rodam com `LOJA_TESTE_BANCO=<url>` e apagam as tabelas do banco apontado.
