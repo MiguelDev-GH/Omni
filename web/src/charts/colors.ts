@@ -47,3 +47,6 @@ export const statusColors: Record<string, string> = {
 
 // queryColor é a cor da série de consultas ao banco, a mesma do PostgreSQL.
 export const queryColor = "#c94f1d";
+
+// limitColors marca as linhas dos limites de alerta: aviso e crítico.
+export const limitColors = { aviso: "#c98a00", critico: "#d24848" };

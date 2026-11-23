@@ -2,6 +2,7 @@ package sysmetrics
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,36 @@ func (p *fakePub) all() []ws.Event {
 	return append([]ws.Event(nil), p.events...)
 }
 
+type fakeSink struct {
+	mu      sync.Mutex
+	samples []Snapshot
+	prunes  []time.Time
+	fail    bool
+}
+
+func (s *fakeSink) AddSystemSample(_ context.Context, snap Snapshot) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fail {
+		return errors.New("disco cheio")
+	}
+	s.samples = append(s.samples, snap)
+	return nil
+}
+
+func (s *fakeSink) PruneSystem(_ context.Context, before time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prunes = append(s.prunes, before)
+	return nil
+}
+
+func (s *fakeSink) count() (samples, prunes int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.samples), len(s.prunes)
+}
+
 func TestSampleInRange(t *testing.T) {
 	snap, err := Sample(context.Background(), t.TempDir())
 	require.NoError(t, err)
@@ -46,15 +77,19 @@ func TestSampleBadDiskPath(t *testing.T) {
 
 func TestRunPublishesUntilCancel(t *testing.T) {
 	pub := &fakePub{}
+	sink := &fakeSink{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		Run(ctx, pub, t.TempDir(), 20*time.Millisecond)
+		Run(ctx, pub, sink, t.TempDir(), 20*time.Millisecond)
 		close(done)
 	}()
 
 	require.Eventually(t, func() bool { return len(pub.all()) >= 2 }, 2*time.Second, 10*time.Millisecond)
+	samples, prunes := sink.count()
+	assert.GreaterOrEqual(t, samples, 2)
+	assert.Equal(t, 1, prunes, "a limpeza roda no máximo uma vez por minuto")
 	for _, ev := range pub.all() {
 		assert.Equal(t, "METRICAS_SISTEMA", ev.Type)
 		_, ok := ev.Data.(Snapshot)
@@ -67,4 +102,12 @@ func TestRunPublishesUntilCancel(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("Run não retornou após o cancelamento")
 	}
+}
+
+func TestRunPublishesWhenSinkFails(t *testing.T) {
+	pub := &fakePub{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go Run(ctx, pub, &fakeSink{fail: true}, t.TempDir(), 20*time.Millisecond)
+	require.Eventually(t, func() bool { return len(pub.all()) >= 2 }, 2*time.Second, 10*time.Millisecond)
 }

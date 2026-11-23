@@ -155,7 +155,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 
 - `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
-- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem.
+- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem. As leituras ficam 24 h no banco e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
 - `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta; as portas da aplicação contam como HTTP.
 - `ESTADO_MOTORES` sai a cada 5 s e a cada mudança, com o estado do sniffer: `ativo`, `inativo` (sem alvos cadastrados) ou `sem-permissao` (falta `CAP_NET_RAW`; o resto do Omni segue no ar).
@@ -184,7 +184,7 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 
 **Barra lateral:**
 
-- **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, Status HTTP, Sistema (Sprint 10)
+- **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, Status HTTP, Sistema
 - **Tráfego:** Inspetor de pacotes (Sprint 14), Capturas `.pcap` (Sprint 15)
 - **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, testssl (Sprint 9), ffuf, Nikto (Sprint 11), SQLMap (Sprint 12), Amass, Vazamentos (Sprint 13)
 - **Relatórios:** histórico, comparação entre scans, exportação em PDF (Sprint 16)
