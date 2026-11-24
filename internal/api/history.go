@@ -10,13 +10,14 @@ import (
 )
 
 const (
-	historyLimit  = 5000
-	historyWindow = 24 * time.Hour
+	// historyPerPort cobre 24 h com o intervalo padrão de 30 s em cada porta.
+	historyPerPort = 2880
+	historyWindow  = 24 * time.Hour
 )
 
 type HistoryStore interface {
 	GetTarget(ctx context.Context, id int64) (target.Target, error)
-	CheckHistory(ctx context.Context, targetID int64, since time.Time, limit int) ([]poller.Result, error)
+	CheckHistory(ctx context.Context, targetID int64, since time.Time, perPort int) ([]poller.Result, error)
 }
 
 // HistoryHandler responde GET /api/alvos/{id}/historico?desde=<RFC3339>.
@@ -39,7 +40,7 @@ func HistoryHandler(hs HistoryStore) http.Handler {
 			storeError(w, err)
 			return
 		}
-		list, err := hs.CheckHistory(r.Context(), id, since, historyLimit)
+		list, err := hs.CheckHistory(r.Context(), id, since, historyPerPort)
 		if err != nil {
 			storeError(w, err)
 			return

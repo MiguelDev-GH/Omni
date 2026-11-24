@@ -94,3 +94,38 @@ func TestInsertCheckResultUnknownTarget(t *testing.T) {
 	s := openTest(t)
 	assert.Error(t, s.InsertCheckResult(context.Background(), result(999, time.Now())))
 }
+
+func TestCheckHistoryLimitIsPerPort(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	id := newTarget(t, s)
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// A porta 3000 é verificada bem mais vezes; a 5432 não pode sumir do histórico.
+	for i := 0; i < 6; i++ {
+		require.NoError(t, s.InsertCheckResult(ctx, result(id, t0.Add(time.Duration(i)*time.Minute))))
+	}
+	db := poller.Result{TargetID: id, Port: 5432, Kind: "tcp", Up: true, At: t0}
+	require.NoError(t, s.InsertCheckResult(ctx, db))
+
+	got, err := s.CheckHistory(ctx, id, t0, 2)
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+	assert.Equal(t, 5432, got[0].Port)
+	assert.Equal(t, t0.Add(4*time.Minute), got[1].At)
+	assert.Equal(t, t0.Add(5*time.Minute), got[2].At)
+}
+
+func TestPruneChecksDeletesOlder(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	id := newTarget(t, s)
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 3; i++ {
+		require.NoError(t, s.InsertCheckResult(ctx, result(id, t0.Add(time.Duration(i)*time.Hour))))
+	}
+	require.NoError(t, s.PruneChecks(ctx, t0.Add(time.Hour)))
+	got, err := s.CheckHistory(ctx, id, time.Unix(0, 0), 10)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, t0.Add(time.Hour), got[0].At)
+}

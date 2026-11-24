@@ -130,7 +130,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	}
 	go func() {
 		defer wg.Done()
-		poller.NewScheduler(st, pub, cfg.PollInterval).Run(bgCtx)
+		poller.NewScheduler(st, pub, cfg.PollInterval).WithRetention(cfg.CheckRetention).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()

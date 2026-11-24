@@ -23,6 +23,14 @@ type fakeStore struct {
 	targets []target.Target
 	results []Result
 	failFor map[int64]bool
+	prunes  []time.Time
+}
+
+func (f *fakeStore) PruneChecks(_ context.Context, before time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.prunes = append(f.prunes, before)
+	return nil
 }
 
 func (f *fakeStore) ListTargets(context.Context) ([]target.Target, error) {
@@ -347,4 +355,22 @@ func TestRunOnceSeparatesStateByKind(t *testing.T) {
 	require.NoError(t, s.RunOnce(ctx))
 	assert.Len(t, pub.ofType("ALERTA_QUEDA"), 1)
 	assert.Empty(t, pub.ofType("SERVICO_RESTAURADO"))
+}
+
+func TestRunOncePrunesAtMostOncePerHour(t *testing.T) {
+	st := &fakeStore{}
+	s := NewScheduler(st, &fakePub{}, time.Hour).WithRetention(48 * time.Hour)
+	start := time.Now()
+	require.NoError(t, s.RunOnce(context.Background()))
+	require.NoError(t, s.RunOnce(context.Background()))
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	require.Len(t, st.prunes, 1)
+	assert.WithinDuration(t, start.Add(-48*time.Hour), st.prunes[0], time.Minute)
+}
+
+func TestRunOnceWithoutRetentionDoesNotPrune(t *testing.T) {
+	st := &fakeStore{}
+	require.NoError(t, NewScheduler(st, &fakePub{}, time.Hour).RunOnce(context.Background()))
+	assert.Empty(t, st.prunes)
 }
