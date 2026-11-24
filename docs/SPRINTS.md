@@ -55,10 +55,10 @@ Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
 
 **Branch:** `feat/poller-e-websocket` · **Labels:** `funcionalidade`, `motor`
 
-**Pendências da Sprint 2:**
+**Decisões da Sprint 2:**
 
-- O histórico de verificações devolve no máximo 5000 resultados somando todas as portas, o que cobre menos de 24 h com intervalos curtos. Decidir limite por porta, amostragem ou sinal de truncamento antes dos gráficos da Sprint 4.
-- Retenção configurável da tabela `check_results`.
+- O histórico de verificações (`GET /api/alvos/{id}/historico`) limita os resultados **por porta e tipo de verificação**, não pela soma: no máximo 2880 por porta, o que cobre 24 h com o intervalo padrão de 30 s. Assim uma porta verificada com mais frequência não empurra as outras para fora. O formato da resposta não mudou.
+- A tabela `check_results` guarda os resultados por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, mínimo `1h`). O poller apaga os mais antigos no fim de uma rodada, no máximo uma vez por hora.
 
 ### Sprint 3: Frontend base
 
