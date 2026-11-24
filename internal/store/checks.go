@@ -16,14 +16,18 @@ func (s *Store) InsertCheckResult(ctx context.Context, r poller.Result) error {
 	return err
 }
 
-// CheckHistory devolve os limit resultados mais recentes com At >= since, em ordem
-// cronológica crescente; sem resultados, devolve slice vazio.
-func (s *Store) CheckHistory(ctx context.Context, targetID int64, since time.Time, limit int) ([]poller.Result, error) {
+// CheckHistory devolve, para cada porta e tipo de verificação, os perPort
+// resultados mais recentes com At >= since, todos em ordem cronológica
+// crescente; sem resultados, devolve slice vazio. O limite por porta impede
+// que um alvo com muitas portas empurre o histórico das outras para fora.
+func (s *Store) CheckHistory(ctx context.Context, targetID int64, since time.Time, perPort int) ([]poller.Result, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT target_id, port, kind, up, status_code, latency_ms, error, checked_at_ms
-		 FROM check_results WHERE target_id = ? AND checked_at_ms >= ?
-		 ORDER BY checked_at_ms DESC, id DESC LIMIT ?`,
-		targetID, since.UnixMilli(), limit)
+		`SELECT target_id, port, kind, up, status_code, latency_ms, error, checked_at_ms FROM (
+		   SELECT *, ROW_NUMBER() OVER (PARTITION BY port, kind ORDER BY checked_at_ms DESC, id DESC) AS n
+		   FROM check_results WHERE target_id = ? AND checked_at_ms >= ?
+		 ) WHERE n <= ?
+		 ORDER BY checked_at_ms DESC, id DESC`,
+		targetID, since.UnixMilli(), perPort)
 	if err != nil {
 		return nil, err
 	}
@@ -46,4 +50,10 @@ func (s *Store) CheckHistory(ctx context.Context, targetID int64, since time.Tim
 		list[i], list[j] = list[j], list[i]
 	}
 	return list, nil
+}
+
+// PruneChecks apaga os resultados de verificação anteriores a before.
+func (s *Store) PruneChecks(ctx context.Context, before time.Time) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM check_results WHERE checked_at_ms < ?`, before.UnixMilli())
+	return err
 }

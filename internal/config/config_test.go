@@ -17,7 +17,7 @@ const tok = "0123456789abcdef0123456789abcdef" // 32 caracteres
 func TestLoadDefaults(t *testing.T) {
 	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
 	require.NoError(t, err)
-	assert.Equal(t, Config{Addr: "127.0.0.1:0", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second,
+	assert.Equal(t, Config{Addr: "127.0.0.1:0", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second, CheckRetention: 168 * time.Hour,
 		AllowedOrigins: []string{"http://127.0.0.1:0", "http://localhost:0", "http://[::1]:0"},
 		Interface:      "any"}, c)
 }
@@ -147,4 +147,19 @@ func TestLoadMail(t *testing.T) {
 
 	_, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_ALERTA_EMAILS": "ana@exemplo.com"}))
 	assert.ErrorIs(t, err, alerts.ErrSMTPSemHost)
+}
+
+func TestLoadCheckRetention(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
+	require.NoError(t, err)
+	assert.Equal(t, 168*time.Hour, c.CheckRetention)
+
+	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_RETENCAO_VERIFICACOES": "2h"}))
+	require.NoError(t, err)
+	assert.Equal(t, 2*time.Hour, c.CheckRetention)
+
+	for _, v := range []string{"59m", "7d", "abc"} {
+		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_RETENCAO_VERIFICACOES": v}))
+		assert.ErrorIs(t, err, ErrRetencaoInvalida, v)
+	}
 }

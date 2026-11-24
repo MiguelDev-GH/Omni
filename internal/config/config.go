@@ -19,6 +19,8 @@ const (
 	defaultPollInterval = "30s"
 	minPollInterval     = time.Second
 	defaultInterface    = "any"
+	defaultRetention    = "168h"
+	minRetention        = time.Hour
 )
 
 // interfaceRe aceita nomes de interface do Linux (até 15 caracteres), sem hífen no início.
@@ -31,6 +33,7 @@ var (
 
 	ErrIntervaloInvalido = errors.New("OMNI_INTERVALO_POLLER inválido; use uma duração de no mínimo 1s, como 30s")
 	ErrOrigemInvalida    = errors.New("origem inválida em OMNI_ORIGENS; use esquema http ou https, host e porta opcional")
+	ErrRetencaoInvalida  = errors.New("OMNI_RETENCAO_VERIFICACOES inválida; use uma duração de no mínimo 1h, como 168h")
 	ErrInterfaceInvalida = errors.New("OMNI_INTERFACE inválida; use o nome de uma interface, como eth0, ou any")
 )
 
@@ -40,7 +43,9 @@ type Config struct {
 	Token       string
 	AllowRemote bool
 
-	PollInterval   time.Duration
+	PollInterval time.Duration
+	// CheckRetention é por quanto tempo os resultados das verificações ficam no banco.
+	CheckRetention time.Duration
 	AllowedOrigins []string
 
 	// Interface é onde o sniffer captura; "any" cobre todas, inclusive o loopback.
@@ -77,6 +82,11 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	c.PollInterval = interval
+	retention, err := parseRetention(withDefault(getenv("OMNI_RETENCAO_VERIFICACOES"), defaultRetention))
+	if err != nil {
+		return Config{}, err
+	}
+	c.CheckRetention = retention
 	extra, err := parseOrigins(getenv("OMNI_ORIGENS"))
 	if err != nil {
 		return Config{}, err
@@ -103,6 +113,14 @@ func parsePollInterval(v string) (time.Duration, error) {
 	d, err := time.ParseDuration(v)
 	if err != nil || d < minPollInterval {
 		return 0, fmt.Errorf("%w: %s", ErrIntervaloInvalido, v)
+	}
+	return d, nil
+}
+
+func parseRetention(v string) (time.Duration, error) {
+	d, err := time.ParseDuration(v)
+	if err != nil || d < minRetention {
+		return 0, fmt.Errorf("%w: %s", ErrRetencaoInvalida, v)
 	}
 	return d, nil
 }

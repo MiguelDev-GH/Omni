@@ -29,7 +29,12 @@ const (
 type ResultStore interface {
 	ListTargets(ctx context.Context) ([]target.Target, error)
 	InsertCheckResult(ctx context.Context, r Result) error
+	// PruneChecks apaga os resultados anteriores a before.
+	PruneChecks(ctx context.Context, before time.Time) error
 }
+
+// pruneEvery é o intervalo mínimo entre duas limpezas do histórico.
+const pruneEvery = time.Hour
 
 // StatusData é o conteúdo de um evento STATUS_ALVOS.
 type StatusData struct {
@@ -77,6 +82,10 @@ type Scheduler struct {
 	// last guarda o último estado de cada porta; só a goroutine que chama
 	// RunOnce o acessa.
 	last map[portKey]bool
+	// retention é por quanto tempo os resultados ficam guardados; zero
+	// desliga a limpeza.
+	retention time.Duration
+	lastPrune time.Time
 }
 
 func NewScheduler(st ResultStore, pub ws.Publisher, interval time.Duration) *Scheduler {
@@ -87,6 +96,13 @@ func NewScheduler(st ResultStore, pub ws.Publisher, interval time.Duration) *Sch
 		client:   NewHTTPClient(CheckTimeout),
 		last:     make(map[portKey]bool),
 	}
+}
+
+// WithRetention liga a limpeza dos resultados mais antigos que d, feita no
+// fim de uma rodada no máximo uma vez por hora.
+func (s *Scheduler) WithRetention(d time.Duration) *Scheduler {
+	s.retention = d
+	return s
 }
 
 // Run faz uma rodada imediatamente e depois uma a cada interval, até ctx ser
@@ -159,7 +175,21 @@ func (s *Scheduler) RunOnce(ctx context.Context) error {
 	if len(results) > 0 {
 		s.pub.Publish(ws.Event{Type: EventStatus, Data: StatusData{Results: results}})
 	}
+	s.prune(ctx)
 	return nil
+}
+
+// prune apaga os resultados mais antigos que a retenção, se a última limpeza
+// tiver sido há pelo menos pruneEvery. Uma falha é só registrada.
+func (s *Scheduler) prune(ctx context.Context) {
+	now := time.Now()
+	if s.retention <= 0 || now.Sub(s.lastPrune) < pruneEvery {
+		return
+	}
+	s.lastPrune = now
+	if err := s.store.PruneChecks(ctx, now.Add(-s.retention)); err != nil && ctx.Err() == nil {
+		slog.Error("apagar verificações antigas", "erro", err)
+	}
 }
 
 // runChecks executa as verificações em paralelo, no máximo
