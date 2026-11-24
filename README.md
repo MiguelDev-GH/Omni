@@ -160,7 +160,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "SCAN_FALHOU", "dados": { "scan_id": 4, "alvo_id": 1, "erro": "nmap: a ferramenta terminou com código 1", "achados": 0 } }
 ```
 
-- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`), e o histórico de cada alvo traz até 2880 resultados por porta.
+- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`); a mesma retenção vale para as métricas de tráfego, HTTP, banco, sistema e para o histórico de alertas, e o histórico de cada alvo traz até 2880 resultados por porta.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
 - `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem. As leituras ficam 24 h no banco e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).

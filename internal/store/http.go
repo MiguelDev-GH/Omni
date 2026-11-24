@@ -51,9 +51,27 @@ func (s *Store) InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error {
 // HTTPSince devolve as limit janelas HTTP mais recentes com início >= since,
 // em ordem cronológica e sem as rotas.
 func (s *Store) HTTPSince(ctx context.Context, since time.Time, limit int) ([]l7.HTTPWindow, error) {
-	rows, err := s.db.QueryContext(ctx,
+	list, err := s.queryHTTP(ctx,
 		`SELECT start_ms, requests, by_status, p50_ms, p95_ms FROM http_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// HTTPBetween devolve as janelas HTTP com from <= início < to, em ordem
+// cronológica e sem as rotas, até maxGroupRows.
+func (s *Store) HTTPBetween(ctx context.Context, from, to time.Time) ([]l7.HTTPWindow, error) {
+	return s.queryHTTP(ctx,
+		`SELECT start_ms, requests, by_status, p50_ms, p95_ms FROM http_windows
+		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
+		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+}
+
+func (s *Store) queryHTTP(ctx context.Context, query string, args ...any) ([]l7.HTTPWindow, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +94,7 @@ func (s *Store) HTTPSince(ctx context.Context, since time.Time, limit int) ([]l7
 		}
 		list = append(list, w)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	reverse(list)
-	return list, nil
+	return list, rows.Err()
 }
 
 // HTTPRoutesSince soma as rotas das janelas com início >= since e devolve as
