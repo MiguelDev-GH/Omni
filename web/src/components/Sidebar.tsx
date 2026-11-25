@@ -7,6 +7,8 @@ const routes: Record<string, string> = {
   "Requisições na API": "/requisicoes",
   "Status HTTP": "/requisicoes",
   "Consultas no banco": "/consultas",
+  DNS: "/dns",
+  SMTP: "/smtp",
   "Visão geral": "/arsenal",
   Nmap: "/arsenal/nmap",
   Nuclei: "/arsenal/nuclei",
@@ -39,7 +41,7 @@ const linkClass =
     }`;
 
 const sections = [
-  { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "Status HTTP", "Sistema"] },
+  { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "DNS", "SMTP", "Status HTTP", "Sistema"] },
   { title: "Tráfego", items: ["Inspetor de pacotes", "Capturas"] },
   { title: "Arsenal", items: ["Visão geral", "Nmap", "Nuclei", "Nikto", "SQLMap", "ffuf", "Amass", "testssl", "Vazamentos"] },
   { title: "Relatórios", items: ["Histórico", "Comparação entre scans", "Exportação em PDF"] },
