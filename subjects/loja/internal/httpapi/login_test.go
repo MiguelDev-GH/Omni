@@ -39,7 +39,9 @@ func TestLoginRejects(t *testing.T) {
 	}
 }
 
+// GET /entrar cai na rota genérica "/", que responde 404 como qualquer
+// caminho desconhecido da loja: só POST faz login.
 func TestLoginOnlyPost(t *testing.T) {
 	rec := do(t, New(&fakeStore{}), http.MethodGet, "/entrar", "")
-	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
