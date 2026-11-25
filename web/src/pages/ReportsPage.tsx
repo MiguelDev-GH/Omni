@@ -4,6 +4,7 @@ import { compareScan, listScans, scanFindings, severities, severityLabels, type 
 import { Card, InternalBadge, PageHeader } from "../components/Card";
 import FindingsDiff from "../components/FindingsDiff";
 import FindingsTable, { severityClasses } from "../components/FindingsTable";
+import ReportPdfForm from "../components/ReportPdfForm";
 import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 import { statusLabels } from "../arsenal/common";
@@ -60,6 +61,7 @@ export default function ReportsPage() {
     );
   }, [opened, scanEvents]);
 
+  const selectedTarget = targets.find((t) => t.id === selected);
   const mine = (scans ?? []).filter((s) => s.alvo_id === selected);
   const shown = detail && detail.scanId === opened ? detail : null;
 
@@ -68,28 +70,30 @@ export default function ReportsPage() {
       <PageHeader title="Relatórios" aside={<InternalBadge />} />
       {error && <p className="text-sm text-erro">{error}</p>}
 
-      <Card
-        title="Histórico de varreduras"
-        plane
-        action={
-          targets.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <label htmlFor="alvo-relatorio" className="text-suave">
-                Alvo
-              </label>
-              <Select
-                id="alvo-relatorio"
-                value={selected}
-                onChange={(id) => {
-                  selectTarget(id);
-                  setParams({});
-                }}
-                options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
-              />
-            </div>
-          )
-        }
-      >
+      {targets.length > 0 && (
+        <div className="flex items-center gap-2 text-sm">
+          <label htmlFor="alvo-relatorio" className="text-suave">
+            Alvo
+          </label>
+          <Select
+            id="alvo-relatorio"
+            value={selected}
+            onChange={(id) => {
+              selectTarget(id);
+              setParams({});
+            }}
+            options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
+          />
+        </div>
+      )}
+
+      {selectedTarget && (
+        <Card title="Relatório em PDF" plane>
+          <ReportPdfForm target={selectedTarget} />
+        </Card>
+      )}
+
+      <Card title="Histórico de varreduras" plane>
         {scans !== null && mine.length === 0 ? (
           <p className="text-sm text-suave">Nenhuma varredura deste alvo ainda. Use o Arsenal para iniciar uma.</p>
         ) : (
