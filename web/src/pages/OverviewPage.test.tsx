@@ -29,6 +29,7 @@ function renderPage(history: TrafficWindow[] = [], targets: unknown[] = [{ id: 1
     if (c.url === "/api/alvos") return json(200, targets);
     if (c.url.startsWith("/api/trafego")) return json(200, history);
     if (c.url.startsWith("/api/requisicoes")) return json(200, []);
+    if (c.url.startsWith("/api/conexoes")) return json(200, []);
     if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
   });
@@ -137,4 +138,14 @@ test("shows requests and queries per second from the newest windows", async () =
   });
   expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("3");
   expect(screen.getByText("Consultas por segundo").nextElementSibling).toHaveTextContent("9");
+});
+
+test("METRICAS_CONEXOES feeds the active connections stat", async () => {
+  renderPage();
+  const ws = await socket();
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("—");
+  act(() =>
+    ws.message({ tipo: "METRICAS_CONEXOES", dados: { hora: new Date().toISOString(), portas: [{ porta: 3000, tipo: "app", estabelecidas: 12, estados: {}, clientes: [] }] } }),
+  );
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("12");
 });

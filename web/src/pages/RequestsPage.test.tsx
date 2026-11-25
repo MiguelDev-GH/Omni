@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { RouteStats } from "../api/requests";
 import { useAppStore } from "../store/app";
+import { connSnapshot } from "../test/connections";
 import { json, mockFetch } from "../test/fetch";
 import RequestsPage, { sortRoutes } from "./RequestsPage";
 
@@ -15,6 +16,7 @@ const routes: RouteStats[] = [
 
 function renderPage() {
   const calls = mockFetch((c) => {
+    if (c.url.startsWith("/api/conexoes")) return json(200, [connSnapshot(new Date(Date.now() - 10_000).toISOString(), 7)]);
     if (c.url.startsWith("/api/requisicoes/rotas")) return json(200, routes);
     if (c.url.startsWith("/api/requisicoes")) return json(200, []);
     return json(500, { erro: "inesperado" });
@@ -82,4 +84,10 @@ test("lists error codes summed over the loaded windows", async () => {
   );
   const rows = within(screen.getByRole("table", { name: "Códigos de erro" })).getAllByRole("row").slice(1);
   expect(rows.map((r) => r.textContent)).toEqual(["4047", "5031", "4011"]);
+});
+
+test("Requests page shows active connections chart for app ports", async () => {
+  renderPage();
+  expect(await screen.findByRole("img", { name: "Conexões ativas a cada 5 s, 1 pontos" })).toBeInTheDocument();
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("7");
 });

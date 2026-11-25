@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { QueryStats } from "../api/queries";
 import { useAppStore } from "../store/app";
+import { connSnapshot } from "../test/connections";
 import { json, mockFetch } from "../test/fetch";
 import QueriesPage from "./QueriesPage";
 
@@ -14,6 +15,7 @@ const slow: QueryStats[] = [
 
 function renderPage() {
   const calls = mockFetch((c) => {
+    if (c.url.startsWith("/api/conexoes")) return json(200, [connSnapshot(new Date(Date.now() - 2_000).toISOString(), 1)]);
     if (c.url.startsWith("/api/consultas/lentas")) return json(200, slow);
     if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
@@ -58,4 +60,12 @@ test("shows queries per second", async () => {
     ]),
   );
   expect(screen.getByText("Consultas por segundo").nextElementSibling).toHaveTextContent("12");
+});
+
+test("Queries page lists the client pools of the database port", async () => {
+  renderPage();
+  const table = await screen.findByRole("table", { name: "Pools de conexões" });
+  const rows = within(table).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["loja54324", "(sem permissão para ver)54321"]);
+  expect(screen.getByText("Conexões abertas no banco").nextElementSibling).toHaveTextContent("5");
 });

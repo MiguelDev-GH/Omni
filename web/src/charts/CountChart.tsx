@@ -12,16 +12,17 @@ type Props = {
   empty: string;
   color?: string;
   id: string; // identificador do gradiente, único na página
+  every?: string; // intervalo entre os pontos, para leitores de tela
 };
 
 // CountChart desenha uma contagem por intervalo de 10 s, como requisições ou
 // consultas, nos últimos 15 minutos.
-export default function CountChart({ points, label, empty, color = chartInk.series, id }: Props) {
+export default function CountChart({ points, label, empty, color = chartInk.series, id, every = "10 s" }: Props) {
   if (points.length === 0) {
     return <p className="flex h-52 items-center justify-center text-sm text-suave">{empty}</p>;
   }
   return (
-    <div role="img" aria-label={`${label} a cada 10 s, ${points.length} pontos`} className="h-52">
+    <div role="img" aria-label={`${label} a cada ${every}, ${points.length} pontos`} className="h-52">
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 208 }}>
         <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>

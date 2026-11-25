@@ -149,3 +149,10 @@ test("ALERTA with bad data is ignored", () => {
   send({ tipo: "ALERTA", dados: { id: "1" } });
   expect(useAppStore.getState().alertHistory).toHaveLength(0);
 });
+
+test("METRICAS_CONEXOES stores the snapshot and ignores malformed ones", () => {
+  send({ tipo: "METRICAS_CONEXOES", dados: { hora: "2026-11-25T12:00:00Z", portas: [{ porta: 3000, tipo: "app", estabelecidas: 2, estados: {}, clientes: [] }] } });
+  send({ tipo: "METRICAS_CONEXOES", dados: { hora: "2026-11-25T12:00:05Z" } });
+  expect(useAppStore.getState().connections).toHaveLength(1);
+  expect(useAppStore.getState().connections[0]?.portas[0]?.estabelecidas).toBe(2);
+});

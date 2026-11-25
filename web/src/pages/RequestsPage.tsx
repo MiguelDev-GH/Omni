@@ -5,6 +5,7 @@ import StatusBars from "../charts/StatusBars";
 import { Card, PageHeader, Stat } from "../components/Card";
 import Select from "../components/Select";
 import { emptyStatus, formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS, type StatusPoint } from "../lib/l7";
+import { connectionSeries, latestEstablished, useConnHistory } from "../lib/connections";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 30_000;
@@ -59,6 +60,10 @@ export default function RequestsPage() {
   const [routesError, setRoutesError] = useState(false);
   const [order, setOrder] = useState<Order>("p95");
   const http = useAppStore((s) => s.http);
+  const connections = useAppStore((s) => s.connections);
+  const connError = useConnHistory();
+  const appConns = useMemo(() => connectionSeries(connections, "app"), [connections]);
+  const appNow = latestEstablished(connections, "app");
 
   // As rotas das últimas 24 h são recarregadas a cada 30 s.
   useEffect(() => {
@@ -87,9 +92,11 @@ export default function RequestsPage() {
         query strings e corpos nunca são guardados.
       </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
+      {connError && <p className="text-sm text-erro">Não foi possível carregar o histórico de conexões.</p>}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
         <Stat label="Requisições por segundo" value={formatRate(lastRate(http, (w) => w.requisicoes))} />
+        <Stat label="Conexões ativas" value={appNow === null ? "—" : appNow.toLocaleString("pt-BR")} />
         <Stat label="Requisições em 24 h" value={total.toLocaleString("pt-BR")} />
         <Stat label="Erros 5xx em 24 h" value={errors.toLocaleString("pt-BR")} tone={errors > 0 ? "text-erro" : undefined} />
         <Stat label="Rotas distintas" value={(routes?.length ?? 0).toLocaleString("pt-BR")} />
@@ -103,6 +110,16 @@ export default function RequestsPage() {
           <StatusBars points={status} />
         </Card>
       </div>
+
+      <Card title="Conexões ativas nas portas da aplicação">
+        <CountChart
+          id="conexoes-app"
+          points={appConns}
+          label="Conexões ativas"
+          every="5 s"
+          empty="Sem coletas de conexões ainda."
+        />
+      </Card>
 
       <Card title="Códigos de erro nos últimos 15 minutos" plane>
         {codes.length === 0 ? (
