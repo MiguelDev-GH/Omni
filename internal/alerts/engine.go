@@ -255,6 +255,14 @@ func (e *Engine) Forget(drop func(service, subject string) bool) {
 	}
 }
 
+// Drop apaga o estado de uma regra para um recurso, por exemplo um IP que
+// parou de atacar e já voltou ao verde.
+func (e *Engine) Drop(rule, subject string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.states, stateKey{rule: rule, subject: subject})
+}
+
 // Snapshot devolve o nível atual de cada recurso, do mais grave para o mais
 // leve, e o histórico do mais novo para o mais antigo.
 func (e *Engine) Snapshot() ([]Status, []Alert) {

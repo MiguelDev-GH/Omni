@@ -33,6 +33,16 @@ const (
 	spikeAlpha = 0.05
 )
 
+// minToShow é o valor a partir do qual um IP ou conta passa a aparecer no
+// painel. Abaixo disso o tráfego é normal e listar cada IP só polui a tela:
+// num DDoS com centenas de origens, cada uma vira uma linha.
+var minToShow = map[string]float64{
+	alerts.RuleIPRate:       1500, // metade do limite amarelo
+	alerts.RuleAuthFailIP:   1,
+	alerts.RuleAuthFailUser: 1,
+	alerts.RuleSpraying:     2, // uma conta só é brute-force, não spraying
+}
+
 // Request é o que o detector precisa de cada requisição observada.
 type Request struct {
 	IP     string // IP de origem (já resolvido atrás do proxy)
@@ -182,7 +192,7 @@ func reportKey(rule, s string) string { return rule + "|" + s }
 // Tick calcula as contagens do último minuto e as entrega ao motor.
 func (t *Traffic) Tick(now time.Time) {
 	t.mu.Lock()
-	samples := t.collect(now)
+	samples, ended := t.collect(now)
 	if t.dropped > 0 {
 		slog.Warn("segurança: limite de IPs e contas acompanhados atingido", "descartados", t.dropped)
 		t.dropped = 0
@@ -191,20 +201,34 @@ func (t *Traffic) Tick(now time.Time) {
 	for _, s := range samples {
 		t.engine.Observe(s)
 	}
+	// Quem voltou a zero acabou de receber a amostra que o leva ao verde;
+	// agora sai da lista, para o painel mostrar só o que importa.
+	for _, s := range ended {
+		t.engine.Drop(s.Rule, s.Subject)
+	}
 }
 
-func (t *Traffic) collect(now time.Time) []alerts.Sample {
-	var out []alerts.Sample
+// collect devolve as amostras do tick e, entre elas, as dos recursos que
+// voltaram abaixo do mínimo e devem sair do painel depois de observadas.
+func (t *Traffic) collect(now time.Time) ([]alerts.Sample, []alerts.Sample) {
+	var out, ended []alerts.Sample
 	seen := map[string]bool{}
 	emit := func(rule, subject string, value float64, detail string) {
 		key := reportKey(rule, subject)
 		seen[key] = true
-		if value == 0 && !t.reported[key] {
-			return // nada a dizer sobre quem nunca passou de zero
+		shown := value >= minToShow[rule]
+		if !shown && !t.reported[key] {
+			return // abaixo do mínimo e nunca mostrado: nada a dizer
 		}
-		t.reported[key] = value != 0
-		out = append(out, alerts.Sample{Rule: rule, Service: alerts.ServiceSecurity, Subject: subject,
-			Value: value, Detail: detail, At: now})
+		s := alerts.Sample{Rule: rule, Service: alerts.ServiceSecurity, Subject: subject,
+			Value: value, Detail: detail, At: now}
+		out = append(out, s)
+		if shown {
+			t.reported[key] = true
+			return
+		}
+		delete(t.reported, key)
+		ended = append(ended, s)
 	}
 
 	for ip := range t.reqIP.buckets {
@@ -239,13 +263,13 @@ func (t *Traffic) collect(now time.Time) []alerts.Sample {
 			delete(t.accounts, ip)
 		}
 	}
-	// Recursos que sumiram de todos os mapas e ainda estavam acima de zero.
-	for key, active := range t.reported {
+	// Recursos mostrados que sumiram de todos os mapas: um zero final.
+	for key := range t.reported {
 		if !seen[key] {
-			if active {
-				rule, subject := splitKey(key)
-				out = append(out, alerts.Sample{Rule: rule, Service: alerts.ServiceSecurity, Subject: subject, At: now})
-			}
+			rule, subject := splitKey(key)
+			s := alerts.Sample{Rule: rule, Service: alerts.ServiceSecurity, Subject: subject, At: now}
+			out = append(out, s)
+			ended = append(ended, s)
 			delete(t.reported, key)
 		}
 	}
@@ -253,7 +277,7 @@ func (t *Traffic) collect(now time.Time) []alerts.Sample {
 	if s, ok := t.spike(now); ok {
 		out = append(out, s)
 	}
-	return out
+	return out, ended
 }
 
 func splitKey(key string) (string, string) {

@@ -41,8 +41,8 @@ func TestBruteForceByIP(t *testing.T) {
 	if lvl, _, _ := level(e, alerts.RuleAuthFailUser, "conta ana"); lvl != alerts.Red {
 		t.Errorf("falhas por conta: %q", lvl)
 	}
-	if lvl, _, _ := level(e, alerts.RuleSpraying, "IP 203.0.113.9"); lvl != alerts.Green {
-		t.Errorf("uma conta só não é spraying: %q", lvl)
+	if _, _, ok := level(e, alerts.RuleSpraying, "IP 203.0.113.9"); ok {
+		t.Error("uma conta só não é spraying e não deveria aparecer")
 	}
 	var found bool
 	for _, a := range *got {
@@ -95,14 +95,20 @@ func TestFailuresExpireAndLevelRecovers(t *testing.T) {
 	if lvl, _, _ := level(e, alerts.RuleAuthFailIP, "IP 203.0.113.9"); lvl != alerts.Yellow {
 		t.Fatalf("depois do ataque: %q", lvl)
 	}
-	// Dois minutos depois as falhas saíram da janela.
+	// Dois minutos depois as falhas saíram da janela: o nível volta ao verde
+	// (com alerta de normalização) e o IP sai do painel.
 	tr.Tick(t0.Add(2 * time.Minute))
-	if lvl, v, _ := level(e, alerts.RuleAuthFailIP, "IP 203.0.113.9"); lvl != alerts.Green || v != 0 {
-		t.Fatalf("depois de 2 min: %q %v", lvl, v)
+	if _, _, ok := level(e, alerts.RuleAuthFailIP, "IP 203.0.113.9"); ok {
+		t.Fatal("o IP continua no painel depois de voltar ao verde")
 	}
-	last := (*got)[len(*got)-1]
-	if last.Level != alerts.Green {
-		t.Errorf("último alerta: %+v", last)
+	var recovered bool
+	for _, a := range *got {
+		if a.Rule == alerts.RuleAuthFailIP && a.Level == alerts.Green && a.Previous == alerts.Yellow {
+			recovered = true
+		}
+	}
+	if !recovered {
+		t.Errorf("sem alerta de normalização: %+v", *got)
 	}
 	// No tick seguinte não há mais nada a dizer sobre esse IP.
 	tr.Tick(t0.Add(2*time.Minute + 5*time.Second))
@@ -222,5 +228,30 @@ func TestEmptyIPIgnored(t *testing.T) {
 	defer tr.mu.Unlock()
 	if len(tr.reqIP.buckets) != 0 {
 		t.Error("requisição sem IP contada")
+	}
+}
+
+func TestQuietIPsStayOffThePanel(t *testing.T) {
+	tr, e, _ := newTestTraffic()
+	// 254 origens com 40 requisições cada: tráfego normal, nada a listar.
+	for i := 1; i <= 254; i++ {
+		for n := 0; n < 40; n++ {
+			tr.Observe(Request{IP: "203.0.113." + itoa(i), Status: 200, At: t0.Add(time.Duration(n) * time.Second)})
+		}
+	}
+	// Um IP perto do limite aparece, ainda verde.
+	for n := 0; n < 1600; n++ {
+		tr.Observe(Request{IP: "192.0.2.50", Status: 200, At: t0.Add(time.Duration(n%50) * time.Second)})
+	}
+	tr.Tick(t0.Add(50 * time.Second))
+	statuses, _ := e.Snapshot()
+	var listed []string
+	for _, s := range statuses {
+		if s.Rule == alerts.RuleIPRate {
+			listed = append(listed, s.Subject)
+		}
+	}
+	if len(listed) != 1 || listed[0] != "IP 192.0.2.50" {
+		t.Fatalf("IPs listados = %v, quer só o que se aproxima do limite", listed)
 	}
 }

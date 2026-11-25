@@ -1,4 +1,5 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { Alert, AlertsOverview } from "../api/alerts";
@@ -159,4 +160,44 @@ test("shows the security service", async () => {
   expect(within(sec).getByText(/IP 203.0.113.66/)).toBeInTheDocument();
   expect(within(sec).getByText("alterado")).toBeInTheDocument();
   expect(within(sec).getByText("alterado é amarelo por 5 min; removido é vermelho")).toBeInTheDocument();
+});
+
+function greenStatus(i: number) {
+  return {
+    regra: "seguranca_taxa_por_ip",
+    servico: "seguranca",
+    nome: "Requisições por IP",
+    recurso: `IP 192.0.2.${i}`,
+    nivel: "verde" as const,
+    valor: 1600,
+    unidade: "/min",
+    limite_amarelo: 3000,
+    limite_vermelho: 6000,
+    desde: down.hora,
+    atualizado: down.hora,
+  };
+}
+
+test("collapses green items beyond five and always shows the alerting ones", async () => {
+  const user = userEvent.setup();
+  const red = { ...greenStatus(99), nivel: "vermelho" as const, valor: 7000 };
+  renderPage({ ...overview, estado: [...Array.from({ length: 8 }, (_, i) => greenStatus(i + 1)), red] });
+  const sec = await screen.findByRole("region", { name: "Segurança" });
+  await within(sec).findByText(/IP 192.0.2.99/);
+  expect(within(sec).getAllByRole("listitem")).toHaveLength(6);
+  await user.click(within(sec).getByRole("button", { name: "Mostrar todos (+3 verdes)" }));
+  expect(within(sec).getAllByRole("listitem")).toHaveLength(9);
+  await user.click(within(sec).getByRole("button", { name: "Mostrar menos" }));
+  expect(within(sec).getAllByRole("listitem")).toHaveLength(6);
+});
+
+test("pages the history twenty at a time", async () => {
+  const user = userEvent.setup();
+  const many = Array.from({ length: 25 }, (_, i) => ({ ...down, id: 100 - i }));
+  renderPage({ ...overview, historico: many });
+  const table = await screen.findByRole("table", { name: "Histórico de alertas" });
+  await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(21));
+  await user.click(screen.getByRole("button", { name: "Mostrar mais (5 restantes)" }));
+  expect(within(table).getAllByRole("row")).toHaveLength(26);
+  expect(screen.queryByRole("button", { name: /Mostrar mais/ })).not.toBeInTheDocument();
 });
