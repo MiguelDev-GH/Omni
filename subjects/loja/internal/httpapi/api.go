@@ -43,6 +43,7 @@ func New(s store.Store) http.Handler {
 	mux.HandleFunc("GET /pedidos/{id}", a.getOrder)
 	mux.HandleFunc("GET /lento", a.slow)
 	mux.HandleFunc("GET /erro", a.broken)
+	mux.HandleFunc("POST /entrar", a.login)
 	registerFlaws(mux)
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, errorBody("rota não encontrada"))

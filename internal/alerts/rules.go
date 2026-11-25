@@ -34,6 +34,8 @@ const (
 	ServiceDNS    = "dns"
 	ServiceSMTP   = "smtp"
 	ServiceSystem = "sistema"
+	// ServiceSecurity agrupa os detectores de ataque e de integridade.
+	ServiceSecurity = "seguranca"
 )
 
 // Identificadores das regras padrão.
@@ -48,6 +50,12 @@ const (
 	RuleSMTPLatency  = "smtp_latencia"
 	RuleProbeErrors  = "taxa_falhas_sonda"
 	RuleSMTPNoTLS    = "smtp_sem_starttls"
+	RuleAuthFailIP   = "seguranca_falhas_login_ip"
+	RuleAuthFailUser = "seguranca_falhas_login_conta"
+	RuleSpraying     = "seguranca_password_spraying"
+	RuleIPRate       = "seguranca_taxa_por_ip"
+	RuleTrafficSpike = "seguranca_pico_trafego"
+	RuleConfigChange = "seguranca_arquivo_alterado"
 	RuleCPU          = "sistema_cpu"
 	RuleMemory       = "sistema_memoria"
 	RuleDisk         = "sistema_disco"
@@ -123,6 +131,18 @@ func DefaultRules() []Rule {
 		{ID: RuleProbeErrors, Service: ServiceDNS, Name: "Taxa de falhas da sonda", Unit: "%",
 			Warn: 20, Crit: 50},
 		{ID: RuleSMTPNoTLS, Service: ServiceSMTP, Name: "SMTP sem STARTTLS", Unit: "",
+			Warn: 1, Crit: 2},
+		{ID: RuleAuthFailIP, Service: ServiceSecurity, Name: "Logins falhos por IP (brute-force)", Unit: "/min",
+			Warn: 10, Crit: 30},
+		{ID: RuleAuthFailUser, Service: ServiceSecurity, Name: "Logins falhos por conta", Unit: "/min",
+			Warn: 10, Crit: 30},
+		{ID: RuleSpraying, Service: ServiceSecurity, Name: "Contas diferentes testadas por IP (password spraying)", Unit: "/min",
+			Warn: 5, Crit: 10},
+		{ID: RuleIPRate, Service: ServiceSecurity, Name: "Requisições por IP", Unit: "/min",
+			Warn: 3000, Crit: 6000},
+		{ID: RuleTrafficSpike, Service: ServiceSecurity, Name: "Pico de tráfego (possível DDoS)", Unit: "x",
+			Warn: 3, Crit: 6},
+		{ID: RuleConfigChange, Service: ServiceSecurity, Name: "Arquivo de configuração alterado", Unit: "",
 			Warn: 1, Crit: 2},
 		{ID: RuleCPU, Service: ServiceSystem, Name: "Uso de CPU", Unit: "%",
 			Warn: 80, Crit: 95, For: time.Minute},

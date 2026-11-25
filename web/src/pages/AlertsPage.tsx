@@ -12,6 +12,11 @@ import { Card, PageHeader } from "../components/Card";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 10_000;
+// GREEN_SHOWN é quantos itens verdes cada cartão mostra antes do botão
+// "Mostrar todos"; amarelos e vermelhos aparecem sempre.
+const GREEN_SHOWN = 5;
+// HISTORY_PAGE é quantas mudanças de nível o histórico mostra por vez.
+const HISTORY_PAGE = 20;
 
 const serviceTitle: Record<string, string> = {
   web: "Web server",
@@ -19,8 +24,9 @@ const serviceTitle: Record<string, string> = {
   dns: "DNS",
   smtp: "SMTP",
   sistema: "Sistema",
+  seguranca: "Segurança",
 };
-const serviceOrder = ["web", "banco", "dns", "smtp", "sistema"];
+const serviceOrder = ["seguranca", "web", "banco", "dns", "smtp", "sistema"];
 
 const levelDot: Record<Level, string> = {
   verde: "bg-destaque",
@@ -53,11 +59,17 @@ function worst(list: AlertStatus[]): Level {
 function limits(regra: string, s: { limite_amarelo: number; limite_vermelho: number; unidade: string }) {
   if (regra === "disponibilidade") return "resposta com erro é amarelo; fora do ar é vermelho";
   if (regra === "smtp_sem_starttls") return "sem STARTTLS é amarelo";
+  if (regra === "seguranca_arquivo_alterado") return "alterado é amarelo por 5 min; removido é vermelho";
   return `amarelo ≥ ${formatAlertValue(regra, s.limite_amarelo, s.unidade)} · vermelho ≥ ${formatAlertValue(regra, s.limite_vermelho, s.unidade)}`;
 }
 
 function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }) {
+  const [showAll, setShowAll] = useState(false);
   const level = worst(list);
+  const alerting = list.filter((s) => s.nivel !== "verde");
+  const green = list.filter((s) => s.nivel === "verde");
+  const hidden = showAll ? 0 : Math.max(green.length - GREEN_SHOWN, 0);
+  const visible = showAll ? list : [...alerting, ...green.slice(0, GREEN_SHOWN)];
   return (
     <section aria-label={serviceTitle[service] ?? service} className="min-w-0 rounded-2xl bg-superficie/80 p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -68,7 +80,7 @@ function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }
         <p className="text-sm text-suave">Sem medições ainda.</p>
       ) : (
         <ul className="space-y-3 text-sm">
-          {list.map((s) => (
+          {visible.map((s) => (
             <li key={`${s.regra}|${s.recurso}`} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate">
@@ -85,6 +97,15 @@ function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }
           ))}
         </ul>
       )}
+      {(hidden > 0 || showAll) && green.length > GREEN_SHOWN && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="mt-3 text-xs text-suave underline-offset-2 hover:text-texto hover:underline"
+        >
+          {showAll ? "Mostrar menos" : `Mostrar todos (+${hidden} verdes)`}
+        </button>
+      )}
     </section>
   );
 }
@@ -92,6 +113,7 @@ function ServiceCard({ service, list }: { service: string; list: AlertStatus[] }
 export default function AlertsPage() {
   const statusMap = useAppStore((s) => s.alertStatus);
   const history = useAppStore((s) => s.alertHistory);
+  const [historyShown, setHistoryShown] = useState(HISTORY_PAGE);
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [email, setEmail] = useState<{ ativo: boolean; destinatarios: number } | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -175,6 +197,7 @@ export default function AlertsPage() {
         {history.length === 0 ? (
           <p className="text-sm text-suave">Nenhuma mudança de nível desde que o Omni foi iniciado.</p>
         ) : (
+          <>
           <div className="overflow-x-auto">
             <table aria-label="Histórico de alertas" className="tabela">
               <thead>
@@ -188,7 +211,7 @@ export default function AlertsPage() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((a) => (
+                {history.slice(0, historyShown).map((a) => (
                   <tr key={a.id} className="align-top">
                     <td className="pr-3 font-mono text-xs whitespace-nowrap text-suave tabular-nums">{formatTime(a.hora)}</td>
                     <td className="pr-3 whitespace-nowrap">
@@ -204,6 +227,16 @@ export default function AlertsPage() {
               </tbody>
             </table>
           </div>
+            {history.length > historyShown && (
+              <button
+                type="button"
+                onClick={() => setHistoryShown((n) => n + HISTORY_PAGE)}
+                className="mt-3 text-xs text-suave underline-offset-2 hover:text-texto hover:underline"
+              >
+                Mostrar mais ({history.length - historyShown} restantes)
+              </button>
+            )}
+          </>
         )}
       </Card>
 

@@ -1,6 +1,8 @@
 /omni
 *.db
 *.db-*
+# linha de base do monitor de integridade de arquivos
+integridade.json
 web/node_modules/
 web/dist/
 *.pcap

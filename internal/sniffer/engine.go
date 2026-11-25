@@ -61,7 +61,12 @@ type Engine struct {
 	mu        sync.Mutex
 	state     string
 	lastPrune time.Time
+	onHTTP    func(l7.HTTPExchange)
 }
+
+// OnHTTP registra uma função chamada a cada requisição HTTP decodificada,
+// na goroutine da captura. Não deve bloquear. Chame antes de Run.
+func (e *Engine) OnHTTP(fn func(l7.HTTPExchange)) { e.onHTTP = fn }
 
 func NewEngine(open Opener, st TrafficStore, pub ws.Publisher) *Engine {
 	return &Engine{
@@ -122,7 +127,12 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 	agg.Flush(time.Now())
 	httpStats := l7.NewHTTPStats()
 	httpStats.Flush(time.Now())
-	httpAsm := l7.NewHTTPAssembler(app, httpStats.Add)
+	httpAsm := l7.NewHTTPAssembler(app, func(ex l7.HTTPExchange) {
+		httpStats.Add(ex)
+		if e.onHTTP != nil {
+			e.onHTTP(ex)
+		}
+	})
 	dbStats := l7.NewDBStats()
 	dbStats.Flush(time.Now())
 	pgAsm := l7.NewPostgresAssembler(db, dbStats.Add)

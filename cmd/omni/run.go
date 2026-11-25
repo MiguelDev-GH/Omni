@@ -116,6 +116,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
 	srv.HandleFrontend(web.Handler(web.Assets()))
 
+	sec := startSecurity(bgCtx, &wg, engine, cfg)
 	wg.Add(5)
 	go func() {
 		defer wg.Done()
@@ -135,7 +136,9 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	go func() {
 		defer wg.Done()
 		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
-		_ = sniffer.NewEngine(open, st, pub).Run(bgCtx)
+		eng := sniffer.NewEngine(open, st, pub)
+		eng.OnHTTP(sec.observeHTTP)
+		_ = eng.Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()

@@ -180,3 +180,34 @@ func TestHTTPUpgradeStopsParsing(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.Equal(t, 101, got[0].Status)
 }
+
+func TestHTTPOriginIPAndBasicUserBehindProxy(t *testing.T) {
+	c := testutil.NewConn("127.0.0.1", 40000, "127.0.0.1", 3000)
+	frames := at(0, c.Handshake()...)
+	req := "POST /entrar HTTP/1.1\r\nHost: loja\r\n" +
+		"X-Forwarded-For: 1.1.1.1\r\nX-Forwarded-For: 203.0.113.9\r\n" +
+		"Authorization: Basic YW5hOnNlbmhhLWVycmFkYQ==\r\nContent-Length: 0\r\n\r\n" // ana:senha-errada
+	frames = append(frames,
+		timed{c.FromClient([]byte(req)), time.Millisecond},
+		timed{c.FromServer([]byte("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n")), 2 * time.Millisecond},
+	)
+	got := runHTTP(t, frames...)
+	require.Len(t, got, 1)
+	assert.Equal(t, "127.0.0.1", got[0].ClientIP)
+	assert.Equal(t, "203.0.113.9", got[0].OriginIP)
+	assert.Equal(t, "ana", got[0].User)
+	assert.Equal(t, 401, got[0].Status)
+}
+
+func TestHTTPForwardedForIgnoredFromRemoteClient(t *testing.T) {
+	c := conn() // 10.0.0.1, sem proxy no meio
+	frames := at(0, c.Handshake()...)
+	frames = append(frames,
+		timed{c.FromClient([]byte("GET / HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\n\r\n")), time.Millisecond},
+		timed{c.FromServer([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")), 2 * time.Millisecond},
+	)
+	got := runHTTP(t, frames...)
+	require.Len(t, got, 1)
+	assert.Equal(t, "10.0.0.1", got[0].OriginIP)
+	assert.Empty(t, got[0].User)
+}
