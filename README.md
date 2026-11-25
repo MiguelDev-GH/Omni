@@ -12,6 +12,9 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - **Monitoramento passivo:** captura de tráfego com gopacket, um "mini-Wireshark" embutido.
 - **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
+- **Detecção de ataques:** brute-force e password spraying, picos de tráfego (DDoS) e alteração de arquivos de configuração.
+
+**Documentação:** [guia de instalação](docs/INSTALACAO.md) · [runbooks de operação](docs/RUNBOOKS.md) · [playbooks de incidente](docs/PLAYBOOKS.md) · [testes de navegação](docs/TESTES-NAVEGACAO.md)
 
 > **Status:** versão básica implementada. As Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas, junto com alertas por e-mail e monitoramento de DNS e SMTP. As Sprints 9 a 16 (página própria por ferramenta do Arsenal, Sistema, ffuf, Nikto, SQLMap, Amass, Gitleaks, Inspetor de pacotes, capturas `.pcap` e PDF) estão planejadas. Veja [docs/SPRINTS.md](docs/SPRINTS.md).
 
@@ -28,6 +31,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Aplicação cobaia](#aplicação-cobaia)
 - [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
 - [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp)
+- [Segurança: brute-force, DDoS e integridade de arquivos](#segurança-brute-force-ddos-e-integridade-de-arquivos)
 - [Requisitos de implantação](#requisitos-de-implantação)
 - [O que falta implementar, por camada](#o-que-falta-implementar-por-camada)
 - [Segurança da própria plataforma](#segurança-da-própria-plataforma)
@@ -240,6 +244,11 @@ Um nível só muda depois que a condição se mantém pelo tempo da regra (colun
 | Taxa de falhas da sonda (últimas 10, mínimo 5) | DNS / SMTP | 20% | 50% | imediato |
 | SMTP sem STARTTLS | SMTP | servidor não oferece STARTTLS | — | imediato |
 | Uso de CPU / memória / disco | Sistema | 80% / 85% / 85% | 95% | 1 min |
+| Logins falhos por IP / por conta | Segurança | 10 por minuto | 30 por minuto | imediato |
+| Contas diferentes testadas por IP (password spraying) | Segurança | 5 por minuto | 10 por minuto | imediato |
+| Requisições por IP | Segurança | 3000 por minuto | 6000 por minuto | imediato |
+| Pico de tráfego (possível DDoS) | Segurança | 3x o normal | 6x o normal | imediato |
+| Arquivo de configuração alterado | Segurança | conteúdo, permissões ou dono mudaram (por 5 min) | arquivo removido ou ilegível | imediato |
 
 As taxas e o p95 só contam com pelo menos 20 requisições ou consultas na janela de 10 s, para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
 
@@ -311,6 +320,55 @@ Cadastre (ou edite) o alvo com domínio `loja.local`, porta DNS `1053` e porta S
 
 **Ainda não coberto:** consultas por segundo do DNS, volume e fila do SMTP. Essas métricas dependem do tráfego real e entram com a captura passiva no sniffer (UDP 53 e SMTP).
 
+## Segurança: brute-force, DDoS e integridade de arquivos
+
+Três detectores em `internal/security` alimentam o mesmo motor de alertas, no serviço **Segurança**: aparecem na tela Alertas, como aviso no painel e por e-mail. O que fazer quando cada um dispara está nos [playbooks de incidente](docs/PLAYBOOKS.md).
+
+### Brute-force e password spraying
+
+O sniffer entrega cada requisição HTTP decodificada ao detector, que conta, numa janela deslizante de 1 minuto:
+
+- **logins falhos por IP**: respostas `401` vindas do mesmo IP (brute-force clássico);
+- **logins falhos por conta**: senhas erradas na mesma conta, de qualquer IP (brute-force distribuído);
+- **contas diferentes por IP**: um IP testando muitas contas com poucas tentativas cada (password spraying).
+
+A conta vem do cabeçalho `Authorization: Basic`: o decodificador guarda só o usuário e descarta a senha na hora (`internal/clientinfo`). O **IP de origem** tem um cuidado de rede: o sniffer captura depois do proxy reverso, então toda conexão parece vir de `127.0.0.1`. O IP real vem no `X-Forwarded-For`, que o proxy acrescenta. Como qualquer cliente pode escrever esse cabeçalho, o Omni só o usa quando a conexão vem do loopback (o proxy local) e, mesmo assim, só o **último** endereço da lista, que é o que o proxy acrescentou; os anteriores vieram do cliente e podem ser falsos.
+
+### Picos de tráfego (DDoS)
+
+- **Requisições por IP:** um IP sozinho passando de 3000 requisições por minuto (DoS simples ou robô).
+- **Pico de tráfego:** o volume total do último minuto comparado com o normal, aprendido por uma média móvel exponencial. A média **fica congelada enquanto o tráfego está acima de 3x o normal**; senão, o próprio ataque viraria o novo normal e o alerta sumiria no meio do incidente. Volumes abaixo de 600 requisições por minuto não contam, e os primeiros minutos servem só para aprender.
+
+O detector acompanha no máximo 10.000 IPs e contas ao mesmo tempo: num ataque com IPs forjados, ele não pode virar o alvo e esgotar a memória do Omni.
+
+### Integridade de arquivos de configuração
+
+Com `OMNI_ARQUIVOS_MONITORADOS` (caminhos separados por vírgula), o Omni guarda a impressão digital de cada arquivo (SHA-256, tamanho, permissões e dono) e confere a cada 10 segundos. Uma mudança fica **amarela por 5 minutos**; arquivo removido ou ilegível fica **vermelho** até voltar. O alerta diz o que mudou (hashes, tamanho, permissões) mas **nunca o conteúdo**, porque configuração costuma ter senhas e o alerta vai por e-mail. A linha de base é salva em `integridade.json` (permissão 600) ao lado do banco, então uma alteração feita com o Omni desligado também é detectada quando ele volta. É o mesmo princípio de ferramentas de FIM (*file integrity monitoring*) como Tripwire, AIDE e Wazuh.
+
+### Como testar
+
+A loja cobaia ganhou a rota `POST /entrar` (autenticação Basic; contas `ana`, `bia`, `carlos` e `admin`, com senhas fracas e sem limite de tentativas, de propósito) e o gerador de carga ganhou a opção `-ataque`. Os ataques falam direto com a porta da loja mandando `X-Forwarded-For`, como se passassem pelo proxy, com IPs dos blocos reservados para documentação (RFC 5737).
+
+1. Suba o Omni vigiando os arquivos da loja, e a loja com a carga normal:
+   ```bash
+   OMNI_ARQUIVOS_MONITORADOS="$PWD/subjects/loja/Caddyfile,$PWD/subjects/loja/compose.yaml" ./omni
+   # noutro terminal
+   cd subjects/loja && make demo
+   ```
+2. Noutro terminal, em `subjects/loja`, rode um ataque de cada vez e acompanhe o cartão **Segurança** em Alertas:
+
+   | Para ver | Comando | Resultado esperado |
+   |---|---|---|
+   | Brute-force (vermelho) | `make carga ARGS="-ataque forca-bruta -taxa 2"` | `IP 203.0.113.66` e `conta ana` em "Logins falhos" |
+   | Password spraying (vermelho) | `make carga ARGS="-ataque spraying -taxa 2"` | `IP 198.51.100.23` em "Contas diferentes testadas" |
+   | Amarelo em vez de vermelho | `-taxa 1 -duracao 15s` em qualquer um dos dois | entre 10 e 30 falhas no minuto |
+   | DDoS (vermelho) | depois de 3 min de carga normal: `make carga ARGS="-ataque ddos -taxa 200 -workers 32"` | "Pico de tráfego" com o volume atual e o normal no detalhe |
+   | Arquivo alterado (amarelo) | `echo '# teste' >> Caddyfile` | hashes e tamanho antigos e novos no detalhe |
+   | Permissão alterada (amarelo) | `chmod 666 Caddyfile` (desfaça com `chmod 644`) | `permissões -rw-r--r-- → -rw-rw-rw-` |
+   | Arquivo removido (vermelho) | `mv Caddyfile /tmp/` (desfaça com `mv /tmp/Caddyfile .`) | "arquivo removido ou ilegível" |
+
+3. Pare o ataque: os contadores saem da janela e o nível volta ao verde em cerca de 1 minuto (5 minutos para arquivo alterado), com e-mail de normalização.
+
 ## Requisitos de implantação
 
 - **Sistema:** servidor Linux. No Windows, rode o Omni dentro do WSL2 (veja [Windows](#windows)).
@@ -365,6 +423,8 @@ Cuidados no WSL2:
 - [ ] **Severidade por CVSS** e deduplicação entre ferramentas.
 - [x] **Comparação entre scans:** indicar o que mudou desde o anterior, por exemplo "porta 22 abriu desde ontem".
 - [x] **Alertas por e-mail.** Veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
+- [x] **Detecção de brute-force e password spraying** pelas respostas 401, com IP de origem atrás do proxy e usuário da autenticação Basic.
+- [x] **Integridade de arquivos de configuração** (SHA-256, permissões e dono).
 - [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
 - [ ] **Novas ferramentas do Arsenal:** ffuf e Nikto (Sprint 11), SQLMap (Sprint 12), Amass e Gitleaks (Sprint 13).
 - [ ] **Exportação de relatório em PDF** (Sprint 16).
@@ -387,7 +447,8 @@ Cuidados no WSL2:
 
 ### Camada 3: Rede
 
-- [ ] **Top IPs de origem por número de conexões,** para detectar abuso ou DDoS (o volume em bytes já aparece na tela Geral).
+- [x] **Detecção de abuso e DDoS:** requisições por IP e pico de tráfego em relação ao normal. Veja [Segurança](#segurança-brute-force-ddos-e-integridade-de-arquivos).
+- [ ] **Top IPs de origem por número de conexões** na camada 3 (o volume em bytes já aparece na tela Geral).
 - [ ] **ICMP:** destino inalcançável e TTL excedido.
 - [ ] **Fragmentação IP.**
 - [ ] **Suporte completo a IPv6.**
