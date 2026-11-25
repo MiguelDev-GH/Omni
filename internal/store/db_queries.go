@@ -26,8 +26,8 @@ func (s *Store) InsertDBWindow(ctx context.Context, w l7.DBWindow) error {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT OR REPLACE INTO db_windows (start_ms, queries, errors, by_kind, p50_ms, p95_ms) VALUES (?, ?, ?, ?, ?, ?)`,
-		ms, int64(w.Queries), int64(w.Errors), string(byKind), w.P50MS, w.P95MS); err != nil {
+		`INSERT OR REPLACE INTO db_windows (start_ms, queries, errors, by_kind, p50_ms, p95_ms, tx_failed) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		ms, int64(w.Queries), int64(w.Errors), string(byKind), w.P50MS, w.P95MS, int64(w.TxFailed)); err != nil {
 		return err
 	}
 	for _, q := range w.Top {
@@ -49,7 +49,7 @@ func (s *Store) InsertDBWindow(ctx context.Context, w l7.DBWindow) error {
 // since, em ordem cronológica e sem as consultas.
 func (s *Store) DBSince(ctx context.Context, since time.Time, limit int) ([]l7.DBWindow, error) {
 	list, err := s.queryDB(ctx,
-		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms FROM db_windows
+		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms, tx_failed FROM db_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (s *Store) DBSince(ctx context.Context, since time.Time, limit int) ([]l7.D
 // cronológica e sem as consultas, até maxGroupRows.
 func (s *Store) DBBetween(ctx context.Context, from, to time.Time) ([]l7.DBWindow, error) {
 	return s.queryDB(ctx,
-		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms FROM db_windows
+		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms, tx_failed FROM db_windows
 		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
 		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
 }
@@ -76,15 +76,15 @@ func (s *Store) queryDB(ctx context.Context, query string, args ...any) ([]l7.DB
 	list := []l7.DBWindow{}
 	for rows.Next() {
 		var (
-			w                 l7.DBWindow
-			ms, queries, errs int64
-			byKind            string
+			w                           l7.DBWindow
+			ms, queries, errs, txFailed int64
+			byKind                      string
 		)
-		if err := rows.Scan(&ms, &queries, &errs, &byKind, &w.P50MS, &w.P95MS); err != nil {
+		if err := rows.Scan(&ms, &queries, &errs, &byKind, &w.P50MS, &w.P95MS, &txFailed); err != nil {
 			return nil, err
 		}
 		w.Start = time.UnixMilli(ms).UTC()
-		w.Queries, w.Errors = uint64(queries), uint64(errs)
+		w.Queries, w.Errors, w.TxFailed = uint64(queries), uint64(errs), uint64(txFailed)
 		w.Top = []l7.QueryStats{}
 		if err := json.Unmarshal([]byte(byKind), &w.ByKind); err != nil {
 			return nil, err

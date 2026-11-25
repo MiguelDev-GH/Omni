@@ -69,3 +69,18 @@ test("Queries page lists the client pools of the database port", async () => {
   expect(rows.map((r) => r.textContent)).toEqual(["loja54324", "(sem permissão para ver)54321"]);
   expect(screen.getByText("Conexões abertas no banco").nextElementSibling).toHaveTextContent("5");
 });
+
+test("shows rollbacks and failed transactions per window", async () => {
+  renderPage();
+  await screen.findByRole("table", { name: "Consultas mais lentas" });
+  act(() =>
+    useAppStore.getState().addDB([
+      { inicio: "2026-11-21T12:00:00Z", consultas: 30, erros: 2, tipos: { SELECT: 25, ROLLBACK: 3 }, transacoes_falhas: 2, p50_ms: 1, p95_ms: 4 },
+      { inicio: "2026-11-21T12:00:10Z", consultas: 10, erros: 0, tipos: { ROLLBACK: 1 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  expect(screen.getByText("Rollbacks em 15 minutos").nextElementSibling).toHaveTextContent("4");
+  const failed = screen.getByText("Transações que falharam em 15 minutos").nextElementSibling;
+  expect(failed).toHaveTextContent("2");
+  expect(failed).toHaveClass("text-erro");
+});

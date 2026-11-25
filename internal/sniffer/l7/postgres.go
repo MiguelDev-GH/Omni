@@ -34,15 +34,30 @@ type DBQuery struct {
 // PostgresAssembler remonta as conexões das portas do banco e emite um
 // DBQuery por consulta respondida. Não é seguro para uso concorrente.
 type PostgresAssembler struct {
-	sa *streamAssembler
+	sa       *streamAssembler
+	onFailed func(at time.Time)
 }
 
 // NewPostgresAssembler decodifica o protocolo do PostgreSQL nas portas
 // dbPorts e chama emit a cada consulta, na mesma goroutine de Add.
 func NewPostgresAssembler(dbPorts []int, emit func(DBQuery)) *PostgresAssembler {
-	return &PostgresAssembler{sa: newStreamAssembler(dbPorts, func(string) connParser {
-		return &pgConn{emit: emit, stmts: map[string]string{}, portals: map[string]string{}}
-	})}
+	a := &PostgresAssembler{}
+	a.sa = newStreamAssembler(dbPorts, func(string) connParser {
+		return &pgConn{emit: emit, txFailed: a.txFailed, stmts: map[string]string{}, portals: map[string]string{}}
+	})
+	return a
+}
+
+// OnTxFailed registra uma função chamada, na goroutine de Add, quando uma
+// transação é abortada: o ReadyForQuery passa a informar o estado 'E'
+// (bloco de transação com erro). Cada transação conta uma vez, por mais
+// comandos que falhem dentro dela. Chame antes do primeiro Add.
+func (a *PostgresAssembler) OnTxFailed(fn func(at time.Time)) { a.onFailed = fn }
+
+func (a *PostgresAssembler) txFailed(at time.Time) {
+	if a.onFailed != nil {
+		a.onFailed(at)
+	}
 }
 
 // Add processa um pacote capturado.
@@ -66,10 +81,14 @@ type pgHalf struct {
 }
 
 type pgConn struct {
-	emit    func(DBQuery)
-	client  pgHalf
-	server  pgHalf
-	started bool // o primeiro byte do cliente já foi visto
+	emit     func(DBQuery)
+	txFailed func(at time.Time)
+	// txStatus é o último estado de transação do ReadyForQuery: 'I' (fora de
+	// transação), 'T' (dentro) ou 'E' (abortada).
+	txStatus byte
+	client   pgHalf
+	server   pgHalf
+	started  bool // o primeiro byte do cliente já foi visto
 	// startup indica que a próxima mensagem do cliente não tem tipo
 	// (StartupMessage depois de um SSLRequest recusado).
 	startup bool
@@ -254,7 +273,7 @@ func (c *pgConn) push(p pgPending) {
 	c.pending = append(c.pending, p)
 }
 
-func (c *pgConn) serverMessage(typ byte, _ []byte, at time.Time) {
+func (c *pgConn) serverMessage(typ byte, body []byte, at time.Time) {
 	switch typ {
 	case 'C', 'I': // CommandComplete, EmptyQueryResponse
 		if len(c.pending) == 0 {
@@ -283,6 +302,12 @@ func (c *pgConn) serverMessage(typ byte, _ []byte, at time.Time) {
 			c.dropExtended()
 		}
 	case 'Z': // ReadyForQuery fecha a consulta simples
+		if len(body) > 0 {
+			if body[0] == 'E' && c.txStatus != 'E' {
+				c.txFailed(at)
+			}
+			c.txStatus = body[0]
+		}
 		if len(c.pending) > 0 && !c.pending[0].extended {
 			p := &c.pending[0]
 			if p.done.IsZero() {

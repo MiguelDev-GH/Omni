@@ -143,6 +143,7 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 	dbStats := l7.NewDBStats()
 	dbStats.Flush(time.Now())
 	pgAsm := l7.NewPostgresAssembler(db, dbStats.Add)
+	pgAsm.OnTxFailed(func(time.Time) { dbStats.AddTxFailure() })
 	var dropped uint64
 	flush := func(now time.Time) {
 		w := agg.Flush(now)

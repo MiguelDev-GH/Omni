@@ -50,6 +50,8 @@ export default function QueriesPage() {
 
   const total = db.reduce((sum, w) => sum + w.consultas, 0);
   const errors = db.reduce((sum, w) => sum + w.erros, 0);
+  const rollbacks = db.reduce((sum, w) => sum + (w.tipos.ROLLBACK ?? 0), 0);
+  const failedTx = db.reduce((sum, w) => sum + (w.transacoes_falhas ?? 0), 0);
   const last = db[db.length - 1];
   const connections = useAppStore((s) => s.connections);
   const connError = useConnHistory();
@@ -65,11 +67,17 @@ export default function QueriesPage() {
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
       {connError && <p className="text-sm text-erro">Não foi possível carregar o histórico de conexões.</p>}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
         <Stat label="Conexões abertas no banco" value={dbConns === null ? "—" : dbConns.toLocaleString("pt-BR")} />
         <Stat label="Consultas por segundo" value={formatRate(lastRate(db, (w) => w.consultas))} />
         <Stat label="Consultas em 15 minutos" value={total.toLocaleString("pt-BR")} />
         <Stat label="Erros em 15 minutos" value={errors.toLocaleString("pt-BR")} />
+        <Stat label="Rollbacks em 15 minutos" value={rollbacks.toLocaleString("pt-BR")} />
+        <Stat
+          label="Transações que falharam em 15 minutos"
+          value={failedTx.toLocaleString("pt-BR")}
+          tone={failedTx > 0 ? "text-erro" : undefined}
+        />
         <Stat label="p95 dos últimos 10 s" value={last ? formatMs(last.p95_ms) : "—"} />
       </div>
 

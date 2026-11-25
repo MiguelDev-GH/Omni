@@ -10,7 +10,10 @@ type DBWindow struct {
 	ByKind  map[string]uint64 `json:"tipos"` // "SELECT", "INSERT"...
 	P50MS   float64           `json:"p50_ms"`
 	P95MS   float64           `json:"p95_ms"`
-	Top     []QueryStats      `json:"top"`
+	// TxFailed conta as transações abortadas por erro. Os rollbacks pedidos
+	// pela aplicação ficam em ByKind["ROLLBACK"].
+	TxFailed uint64       `json:"transacoes_falhas"`
+	Top      []QueryStats `json:"top"`
 }
 
 // QueryStats resume uma consulta normalizada numa janela.
@@ -26,10 +29,11 @@ type QueryStats struct {
 
 // DBStats agrega os DBQuery da janela atual. Não é seguro para uso concorrente.
 type DBStats struct {
-	start   time.Time
-	all     group
-	byKind  map[string]uint64
-	queries map[string]*group
+	start    time.Time
+	all      group
+	byKind   map[string]uint64
+	queries  map[string]*group
+	txFailed uint64
 }
 
 func NewDBStats() *DBStats {
@@ -43,7 +47,11 @@ func (s *DBStats) reset(start time.Time) {
 	s.all = group{}
 	s.byKind = map[string]uint64{}
 	s.queries = map[string]*group{}
+	s.txFailed = 0
 }
+
+// AddTxFailure conta uma transação abortada na janela.
+func (s *DBStats) AddTxFailure() { s.txFailed++ }
 
 // Add conta q na janela.
 func (s *DBStats) Add(q DBQuery) {
@@ -64,7 +72,7 @@ func (s *DBStats) Flush(now time.Time) DBWindow {
 	if start.IsZero() {
 		start = now
 	}
-	w := DBWindow{Start: start.UTC(), Queries: s.all.count, Errors: s.all.errors, ByKind: s.byKind, Top: []QueryStats{}}
+	w := DBWindow{Start: start.UTC(), Queries: s.all.count, Errors: s.all.errors, ByKind: s.byKind, TxFailed: s.txFailed, Top: []QueryStats{}}
 	w.P50MS, w.P95MS = s.all.quantiles()
 	keys, rest := topGroups(s.queries)
 	for _, k := range keys {

@@ -6,7 +6,8 @@ export type DBWindow = {
   inicio: string;
   consultas: number;
   erros: number;
-  tipos: Record<string, number>;
+  tipos: Record<string, number>; // "SELECT", "ROLLBACK"...
+  transacoes_falhas?: number; // transações abortadas por erro
   p50_ms: number;
   p95_ms: number;
   top?: QueryStats[];
