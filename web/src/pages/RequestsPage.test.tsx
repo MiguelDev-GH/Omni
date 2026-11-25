@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
@@ -55,4 +55,16 @@ test("shows an empty state without requests", async () => {
   const router = createMemoryRouter([{ path: "/", element: <RequestsPage /> }]);
   render(<RouterProvider router={router} />);
   expect(await screen.findByText("Nenhuma requisição registrada nas últimas 24 horas.")).toBeInTheDocument();
+});
+
+test("shows requests per second from the last window", async () => {
+  renderPage();
+  await screen.findByText("/lenta");
+  expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("—");
+  act(() =>
+    useAppStore.getState().addHTTP([
+      { inicio: new Date(Date.now() - 12_000).toISOString(), requisicoes: 55, status: { "2xx": 55 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("5,5");
 });

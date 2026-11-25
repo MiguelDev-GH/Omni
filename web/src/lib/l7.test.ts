@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { formatMs, l7Series, L7_POINTS, mergeL7 } from "./l7";
+import { formatMs, l7Series, L7_POINTS, lastRate, mergeL7, perSecond } from "./l7";
 
 const t0 = Date.parse("2026-11-21T12:00:00Z");
 const w = (i: number, n: number) => ({ inicio: new Date(t0 + i * 10_000).toISOString(), n });
@@ -23,4 +23,17 @@ test("formatMs", () => {
   expect(formatMs(1.25)).toBe("1,3 ms");
   expect(formatMs(120)).toBe("120 ms");
   expect(formatMs(1500)).toBe("1,5 s");
+});
+
+test("perSecond divides a 10 s window count by its length", () => {
+  expect(perSecond(42)).toBe(4.2);
+  expect(perSecond(42, 1000)).toBe(42);
+});
+
+test("lastRate uses the newest window and ignores stale data", () => {
+  const now = Date.parse("2026-11-25T12:00:00Z");
+  const at = (secondsAgo: number, n: number) => ({ inicio: new Date(now - secondsAgo * 1000).toISOString(), n });
+  expect(lastRate([], (x: { n: number }) => x.n, now)).toBeNull();
+  expect(lastRate([at(25, 10), at(15, 42)], (x) => x.n, now)).toBe(4.2);
+  expect(lastRate([at(30, 42)], (x) => x.n, now)).toBeNull();
 });

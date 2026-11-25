@@ -4,7 +4,7 @@ import CountChart from "../charts/CountChart";
 import StatusBars from "../charts/StatusBars";
 import { Card, PageHeader, Stat } from "../components/Card";
 import Select from "../components/Select";
-import { emptyStatus, formatMs, l7Series, L7_POINTS, L7_STEP_MS, type StatusPoint } from "../lib/l7";
+import { emptyStatus, formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS, type StatusPoint } from "../lib/l7";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 30_000;
@@ -46,6 +46,7 @@ export default function RequestsPage() {
   const [routes, setRoutes] = useState<RouteStats[] | null>(null);
   const [routesError, setRoutesError] = useState(false);
   const [order, setOrder] = useState<Order>("p95");
+  const http = useAppStore((s) => s.http);
 
   // As rotas das últimas 24 h são recarregadas a cada 30 s.
   useEffect(() => {
@@ -74,7 +75,8 @@ export default function RequestsPage() {
       </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+        <Stat label="Requisições por segundo" value={formatRate(lastRate(http, (w) => w.requisicoes))} />
         <Stat label="Requisições em 24 h" value={total.toLocaleString("pt-BR")} />
         <Stat label="Erros 5xx em 24 h" value={errors.toLocaleString("pt-BR")} tone={errors > 0 ? "text-erro" : undefined} />
         <Stat label="Rotas distintas" value={(routes?.length ?? 0).toLocaleString("pt-BR")} />

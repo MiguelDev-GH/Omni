@@ -7,6 +7,7 @@ import CountChart from "../charts/CountChart";
 import ProtocolDonut from "../charts/ProtocolDonut";
 import StatusBars from "../charts/StatusBars";
 import { Card, Notice, PageHeader, Stat } from "../components/Card";
+import { formatRate, lastRate } from "../lib/l7";
 import { bandwidthSeries, formatBytes, MAX_POINTS, protocolTotals, topSources } from "../lib/traffic";
 import { useAppStore } from "../store/app";
 import { useDBHistory, useDBSeries } from "./QueriesPage";
@@ -22,6 +23,8 @@ export default function OverviewPage() {
   const httpSeries = useHTTPSeries();
   const dbError = useDBHistory();
   const dbSeries = useDBSeries();
+  const http = useAppStore((s) => s.http);
+  const db = useAppStore((s) => s.db);
 
   // Carrega os últimos 15 minutos uma vez; os eventos ao vivo completam a série.
   useEffect(() => {
@@ -65,7 +68,9 @@ export default function OverviewPage() {
       {httpError && <p className="text-sm text-erro">Não foi possível carregar o histórico de requisições.</p>}
       {dbError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
+        <Stat label="Requisições por segundo" value={formatRate(lastRate(http, (w) => w.requisicoes))} />
+        <Stat label="Consultas por segundo" value={formatRate(lastRate(db, (w) => w.consultas))} />
         <Stat label="Banda agora" value={last ? `${formatBytes(last.bytes)}/s` : "—"} />
         <Stat label="Pacotes por segundo" value={last ? last.pacotes.toLocaleString("pt-BR") : "—"} />
         <Stat label="Total em 15 minutos" value={formatBytes(total)} />

@@ -48,3 +48,14 @@ test("live windows feed the chart and stats", async () => {
   expect(screen.getByText("Consultas em 15 minutos").nextElementSibling).toHaveTextContent("40");
   expect(screen.getByText("p95 dos últimos 10 s").nextElementSibling).toHaveTextContent("12 ms");
 });
+
+test("shows queries per second", async () => {
+  renderPage();
+  await screen.findByRole("table", { name: "Consultas mais lentas" });
+  act(() =>
+    useAppStore.getState().addDB([
+      { inicio: new Date(Date.now() - 12_000).toISOString(), consultas: 120, erros: 0, tipos: { SELECT: 120 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  expect(screen.getByText("Consultas por segundo").nextElementSibling).toHaveTextContent("12");
+});

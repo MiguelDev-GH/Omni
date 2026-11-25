@@ -3,7 +3,7 @@ import { listQueries, listSlowQueries, type QueryStats } from "../api/queries";
 import CountChart from "../charts/CountChart";
 import { queryColor } from "../charts/colors";
 import { Card, PageHeader, Stat } from "../components/Card";
-import { formatMs, l7Series, L7_POINTS, L7_STEP_MS } from "../lib/l7";
+import { formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS } from "../lib/l7";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 30_000;
@@ -59,7 +59,8 @@ export default function QueriesPage() {
       </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+        <Stat label="Consultas por segundo" value={formatRate(lastRate(db, (w) => w.consultas))} />
         <Stat label="Consultas em 15 minutos" value={total.toLocaleString("pt-BR")} />
         <Stat label="Erros em 15 minutos" value={errors.toLocaleString("pt-BR")} />
         <Stat label="p95 dos últimos 10 s" value={last ? formatMs(last.p95_ms) : "—"} />
