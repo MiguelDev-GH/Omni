@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { listQueries, listSlowQueries, type QueryStats } from "../api/queries";
+import { getDBSizes, listQueries, listSlowQueries, type DBSizes, type QueryStats } from "../api/queries";
 import CountChart from "../charts/CountChart";
 import { queryColor } from "../charts/colors";
 import { Card, PageHeader, Stat } from "../components/Card";
 import { formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS } from "../lib/l7";
 import { latestEstablished, latestPools, useConnHistory } from "../lib/connections";
+import { formatBytes } from "../lib/traffic";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 30_000;
+
+// formatGrowth mostra o crescimento com sinal, como "+0,25 GB/dia".
+const formatGrowth = (g: number | null) =>
+  g === null ? "—" : `${g >= 0 ? "+" : ""}${g.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} GB/dia`;
 
 // useDBHistory carrega os últimos 15 minutos de janelas de consultas uma vez.
 export function useDBHistory(): boolean {
@@ -32,6 +37,8 @@ export default function QueriesPage() {
   const db = useAppStore((s) => s.db);
   const [slow, setSlow] = useState<QueryStats[] | null>(null);
   const [slowError, setSlowError] = useState(false);
+  const [sizes, setSizes] = useState<DBSizes | null>(null);
+  const [sizesError, setSizesError] = useState(false);
 
   // As consultas mais lentas das últimas 24 h são recarregadas a cada 30 s.
   useEffect(() => {
@@ -42,6 +49,21 @@ export default function QueriesPage() {
           setSlowError(false);
         },
         () => setSlowError(true),
+      );
+    void load();
+    const id = setInterval(load, REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  // O tamanho é medido a cada 5 minutos no backend; recarrega junto com as lentas.
+  useEffect(() => {
+    const load = () =>
+      getDBSizes().then(
+        (s) => {
+          setSizes(s);
+          setSizesError(false);
+        },
+        () => setSizesError(true),
       );
     void load();
     const id = setInterval(load, REFRESH_MS);
@@ -83,6 +105,39 @@ export default function QueriesPage() {
 
       <Card title="Consultas nos últimos 15 minutos">
         <CountChart id="db-page" points={series} label="Consultas" color={queryColor} empty="Sem consultas capturadas ainda." />
+      </Card>
+
+      <Card title="Tamanho dos bancos" plane>
+        {sizesError && <p className="text-sm text-erro">Não foi possível carregar o tamanho dos bancos.</p>}
+        {sizes && !sizes.configurado ? (
+          <p className="text-sm text-suave">
+            A medição do tamanho está desligada. Defina <code className="font-mono">OMNI_PG_DSN_ARQUIVO</code> com uma
+            conexão de um papel com <code className="font-mono">pg_monitor</code>, só de leitura.
+          </p>
+        ) : sizes && sizes.bancos.length === 0 ? (
+          <p className="text-sm text-suave">Nenhuma medição ainda; a primeira sai em até 5 minutos.</p>
+        ) : (
+          sizes && (
+            <table aria-label="Tamanho dos bancos" className="tabela">
+              <thead>
+                <tr>
+                  <th>Banco</th>
+                  <th className="text-right">Tamanho</th>
+                  <th className="text-right">Crescimento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sizes.bancos.map((b) => (
+                  <tr key={b.banco}>
+                    <td className="font-mono text-xs">{b.banco}</td>
+                    <td className="text-right font-mono text-xs tabular-nums">{formatBytes(b.bytes)}</td>
+                    <td className="text-right font-mono text-xs tabular-nums">{formatGrowth(b.crescimento_gb_dia)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        )}
       </Card>
 
       <Card title="Pools de conexões ao banco" plane>

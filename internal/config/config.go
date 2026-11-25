@@ -36,6 +36,7 @@ var (
 	ErrOrigemInvalida    = errors.New("origem inválida em OMNI_ORIGENS; use esquema http ou https, host e porta opcional")
 	ErrRetencaoInvalida  = errors.New("OMNI_RETENCAO_VERIFICACOES inválida; use uma duração de no mínimo 1h, como 168h")
 	ErrInterfaceInvalida = errors.New("OMNI_INTERFACE inválida; use o nome de uma interface, como eth0, ou any")
+	ErrPGDSNDuplo        = errors.New("use OMNI_PG_DSN ou OMNI_PG_DSN_ARQUIVO, não os dois")
 )
 
 type Config struct {
@@ -58,6 +59,11 @@ type Config struct {
 	// WatchedFiles são os arquivos de configuração cuja integridade é
 	// monitorada (OMNI_ARQUIVOS_MONITORADOS, separados por vírgula).
 	WatchedFiles []string
+
+	// PGDSN é a conexão opcional com o PostgreSQL usada para medir o tamanho
+	// dos bancos (OMNI_PG_DSN ou, preferível, o arquivo em
+	// OMNI_PG_DSN_ARQUIVO). Vazio desliga a medição.
+	PGDSN string
 
 	// extraOrigins guarda as origens de OMNI_ORIGENS já validadas, para Bind
 	// refazer AllowedOrigins com a porta real.
@@ -115,7 +121,30 @@ func Load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	c.PGDSN, err = pgDSN(getenv, os.ReadFile)
+	if err != nil {
+		return Config{}, err
+	}
 	return c, nil
+}
+
+// pgDSN lê OMNI_PG_DSN ou o arquivo em OMNI_PG_DSN_ARQUIVO. O arquivo é
+// preferível: variáveis de ambiente ficam visíveis em /proc/<pid>/environ.
+// O erro de leitura nunca traz o conteúdo do arquivo.
+func pgDSN(getenv func(string) string, readFile func(string) ([]byte, error)) (string, error) {
+	dsn, file := getenv("OMNI_PG_DSN"), getenv("OMNI_PG_DSN_ARQUIVO")
+	switch {
+	case dsn != "" && file != "":
+		return "", ErrPGDSNDuplo
+	case file != "":
+		b, err := readFile(file)
+		if err != nil {
+			return "", fmt.Errorf("ler OMNI_PG_DSN_ARQUIVO: %w", err)
+		}
+		return strings.TrimSpace(string(b)), nil
+	default:
+		return strings.TrimSpace(dsn), nil
+	}
 }
 
 func parsePollInterval(v string) (time.Duration, error) {

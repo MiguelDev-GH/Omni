@@ -2,6 +2,8 @@ package config
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -172,4 +174,22 @@ func TestLoadWatchedFiles(t *testing.T) {
 	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_ARQUIVOS_MONITORADOS": "/etc/caddy/Caddyfile, /etc/hosts"}))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"/etc/caddy/Caddyfile", "/etc/hosts"}, c.WatchedFiles)
+}
+
+func TestLoadReadsPGDSNFromFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "dsn")
+	require.NoError(t, os.WriteFile(file, []byte("postgres://omni:x@127.0.0.1/loja\n"), 0o600))
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_PG_DSN_ARQUIVO": file}))
+	require.NoError(t, err)
+	assert.Equal(t, "postgres://omni:x@127.0.0.1/loja", c.PGDSN)
+
+	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_PG_DSN": "postgres://a@b/c"}))
+	require.NoError(t, err)
+	assert.Equal(t, "postgres://a@b/c", c.PGDSN)
+
+	_, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_PG_DSN": "x", "OMNI_PG_DSN_ARQUIVO": file}))
+	require.ErrorIs(t, err, ErrPGDSNDuplo)
+
+	_, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_PG_DSN_ARQUIVO": filepath.Join(t.TempDir(), "nao-existe")}))
+	require.Error(t, err)
 }
