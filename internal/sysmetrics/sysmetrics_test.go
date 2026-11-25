@@ -82,7 +82,7 @@ func TestRunPublishesUntilCancel(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		Run(ctx, pub, sink, t.TempDir(), 20*time.Millisecond)
+		Run(ctx, pub, sink, t.TempDir(), 20*time.Millisecond, Retention)
 		close(done)
 	}()
 
@@ -108,6 +108,6 @@ func TestRunPublishesWhenSinkFails(t *testing.T) {
 	pub := &fakePub{}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go Run(ctx, pub, &fakeSink{fail: true}, t.TempDir(), 20*time.Millisecond)
+	go Run(ctx, pub, &fakeSink{fail: true}, t.TempDir(), 20*time.Millisecond, Retention)
 	require.Eventually(t, func() bool { return len(pub.all()) >= 2 }, 2*time.Second, 10*time.Millisecond)
 }

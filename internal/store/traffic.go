@@ -29,10 +29,28 @@ func (s *Store) InsertTrafficWindow(ctx context.Context, w sniffer.Window) error
 // TrafficSince devolve as limit janelas mais recentes com Start >= since, em
 // ordem cronológica crescente; sem janelas, devolve slice vazio.
 func (s *Store) TrafficSince(ctx context.Context, since time.Time, limit int) ([]sniffer.Window, error) {
-	rows, err := s.db.QueryContext(ctx,
+	list, err := s.queryTraffic(ctx,
 		`SELECT start_ms, bytes, packets, dropped, protocols, top_sources
 		 FROM traffic_windows WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`,
 		since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// TrafficBetween devolve as janelas com from <= início < to, em ordem
+// cronológica, até maxGroupRows.
+func (s *Store) TrafficBetween(ctx context.Context, from, to time.Time) ([]sniffer.Window, error) {
+	return s.queryTraffic(ctx,
+		`SELECT start_ms, bytes, packets, dropped, protocols, top_sources
+		 FROM traffic_windows WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
+		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+}
+
+func (s *Store) queryTraffic(ctx context.Context, query string, args ...any) ([]sniffer.Window, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +77,7 @@ func (s *Store) TrafficSince(ctx context.Context, since time.Time, limit int) ([
 		}
 		list = append(list, w)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	reverse(list)
-	return list, nil
+	return list, rows.Err()
 }
 
 // snifferTables são as tabelas de métricas do sniffer, todas com start_ms.

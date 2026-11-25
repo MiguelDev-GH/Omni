@@ -69,6 +69,14 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	watcher := alerts.NewWatcher(engine, st)
 	pub := alertTap{next: hub, feed: watcher.Feed}
 	engine.OnAlert(func(a alerts.Alert) { hub.Publish(ws.Event{Type: alerts.EventAlert, Data: a}) })
+	// Cada mudança de nível vai também para o banco, que alimenta os relatórios.
+	engine.OnAlert(func(a alerts.Alert) {
+		saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := st.AddAlert(saveCtx, a); err != nil {
+			slog.Error("alertas: gravar no banco", "erro", err)
+		}
+	})
 	var mailer *alerts.Mailer
 	if cfg.Mail.Enabled() {
 		mc := cfg.Mail
@@ -89,6 +97,8 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	srv.Handle("GET /api/consultas", api.QueriesHandler(st))
 	srv.Handle("GET /api/consultas/lentas", api.SlowQueriesHandler(st))
+	srv.Handle("GET /api/alertas/historico", api.AlertHistoryHandler(st))
+	srv.Handle("GET /api/alvos/{id}/relatorio", api.ReportHandler(st))
 	srv.Handle("GET /api/alertas", alerts.Handler(engine, alerts.EmailInfo{Enabled: cfg.Mail.Enabled(), Recipients: len(cfg.Mail.To)}))
 	if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 		srv.Handle("GET /api/descoberta", api.DiscoveryHandler(discovery.SystemListeners, tcp.Port))
@@ -128,6 +138,11 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 			mailer.Run(bgCtx)
 		}()
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pruneAlerts(bgCtx, st, cfg.CheckRetention)
+	}()
 	go func() {
 		defer wg.Done()
 		poller.NewScheduler(st, pub, cfg.PollInterval).WithRetention(cfg.CheckRetention).Run(bgCtx)
@@ -135,7 +150,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	go func() {
 		defer wg.Done()
 		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
-		_ = sniffer.NewEngine(open, st, pub).Run(bgCtx)
+		_ = sniffer.NewEngine(open, st, pub).WithRetention(cfg.CheckRetention).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()
@@ -143,7 +158,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	}()
 	go func() {
 		defer wg.Done()
-		sysmetrics.Run(bgCtx, pub, st, filepath.Dir(cfg.DBPath), sysmetrics.DefaultInterval)
+		sysmetrics.Run(bgCtx, pub, st, filepath.Dir(cfg.DBPath), sysmetrics.DefaultInterval, cfg.CheckRetention)
 	}()
 
 	httpSrv := &http.Server{

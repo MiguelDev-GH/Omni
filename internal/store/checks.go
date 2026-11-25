@@ -57,3 +57,28 @@ func (s *Store) PruneChecks(ctx context.Context, before time.Time) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM check_results WHERE checked_at_ms < ?`, before.UnixMilli())
 	return err
 }
+
+// ChecksBetween devolve os resultados do alvo com from <= hora < to, em ordem
+// cronológica, até maxGroupRows.
+func (s *Store) ChecksBetween(ctx context.Context, targetID int64, from, to time.Time) ([]poller.Result, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT target_id, port, kind, up, status_code, latency_ms, error, checked_at_ms FROM check_results
+		 WHERE target_id = ? AND checked_at_ms >= ? AND checked_at_ms < ?
+		 ORDER BY checked_at_ms, id LIMIT ?`,
+		targetID, from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []poller.Result{}
+	for rows.Next() {
+		var r poller.Result
+		var ms int64
+		if err := rows.Scan(&r.TargetID, &r.Port, &r.Kind, &r.Up, &r.StatusCode, &r.LatencyMS, &r.Err, &ms); err != nil {
+			return nil, err
+		}
+		r.At = time.UnixMilli(ms).UTC()
+		list = append(list, r)
+	}
+	return list, rows.Err()
+}
