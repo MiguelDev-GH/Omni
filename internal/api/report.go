@@ -23,6 +23,9 @@ const (
 	reportMinStep = 10 * time.Second
 	// reportTopSources é quantas origens cada faixa de tráfego guarda.
 	reportTopSources = 10
+	// reportAlertRows é quantas mudanças de nível, as mais graves, o
+	// relatório lista. Os totais vêm do resumo, que não tem limite.
+	reportAlertRows = 100
 )
 
 type ReportStore interface {
@@ -32,7 +35,8 @@ type ReportStore interface {
 	HTTPBetween(ctx context.Context, from, to time.Time) ([]l7.HTTPWindow, error)
 	DBBetween(ctx context.Context, from, to time.Time) ([]l7.DBWindow, error)
 	SystemBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]sysmetrics.Snapshot, error)
-	AlertsBetween(ctx context.Context, from, to time.Time, limit int) ([]alerts.Alert, error)
+	WorstAlertsBetween(ctx context.Context, from, to time.Time, limit int) ([]alerts.Alert, error)
+	AlertSummaryBetween(ctx context.Context, from, to time.Time) ([]store.AlertRuleSummary, error)
 	ListScans(ctx context.Context, targetID int64) ([]store.Scan, error)
 	ScanFindings(ctx context.Context, scanID int64) ([]findings.Finding, error)
 }
@@ -59,16 +63,19 @@ type Report struct {
 	From     time.Time     `json:"desde"`
 	To       time.Time     `json:"ate"`
 	StepSecs int64         `json:"passo_s"`
-	// AlertCounts conta as mudanças de nível do intervalo pelo nível de chegada.
-	AlertCounts map[alerts.Level]int  `json:"contagem_alertas"`
-	Alerts      []alerts.Alert        `json:"alertas"`
-	Uptime      []PortUptime          `json:"disponibilidade"`
-	Checks      []poller.Result       `json:"verificacoes"`
-	Traffic     []sniffer.Window      `json:"trafego"`
-	HTTP        []l7.HTTPWindow       `json:"http"`
-	DB          []l7.DBWindow         `json:"banco"`
-	System      []sysmetrics.Snapshot `json:"sistema"`
-	Scans       []ReportScan          `json:"varreduras"`
+	// AlertCounts conta todas as mudanças de nível do intervalo pelo nível de
+	// chegada; AlertSummary faz o mesmo por regra.
+	AlertCounts  map[alerts.Level]int     `json:"contagem_alertas"`
+	AlertSummary []store.AlertRuleSummary `json:"resumo_alertas"`
+	// Alerts traz até reportAlertRows mudanças, as mais graves primeiro.
+	Alerts  []alerts.Alert        `json:"alertas"`
+	Uptime  []PortUptime          `json:"disponibilidade"`
+	Checks  []poller.Result       `json:"verificacoes"`
+	Traffic []sniffer.Window      `json:"trafego"`
+	HTTP    []l7.HTTPWindow       `json:"http"`
+	DB      []l7.DBWindow         `json:"banco"`
+	System  []sysmetrics.Snapshot `json:"sistema"`
+	Scans   []ReportScan          `json:"varreduras"`
 }
 
 // reportStep divide o intervalo em até reportPoints faixas, múltiplas de 10 s.
@@ -112,11 +119,16 @@ func buildReport(ctx context.Context, rs ReportStore, id int64, from, to time.Ti
 		AlertCounts: map[alerts.Level]int{alerts.Green: 0, alerts.Yellow: 0, alerts.Red: 0},
 	}
 
-	if rep.Alerts, err = rs.AlertsBetween(ctx, from, to, alertHistoryLimit); err != nil {
+	if rep.AlertSummary, err = rs.AlertSummaryBetween(ctx, from, to); err != nil {
 		return rep, err
 	}
-	for _, a := range rep.Alerts {
-		rep.AlertCounts[a.Level]++
+	for _, r := range rep.AlertSummary {
+		for lvl, n := range r.Counts {
+			rep.AlertCounts[lvl] += n
+		}
+	}
+	if rep.Alerts, err = rs.WorstAlertsBetween(ctx, from, to, reportAlertRows); err != nil {
+		return rep, err
 	}
 
 	checks, err := rs.ChecksBetween(ctx, id, from, to)

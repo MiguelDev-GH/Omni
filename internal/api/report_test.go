@@ -70,6 +70,12 @@ func TestReportHandlerBuildsWholeReport(t *testing.T) {
 	require.NoError(t, st.InsertTrafficWindow(ctx, sniffer.Window{Start: now.Add(-time.Minute), Bytes: 100, ByProtocol: map[string]uint64{"tcp": 100}, TopSources: []sniffer.SourceCount{}}))
 	_, err = st.AddAlert(ctx, alerts.Alert{Rule: alerts.RuleAvailability, Level: alerts.Red, Previous: alerts.Green, At: now.Add(-2 * time.Minute)})
 	require.NoError(t, err)
+	// Um ataque com muitos IPs gera mais mudanças do que a lista do relatório
+	// mostra; as contagens continuam exatas.
+	for i := range reportAlertRows + 50 {
+		_, err = st.AddAlert(ctx, alerts.Alert{Rule: alerts.RuleAuthFailIP, Subject: "10.0.0." + itoa(int64(i)), Level: alerts.Yellow, Previous: alerts.Green, At: now.Add(-3 * time.Minute)})
+		require.NoError(t, err)
+	}
 	_, err = st.CreateScan(ctx, tg.ID, []string{"nmap"}, nil)
 	require.NoError(t, err)
 
@@ -79,6 +85,12 @@ func TestReportHandlerBuildsWholeReport(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &rep))
 	assert.Equal(t, "loja", rep.Target.Name)
 	assert.Equal(t, 1, rep.AlertCounts[alerts.Red])
+	assert.Equal(t, reportAlertRows+50, rep.AlertCounts[alerts.Yellow])
+	require.Len(t, rep.Alerts, reportAlertRows)
+	assert.Equal(t, alerts.Red, rep.Alerts[0].Level, "a mais grave primeiro")
+	require.Len(t, rep.AlertSummary, 2)
+	assert.Equal(t, alerts.RuleAvailability, rep.AlertSummary[0].Rule)
+	assert.Equal(t, reportAlertRows+50, rep.AlertSummary[1].Subjects)
 	require.Len(t, rep.Uptime, 1)
 	assert.InDelta(t, 75, rep.Uptime[0].Percent, 0.001)
 	assert.Len(t, rep.Traffic, 1)

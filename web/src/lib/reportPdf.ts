@@ -308,20 +308,47 @@ function alertsSection(w: Writer, rep: TargetReport) {
     doc.setFillColor(...c).rect(x, w.y, 1.2, 16, "F");
     doc.setFont("helvetica", "bold").setFontSize(16);
     w.color(c);
-    doc.text(String(rep.contagem_alertas?.[lvl] ?? 0), x + 5, w.y + 8.5);
+    doc.text(num(rep.contagem_alertas?.[lvl] ?? 0), x + 5, w.y + 8.5);
     doc.setFont("helvetica", "normal").setFontSize(8);
     w.color(soft);
     doc.text(`mudanças para ${levelLabel[lvl].toLowerCase()}`, x + 5, w.y + 13);
   });
   w.y += 21;
 
+  const summary = rep.resumo_alertas ?? [];
   const list = [...(rep.alertas ?? [])].sort((a, b) => t(a.hora) - t(b.hora));
-  if (list.length === 0) {
+  if (summary.length === 0 && list.length === 0) {
     w.text("Nenhuma mudança de nível no intervalo. Os alertas são gravados desde a versão que passou a guardá-los no banco.", {
       color: soft,
       size: 9,
     });
     return;
+  }
+
+  // Por regra: as contagens são exatas, mesmo quando um ataque com muitos
+  // IPs gera mais mudanças do que a lista abaixo mostra.
+  if (summary.length > 0) {
+    w.text("Por regra", { bold: true, size: 10.5, gap: 1 });
+    const countCell = (n: number, lvl: Level) =>
+      n > 0 ? { content: num(n), styles: { textColor: levelColors[lvl], fontStyle: "bold" as const } } : { content: "-", styles: { textColor: faint } };
+    w.table(
+      ["Regra", "Recursos", "Para vermelho", "Para amarelo", "Para verde"],
+      summary.map((r) => [
+        r.nome || r.regra,
+        num(r.recursos),
+        countCell(r.mudancas.vermelho ?? 0, "vermelho"),
+        countCell(r.mudancas.amarelo ?? 0, "amarelo"),
+        countCell(r.mudancas.verde ?? 0, "verde"),
+      ]),
+      { columnStyles: { 1: { cellWidth: 20 }, 2: { cellWidth: 24 }, 3: { cellWidth: 24 }, 4: { cellWidth: 24 } } },
+    );
+  }
+
+  if (list.length === 0) return;
+  const total = (["verde", "amarelo", "vermelho"] as Level[]).reduce((n, l) => n + (rep.contagem_alertas?.[l] ?? 0), 0);
+  w.text("Mudanças de nível", { bold: true, size: 10.5, gap: 0.5 });
+  if (total > list.length) {
+    w.text(`Mostrando as ${num(list.length)} mais graves de ${num(total)} mudanças, em ordem de hora.`, { size: 8.5, color: soft, gap: 1 });
   }
   w.table(
     ["Hora", "Regra", "Recurso", "Mudança", "Valor"],

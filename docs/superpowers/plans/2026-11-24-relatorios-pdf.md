@@ -20,3 +20,10 @@
 3. [x] `GET /api/alvos/{id}/relatorio?desde=&ate=` devolve tudo de uma vez: alvo, contagem e lista de alertas, disponibilidade por porta, séries agrupadas em até 300 pontos (passo múltiplo de 10 s) e as varreduras criadas no intervalo com os achados. Tráfego, HTTP, banco e sistema são do servidor todo. Os p50/p95 agrupados são média ponderada dos percentis, uma aproximação.
 4. [x] Cartão "Relatório em PDF" na página Relatórios: alvo, intervalo (último dia, última semana, personalizado) e validação do limite de 168 h.
 5. [x] `web/src/lib/reportPdf.ts` monta o PDF (jsPDF + jspdf-autotable), carregado só no clique. A rota `GET /api/alvos/{id}/relatorio` foi registrada em `cmd/omni/run.go`, que faltava.
+
+## Ajuste depois da detecção de segurança (25/11/2026)
+
+Os detectores de segurança geram alertas por IP e por conta, então um ataque pode gravar milhares de mudanças no intervalo. O relatório passou a:
+
+- contar as mudanças no banco, por regra e por nível, sem limite (`resumo_alertas` e `contagem_alertas`);
+- listar só as 100 mudanças mais graves (vermelho, depois amarelo, depois verde; no mesmo nível, as mais novas), e o PDF avisa quando a lista está cortada.

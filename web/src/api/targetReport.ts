@@ -32,6 +32,15 @@ export type PortUptime = {
   latencia_media_ms: number;
 };
 
+// AlertRuleSummary conta, sem limite, as mudanças de nível de uma regra.
+export type AlertRuleSummary = {
+  regra: string;
+  servico: string;
+  nome: string;
+  recursos: number;
+  mudancas: Record<Level, number>;
+};
+
 export type ReportScan = Scan & { lista_achados: Finding[] };
 
 // TargetReport é a resposta de GET /api/alvos/{id}/relatorio. Tráfego, HTTP,
@@ -42,6 +51,8 @@ export type TargetReport = {
   ate: string;
   passo_s: number;
   contagem_alertas: Record<Level, number>;
+  resumo_alertas: AlertRuleSummary[];
+  // alertas traz até 100 mudanças, as mais graves primeiro.
   alertas: Alert[];
   disponibilidade: PortUptime[];
   verificacoes: CheckPoint[];

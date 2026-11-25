@@ -15,6 +15,11 @@ export function fixture(over: Partial<TargetReport> = {}): TargetReport {
     ate: iso(to),
     passo_s: step,
     contagem_alertas: { verde: 1, amarelo: 2, vermelho: 1 },
+    resumo_alertas: [
+      { regra: "disponibilidade", servico: "web", nome: "Disponibilidade", recursos: 1, mudancas: { verde: 1, amarelo: 0, vermelho: 1 } },
+      { regra: "latencia_http", servico: "web", nome: "Latência HTTP", recursos: 1, mudancas: { verde: 0, amarelo: 1, vermelho: 0 } },
+      { regra: "cpu", servico: "sistema", nome: "CPU", recursos: 1, mudancas: { verde: 0, amarelo: 1, vermelho: 0 } },
+    ],
     alertas: [
       { id: 1, regra: "latencia_http", servico: "web", nome: "Latência HTTP", recurso: "loja:8080", nivel: "amarelo", nivel_anterior: "verde", valor: 812.4, limite: 500, unidade: "ms", hora: iso(from + 3_600_000) },
       { id: 2, regra: "disponibilidade", servico: "web", nome: "Disponibilidade", recurso: "loja:8443", nivel: "vermelho", nivel_anterior: "amarelo", valor: 2, limite: 2, unidade: "", detalhe: "conexão recusada", hora: iso(from + 7_200_000) },
@@ -68,10 +73,40 @@ test("the PDF carries the target, alerts, uptime, scans and charts", () => {
   }
 });
 
+test("an attack with many IPs lists only the worst changes but keeps exact totals", () => {
+  const ips = Array.from({ length: 100 }, (_, i) => ({
+    id: i + 10,
+    regra: "seguranca_falhas_login_ip",
+    servico: "seguranca",
+    nome: "Logins falhos por IP (brute-force)",
+    recurso: `10.0.0.${i}`,
+    nivel: "vermelho" as const,
+    nivel_anterior: "verde" as const,
+    valor: 40,
+    limite: 30,
+    unidade: "/min",
+    hora: iso(from + i * 60_000),
+  }));
+  const { raw } = text(
+    fixture({
+      contagem_alertas: { verde: 900, amarelo: 0, vermelho: 1450 },
+      resumo_alertas: [
+        { regra: "seguranca_falhas_login_ip", servico: "seguranca", nome: "Logins falhos por IP (brute-force)", recursos: 1200, mudancas: { verde: 900, amarelo: 0, vermelho: 1450 } },
+      ],
+      alertas: ips,
+    }),
+  );
+  expect(raw).toContain("Por regra");
+  expect(raw).toContain("1.450");
+  expect(raw).toContain("1.200");
+  expect(raw).toContain("Mostrando as 100 mais graves de 2.350");
+});
+
 test("an empty interval still produces a readable report", () => {
   const { raw } = text(
     fixture({
       contagem_alertas: { verde: 0, amarelo: 0, vermelho: 0 },
+      resumo_alertas: [],
       alertas: [],
       disponibilidade: [],
       verificacoes: [],
@@ -88,7 +123,7 @@ test("an empty interval still produces a readable report", () => {
 
 test("null lists from the backend are treated as empty", () => {
   const rep = fixture();
-  const nulled = { ...rep, alertas: null, verificacoes: null, varreduras: null } as unknown as TargetReport;
+  const nulled = { ...rep, alertas: null, resumo_alertas: null, verificacoes: null, varreduras: null } as unknown as TargetReport;
   expect(() => buildReportPdf(nulled)).not.toThrow();
 });
 
