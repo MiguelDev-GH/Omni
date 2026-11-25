@@ -29,7 +29,7 @@ const (
 	defaultWindow      = time.Second
 	defaultStatusEvery = 5 * time.Second
 	defaultL7Window    = 10 * time.Second
-	// Retention é por quanto tempo as janelas ficam no banco.
+	// Retention é por quanto tempo as janelas ficam no banco, salvo WithRetention.
 	Retention  = 24 * time.Hour
 	pruneEvery = time.Minute
 )
@@ -57,6 +57,7 @@ type Engine struct {
 	window      time.Duration
 	statusEvery time.Duration
 	l7Window    time.Duration
+	retention   time.Duration
 
 	mu        sync.Mutex
 	state     string
@@ -71,9 +72,15 @@ func (e *Engine) OnHTTP(fn func(l7.HTTPExchange)) { e.onHTTP = fn }
 func NewEngine(open Opener, st TrafficStore, pub ws.Publisher) *Engine {
 	return &Engine{
 		open: open, st: st, pub: pub,
-		window: defaultWindow, statusEvery: defaultStatusEvery, l7Window: defaultL7Window,
+		window: defaultWindow, statusEvery: defaultStatusEvery, l7Window: defaultL7Window, retention: Retention,
 		state: StateInactive,
 	}
+}
+
+// WithRetention troca por quanto tempo as janelas ficam no banco.
+func (e *Engine) WithRetention(d time.Duration) *Engine {
+	e.retention = d
+	return e
 }
 
 // State devolve "ativo", "sem-permissao" ou "inativo".
@@ -236,7 +243,7 @@ func (e *Engine) publishState() {
 	e.pub.Publish(ws.Event{Type: EventEngines, Data: map[string]string{"sniffer": e.State()}})
 }
 
-// prune apaga as janelas mais antigas que Retention, no máximo uma vez por minuto.
+// prune apaga as janelas mais antigas que a retenção, no máximo uma vez por minuto.
 func (e *Engine) prune(ctx context.Context) {
 	now := time.Now()
 	e.mu.Lock()
@@ -248,7 +255,7 @@ func (e *Engine) prune(ctx context.Context) {
 	if !due {
 		return
 	}
-	if err := e.st.PruneTraffic(ctx, now.Add(-Retention)); err != nil && ctx.Err() == nil {
+	if err := e.st.PruneTraffic(ctx, now.Add(-e.retention)); err != nil && ctx.Err() == nil {
 		slog.Error("sniffer: apagar janelas antigas", "erro", err)
 	}
 }

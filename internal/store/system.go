@@ -60,3 +60,31 @@ func (s *Store) PruneSystem(ctx context.Context, before time.Time) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM system_metrics WHERE time_ms < ?", before.UnixMilli())
 	return err
 }
+
+// SystemBetween devolve as leituras com from <= hora < to, em ordem
+// cronológica, com uma média por intervalo de step contado a partir de from.
+func (s *Store) SystemBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]sysmetrics.Snapshot, error) {
+	stepMs := max(step.Milliseconds(), 1)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT MIN(time_ms), AVG(cpu), AVG(memory), AVG(disk)
+		 FROM system_metrics WHERE time_ms >= ?1 AND time_ms < ?2
+		 GROUP BY (time_ms - ?1) / ?3 ORDER BY 1`,
+		from.UnixMilli(), to.UnixMilli(), stepMs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []sysmetrics.Snapshot{}
+	for rows.Next() {
+		var (
+			snap sysmetrics.Snapshot
+			ms   int64
+		)
+		if err := rows.Scan(&ms, &snap.CPUPercent, &snap.MemPercent, &snap.DiskPercent); err != nil {
+			return nil, err
+		}
+		snap.At = time.UnixMilli(ms).UTC()
+		list = append(list, snap)
+	}
+	return list, rows.Err()
+}

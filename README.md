@@ -104,7 +104,7 @@ graph TD
 | **Poller** | Testes ativos periódicos: disponibilidade e latência HTTP, resolução DNS, handshake SMTP e STARTTLS, validade do certificado. Coleta CPU, RAM, disco e conexões via `gopsutil` e `/proc`. |
 | **Orquestrador Docker** | Sobe containers efêmeros do arsenal com limites de CPU e RAM, coleta a saída, normaliza os achados num esquema único e destrói o container. |
 | **Agregador** | Consolida eventos em janelas de 1s (requisições por rota, status HTTP, latência, consultas, banda, protocolos) e grava em lote. |
-| **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. O PDF é gerado pelo navegador, a partir de uma página de impressão (Sprint 16). |
+| **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. `GET /api/alvos/{id}/relatorio` junta o que o PDF precisa; o navegador monta o arquivo com jsPDF. |
 | **Hub WebSocket** | Envia alertas, métricas e pacotes ao frontend em lotes, com buffer por cliente. |
 | **Armazenamento** | SQLite em modo WAL, só com agregados, achados e relatórios das ferramentas. Capturas completas ficam em arquivos `.pcap` com retenção configurável (Sprint 15). |
 
@@ -130,7 +130,7 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 3. **Testes ativos:** o Poller verifica periodicamente se a aplicação está no ar e respondendo bem, e coleta métricas do sistema.
 4. **Agregação:** a cada segundo, o Agregador salva os agregados no SQLite e envia as atualizações em lote pelo WebSocket, e os gráficos se atualizam.
 5. **Varredura de segurança:** sob demanda ou agendada, o Orquestrador roda as ferramentas selecionadas, consolida as vulnerabilidades, compara com o scan anterior e avisa o fim pelo WebSocket.
-6. **Relatórios:** o usuário filtra o período e os módulos e exporta um PDF pela janela de impressão do navegador (Sprint 16).
+6. **Relatórios:** o usuário escolhe o alvo e o período (último dia, última semana ou de/até, no máximo 168 h) e baixa um PDF com alertas, disponibilidade, varreduras do Arsenal com os achados e os gráficos do período. Alertas, tráfego, HTTP, banco e sistema são do servidor inteiro.
 
 ## Comunicação em tempo real (WebSocket)
 
@@ -164,9 +164,9 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "SCAN_FALHOU", "dados": { "scan_id": 4, "alvo_id": 1, "erro": "nmap: a ferramenta terminou com código 1", "achados": 0 } }
 ```
 
-- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`), e o histórico de cada alvo traz até 2880 resultados por porta.
+- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`); a mesma retenção vale para as métricas de tráfego, HTTP, banco, sistema e para o histórico de alertas, e o histórico de cada alvo traz até 2880 resultados por porta.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
-- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem. As leituras ficam 24 h no banco e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
+- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem. As leituras ficam no banco por `OMNI_RETENCAO_VERIFICACOES` e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
 - `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta; as portas da aplicação contam como HTTP.
 - `ESTADO_MOTORES` sai a cada 5 s e a cada mudança, com o estado do sniffer: `ativo`, `inativo` (sem alvos cadastrados) ou `sem-permissao` (falta `CAP_NET_RAW`; o resto do Omni segue no ar).
@@ -427,7 +427,7 @@ Cuidados no WSL2:
 - [x] **Integridade de arquivos de configuração** (SHA-256, permissões e dono).
 - [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
 - [ ] **Novas ferramentas do Arsenal:** ffuf e Nikto (Sprint 11), SQLMap (Sprint 12), Amass e Gitleaks (Sprint 13).
-- [ ] **Exportação de relatório em PDF** (Sprint 16).
+- [x] **Exportação de relatório em PDF** por alvo e intervalo (até 168 h).
 
 ### Camada 6: Apresentação (TLS)
 

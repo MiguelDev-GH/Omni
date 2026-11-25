@@ -22,7 +22,7 @@ const DefaultInterval = 5 * time.Second
 const EventMetrics = "METRICAS_SISTEMA"
 
 const (
-	// Retention é por quanto tempo as leituras ficam no banco.
+	// Retention é a retenção padrão das leituras no banco.
 	Retention  = 24 * time.Hour
 	pruneEvery = time.Minute
 )
@@ -75,8 +75,8 @@ type Sink interface {
 // Run coleta um Snapshot a cada interval até ctx ser cancelado, grava no sink
 // e publica. Falhas de coleta ou de gravação são registradas e o ciclo segue;
 // uma falha ao gravar não impede a publicação. Uma vez por minuto, apaga as
-// leituras mais antigas que Retention.
-func Run(ctx context.Context, pub ws.Publisher, sink Sink, diskPath string, interval time.Duration) {
+// leituras mais antigas que retention.
+func Run(ctx context.Context, pub ws.Publisher, sink Sink, diskPath string, interval, retention time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	var lastPrune time.Time
@@ -90,7 +90,7 @@ func Run(ctx context.Context, pub ws.Publisher, sink Sink, diskPath string, inte
 			pub.Publish(ws.Event{Type: EventMetrics, Data: snap})
 			if snap.At.Sub(lastPrune) >= pruneEvery {
 				lastPrune = snap.At
-				if err := sink.PruneSystem(ctx, snap.At.Add(-Retention)); err != nil && ctx.Err() == nil {
+				if err := sink.PruneSystem(ctx, snap.At.Add(-retention)); err != nil && ctx.Err() == nil {
 					slog.Error("apagar métricas antigas do sistema", "erro", err)
 				}
 			}

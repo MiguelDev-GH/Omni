@@ -48,9 +48,27 @@ func (s *Store) InsertDBWindow(ctx context.Context, w l7.DBWindow) error {
 // DBSince devolve as limit janelas de consultas mais recentes com início >=
 // since, em ordem cronológica e sem as consultas.
 func (s *Store) DBSince(ctx context.Context, since time.Time, limit int) ([]l7.DBWindow, error) {
-	rows, err := s.db.QueryContext(ctx,
+	list, err := s.queryDB(ctx,
 		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms FROM db_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// DBBetween devolve as janelas do banco com from <= início < to, em ordem
+// cronológica e sem as consultas, até maxGroupRows.
+func (s *Store) DBBetween(ctx context.Context, from, to time.Time) ([]l7.DBWindow, error) {
+	return s.queryDB(ctx,
+		`SELECT start_ms, queries, errors, by_kind, p50_ms, p95_ms FROM db_windows
+		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
+		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+}
+
+func (s *Store) queryDB(ctx context.Context, query string, args ...any) ([]l7.DBWindow, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +91,7 @@ func (s *Store) DBSince(ctx context.Context, since time.Time, limit int) ([]l7.D
 		}
 		list = append(list, w)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	reverse(list)
-	return list, nil
+	return list, rows.Err()
 }
 
 // SlowQueriesSince soma as consultas das janelas com início >= since e
