@@ -27,12 +27,21 @@ const (
 	pruneEvery = time.Minute
 )
 
-// Snapshot é uma leitura dos recursos do servidor, em percentual de uso.
+// Snapshot é uma leitura dos recursos do servidor: CPU, memória e disco em
+// percentual de uso e, quando IO é true, o I/O do disco no intervalo.
 type Snapshot struct {
-	CPUPercent  float64   `json:"cpu"`
-	MemPercent  float64   `json:"memoria"`
-	DiskPercent float64   `json:"disco"`
-	At          time.Time `json:"hora"`
+	CPUPercent  float64 `json:"cpu"`
+	MemPercent  float64 `json:"memoria"`
+	DiskPercent float64 `json:"disco"`
+	// IO é false quando o dispositivo do disco não foi encontrado ou ainda
+	// não há leitura anterior; os campos de I/O ficam zerados.
+	IO            bool      `json:"io"`
+	ReadBps       float64   `json:"leitura_bps"`
+	WriteBps      float64   `json:"escrita_bps"`
+	IOPS          float64   `json:"iops"`
+	DiskLatencyMS float64   `json:"latencia_disco_ms"` // tempo médio por operação
+	DiskBusy      float64   `json:"disco_ocupado"`     // % do intervalo com I/O em andamento
+	At            time.Time `json:"hora"`
 }
 
 // Sample lê CPU, memória e o disco que contém diskPath. O percentual de CPU
@@ -80,8 +89,9 @@ func Run(ctx context.Context, pub ws.Publisher, sink Sink, diskPath string, inte
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	var lastPrune time.Time
+	sampler := NewSampler(diskPath)
 	for {
-		snap, err := Sample(ctx, diskPath)
+		snap, err := sampler.Sample(ctx)
 		switch {
 		case err == nil:
 			if err := sink.AddSystemSample(ctx, snap); err != nil && ctx.Err() == nil {
