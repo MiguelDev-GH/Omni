@@ -177,6 +177,15 @@ func (m *Mailer) buildMessage(a Alert, suppressed int) ([]byte, error) {
 	switch a.Rule {
 	case RuleAvailability:
 		fmt.Fprintf(&body, "Estado: %s\n", availabilityText(a.Value))
+	case RuleConfigChange:
+		switch {
+		case a.Value >= 2:
+			body.WriteString("Estado: o arquivo sumiu ou não pode mais ser lido\n")
+		case a.Value >= 1:
+			body.WriteString("Estado: o arquivo foi alterado; confira se a mudança foi autorizada\n")
+		default:
+			body.WriteString("Estado: sem novas alterações nos últimos minutos\n")
+		}
 	case RuleSMTPNoTLS:
 		if a.Value >= 1 {
 			body.WriteString("Estado: o servidor não oferece STARTTLS; os e-mails trafegam sem criptografia\n")

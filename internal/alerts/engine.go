@@ -242,13 +242,14 @@ func keep(since, now time.Time) time.Time {
 	return since
 }
 
-// Forget apaga o estado dos recursos cujo Subject satisfaz drop, por exemplo
-// as portas de um alvo removido.
-func (e *Engine) Forget(drop func(subject string) bool) {
+// Forget apaga o estado dos recursos para os quais drop(serviço, recurso)
+// é verdadeiro, por exemplo as portas de um alvo removido ou um IP que
+// parou de mandar tráfego.
+func (e *Engine) Forget(drop func(service, subject string) bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for k := range e.states {
-		if k.subject != "" && drop(k.subject) {
+	for k, st := range e.states {
+		if k.subject != "" && drop(st.service, k.subject) {
 			delete(e.states, k)
 		}
 	}

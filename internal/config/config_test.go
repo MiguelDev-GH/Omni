@@ -163,3 +163,13 @@ func TestLoadCheckRetention(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRetencaoInvalida, v)
 	}
 }
+
+func TestLoadWatchedFiles(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
+	require.NoError(t, err)
+	assert.Empty(t, c.WatchedFiles)
+
+	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_ARQUIVOS_MONITORADOS": "/etc/caddy/Caddyfile, /etc/hosts"}))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/etc/caddy/Caddyfile", "/etc/hosts"}, c.WatchedFiles)
+}
