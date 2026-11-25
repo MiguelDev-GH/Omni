@@ -121,3 +121,42 @@ test("shows DNS and SMTP services", async () => {
   expect(within(smtp).getByText("sem STARTTLS é amarelo")).toBeInTheDocument();
   expect(within(screen.getByRole("region", { name: "DNS" })).getByText("Sem medições ainda.")).toBeInTheDocument();
 });
+
+test("shows the security service", async () => {
+  renderPage({
+    ...overview,
+    estado: [
+      {
+        regra: "seguranca_falhas_login_ip",
+        servico: "seguranca",
+        nome: "Logins falhos por IP (brute-force)",
+        recurso: "IP 203.0.113.66",
+        nivel: "vermelho",
+        valor: 35,
+        unidade: "/min",
+        limite_amarelo: 10,
+        limite_vermelho: 30,
+        desde: down.hora,
+        atualizado: down.hora,
+      },
+      {
+        regra: "seguranca_arquivo_alterado",
+        servico: "seguranca",
+        nome: "Arquivo de configuração alterado",
+        recurso: "/etc/caddy/Caddyfile",
+        nivel: "amarelo",
+        valor: 1,
+        unidade: "",
+        limite_amarelo: 1,
+        limite_vermelho: 2,
+        desde: down.hora,
+        atualizado: down.hora,
+      },
+    ],
+  });
+  const sec = await screen.findByRole("region", { name: "Segurança" });
+  await within(sec).findByText("35 /min");
+  expect(within(sec).getByText(/IP 203.0.113.66/)).toBeInTheDocument();
+  expect(within(sec).getByText("alterado")).toBeInTheDocument();
+  expect(within(sec).getByText("alterado é amarelo por 5 min; removido é vermelho")).toBeInTheDocument();
+});

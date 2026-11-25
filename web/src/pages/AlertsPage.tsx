@@ -19,8 +19,9 @@ const serviceTitle: Record<string, string> = {
   dns: "DNS",
   smtp: "SMTP",
   sistema: "Sistema",
+  seguranca: "Segurança",
 };
-const serviceOrder = ["web", "banco", "dns", "smtp", "sistema"];
+const serviceOrder = ["seguranca", "web", "banco", "dns", "smtp", "sistema"];
 
 const levelDot: Record<Level, string> = {
   verde: "bg-destaque",
@@ -53,6 +54,7 @@ function worst(list: AlertStatus[]): Level {
 function limits(regra: string, s: { limite_amarelo: number; limite_vermelho: number; unidade: string }) {
   if (regra === "disponibilidade") return "resposta com erro é amarelo; fora do ar é vermelho";
   if (regra === "smtp_sem_starttls") return "sem STARTTLS é amarelo";
+  if (regra === "seguranca_arquivo_alterado") return "alterado é amarelo por 5 min; removido é vermelho";
   return `amarelo ≥ ${formatAlertValue(regra, s.limite_amarelo, s.unidade)} · vermelho ≥ ${formatAlertValue(regra, s.limite_vermelho, s.unidade)}`;
 }
 
