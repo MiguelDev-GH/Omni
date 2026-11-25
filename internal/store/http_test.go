@@ -58,3 +58,22 @@ func TestHTTPWindowsRoundTrip(t *testing.T) {
 	require.Len(t, routes, 1)
 	assert.Equal(t, uint64(1), routes[0].Requests)
 }
+
+func TestHTTPWindowRoundTripsCodes(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	w := httpWindow(t, at, map[string][]time.Duration{"/a": {time.Millisecond}})
+	w.ByCode = map[string]uint64{"404": 3, "502": 1}
+	require.NoError(t, s.InsertHTTPWindow(ctx, w))
+
+	for name, get := range map[string]func() ([]l7.HTTPWindow, error){
+		"HTTPSince":   func() ([]l7.HTTPWindow, error) { return s.HTTPSince(ctx, at, 10) },
+		"HTTPBetween": func() ([]l7.HTTPWindow, error) { return s.HTTPBetween(ctx, at, at.Add(time.Hour)) },
+	} {
+		got, err := get()
+		require.NoError(t, err, name)
+		require.Len(t, got, 1, name)
+		assert.Equal(t, map[string]uint64{"404": 3, "502": 1}, got[0].ByCode, name)
+	}
+}

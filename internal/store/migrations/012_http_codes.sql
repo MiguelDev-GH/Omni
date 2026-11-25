@@ -1,0 +1,1 @@
+ALTER TABLE http_windows ADD COLUMN by_code TEXT NOT NULL DEFAULT '{}';

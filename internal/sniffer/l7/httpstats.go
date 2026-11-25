@@ -2,6 +2,7 @@ package l7
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -11,9 +12,11 @@ type HTTPWindow struct {
 	Start    time.Time         `json:"inicio"`
 	Requests uint64            `json:"requisicoes"`
 	ByStatus map[string]uint64 `json:"status"` // "2xx", "3xx", "4xx", "5xx"
-	P50MS    float64           `json:"p50_ms"`
-	P95MS    float64           `json:"p95_ms"`
-	Routes   []RouteStats      `json:"rotas"`
+	// ByCode conta as respostas de erro (status >= 400) por código, como "404".
+	ByCode map[string]uint64 `json:"codigos"`
+	P50MS  float64           `json:"p50_ms"`
+	P95MS  float64           `json:"p95_ms"`
+	Routes []RouteStats      `json:"rotas"`
 }
 
 // RouteStats resume uma rota numa janela. Errors conta as respostas 5xx.
@@ -33,6 +36,7 @@ type HTTPStats struct {
 	start    time.Time
 	all      group
 	byStatus map[string]uint64
+	byCode   map[string]uint64
 	routes   map[string]*group
 }
 
@@ -46,6 +50,7 @@ func (s *HTTPStats) reset(start time.Time) {
 	s.start = start
 	s.all = group{}
 	s.byStatus = map[string]uint64{}
+	s.byCode = map[string]uint64{}
 	s.routes = map[string]*group{}
 }
 
@@ -57,6 +62,9 @@ func (s *HTTPStats) Add(ex HTTPExchange) {
 	isErr := ex.Status >= 500
 	s.all.observe(ex.Latency, isErr)
 	s.byStatus[StatusClass(ex.Status)]++
+	if ex.Status >= 400 {
+		s.byCode[strconv.Itoa(ex.Status)]++
+	}
 	key := ex.Method + " " + ex.Route
 	g := s.routes[key]
 	if g == nil {
@@ -73,7 +81,7 @@ func (s *HTTPStats) Flush(now time.Time) HTTPWindow {
 	if start.IsZero() {
 		start = now
 	}
-	w := HTTPWindow{Start: start.UTC(), Requests: s.all.count, ByStatus: s.byStatus, Routes: []RouteStats{}}
+	w := HTTPWindow{Start: start.UTC(), Requests: s.all.count, ByStatus: s.byStatus, ByCode: s.byCode, Routes: []RouteStats{}}
 	w.P50MS, w.P95MS = s.all.quantiles()
 	keys, rest := topGroups(s.routes)
 	for _, k := range keys {

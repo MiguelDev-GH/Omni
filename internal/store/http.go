@@ -19,6 +19,12 @@ func (s *Store) InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error {
 	if err != nil {
 		return err
 	}
+	byCode := []byte("{}")
+	if len(w.ByCode) > 0 {
+		if byCode, err = json.Marshal(w.ByCode); err != nil {
+			return err
+		}
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -29,8 +35,8 @@ func (s *Store) InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT OR REPLACE INTO http_windows (start_ms, requests, by_status, p50_ms, p95_ms) VALUES (?, ?, ?, ?, ?)`,
-		ms, int64(w.Requests), string(byStatus), w.P50MS, w.P95MS); err != nil {
+		`INSERT OR REPLACE INTO http_windows (start_ms, requests, by_status, p50_ms, p95_ms, by_code) VALUES (?, ?, ?, ?, ?, ?)`,
+		ms, int64(w.Requests), string(byStatus), w.P50MS, w.P95MS, string(byCode)); err != nil {
 		return err
 	}
 	for _, r := range w.Routes {
@@ -52,7 +58,7 @@ func (s *Store) InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error {
 // em ordem cronológica e sem as rotas.
 func (s *Store) HTTPSince(ctx context.Context, since time.Time, limit int) ([]l7.HTTPWindow, error) {
 	list, err := s.queryHTTP(ctx,
-		`SELECT start_ms, requests, by_status, p50_ms, p95_ms FROM http_windows
+		`SELECT start_ms, requests, by_status, p50_ms, p95_ms, by_code FROM http_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
 	if err != nil {
 		return nil, err
@@ -65,7 +71,7 @@ func (s *Store) HTTPSince(ctx context.Context, since time.Time, limit int) ([]l7
 // cronológica e sem as rotas, até maxGroupRows.
 func (s *Store) HTTPBetween(ctx context.Context, from, to time.Time) ([]l7.HTTPWindow, error) {
 	return s.queryHTTP(ctx,
-		`SELECT start_ms, requests, by_status, p50_ms, p95_ms FROM http_windows
+		`SELECT start_ms, requests, by_status, p50_ms, p95_ms, by_code FROM http_windows
 		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
 		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
 }
@@ -82,14 +88,18 @@ func (s *Store) queryHTTP(ctx context.Context, query string, args ...any) ([]l7.
 			w        l7.HTTPWindow
 			ms, reqs int64
 			byStatus string
+			byCode   string
 		)
-		if err := rows.Scan(&ms, &reqs, &byStatus, &w.P50MS, &w.P95MS); err != nil {
+		if err := rows.Scan(&ms, &reqs, &byStatus, &w.P50MS, &w.P95MS, &byCode); err != nil {
 			return nil, err
 		}
 		w.Start = time.UnixMilli(ms).UTC()
 		w.Requests = uint64(reqs)
 		w.Routes = []l7.RouteStats{}
 		if err := json.Unmarshal([]byte(byStatus), &w.ByStatus); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(byCode), &w.ByCode); err != nil {
 			return nil, err
 		}
 		list = append(list, w)

@@ -68,3 +68,18 @@ test("shows requests per second from the last window", async () => {
   );
   expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("5,5");
 });
+
+test("lists error codes summed over the loaded windows", async () => {
+  renderPage();
+  await screen.findByText("/lenta");
+  expect(screen.getByText("Nenhuma resposta de erro nos últimos 15 minutos.")).toBeInTheDocument();
+  act(() =>
+    useAppStore.getState().addHTTP([
+      { inicio: "2026-11-21T12:00:00Z", requisicoes: 9, status: { "4xx": 5, "5xx": 1 }, codigos: { "404": 4, "401": 1, "503": 1 }, p50_ms: 1, p95_ms: 2 },
+      { inicio: "2026-11-21T12:00:10Z", requisicoes: 3, status: { "4xx": 3 }, codigos: { "404": 3 }, p50_ms: 1, p95_ms: 2 },
+      { inicio: "2026-11-21T12:00:20Z", requisicoes: 1, status: { "2xx": 1 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  const rows = within(screen.getByRole("table", { name: "Códigos de erro" })).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["4047", "5031", "4011"]);
+});

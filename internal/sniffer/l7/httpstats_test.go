@@ -64,3 +64,18 @@ func TestHistogramMergeAndQuantile(t *testing.T) {
 	assert.Equal(t, 0.0, newHistogram().Quantile(0.5))
 	assert.Equal(t, 3.0, Percentile([]float64{5, 1, 3}, 0.5))
 }
+
+func TestHTTPStatsCountsErrorCodes(t *testing.T) {
+	s := NewHTTPStats()
+	s.Flush(t0)
+	for _, code := range []int{200, 404, 404, 503, 301} {
+		s.Add(HTTPExchange{Method: "GET", Route: "/a", Status: code, Latency: time.Millisecond})
+	}
+	s.Add(HTTPExchange{Method: "GET", Route: "/a", Status: 500, Latency: time.Millisecond, Internal: true})
+
+	w := s.Flush(t0.Add(10 * time.Second))
+	assert.Equal(t, map[string]uint64{"404": 2, "503": 1}, w.ByCode)
+
+	next := s.Flush(t0.Add(20 * time.Second))
+	assert.Equal(t, map[string]uint64{}, next.ByCode)
+}

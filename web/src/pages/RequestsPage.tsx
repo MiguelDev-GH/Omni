@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listRequests, listRoutes, type RouteStats } from "../api/requests";
+import { listRequests, listRoutes, type HTTPWindow, type RouteStats } from "../api/requests";
 import CountChart from "../charts/CountChart";
 import StatusBars from "../charts/StatusBars";
 import { Card, PageHeader, Stat } from "../components/Card";
@@ -15,6 +15,18 @@ type Order = "p95" | "volume";
 export function sortRoutes(list: RouteStats[], order: Order): RouteStats[] {
   const key = (r: RouteStats) => (order === "p95" ? r.p95_ms : r.requisicoes);
   return [...list].sort((a, b) => key(b) - key(a) || a.rota.localeCompare(b.rota));
+}
+
+// sumErrorCodes soma os códigos de erro das janelas: os mais frequentes
+// primeiro e, no empate, o código maior (5xx antes de 4xx).
+export function sumErrorCodes(windows: HTTPWindow[]): { codigo: string; total: number }[] {
+  const totals = new Map<string, number>();
+  for (const w of windows) {
+    for (const [code, n] of Object.entries(w.codigos ?? {})) totals.set(code, (totals.get(code) ?? 0) + n);
+  }
+  return [...totals.entries()]
+    .map(([codigo, total]) => ({ codigo, total }))
+    .sort((a, b) => b.total - a.total || Number(b.codigo) - Number(a.codigo));
 }
 
 // useHTTPHistory carrega os últimos 15 minutos de janelas HTTP uma vez.
@@ -63,6 +75,7 @@ export default function RequestsPage() {
     return () => clearInterval(id);
   }, []);
 
+  const codes = useMemo(() => sumErrorCodes(http), [http]);
   const sorted = useMemo(() => sortRoutes(routes ?? [], order), [routes, order]);
   const total = (routes ?? []).reduce((sum, r) => sum + r.requisicoes, 0);
   const errors = (routes ?? []).reduce((sum, r) => sum + r.erros, 0);
@@ -90,6 +103,29 @@ export default function RequestsPage() {
           <StatusBars points={status} />
         </Card>
       </div>
+
+      <Card title="Códigos de erro nos últimos 15 minutos" plane>
+        {codes.length === 0 ? (
+          <p className="text-sm text-suave">Nenhuma resposta de erro nos últimos 15 minutos.</p>
+        ) : (
+          <table aria-label="Códigos de erro" className="tabela">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th className="text-right">Respostas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((c) => (
+                <tr key={c.codigo}>
+                  <td className={`font-mono text-xs ${c.codigo.startsWith("5") ? "text-erro" : "text-aviso"}`}>{c.codigo}</td>
+                  <td className="text-right font-mono text-xs tabular-nums">{c.total.toLocaleString("pt-BR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
 
       <Card
         title="Rotas nas últimas 24 horas"
