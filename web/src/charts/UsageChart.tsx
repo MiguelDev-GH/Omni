@@ -9,19 +9,22 @@ export type UsagePoint = { t: number; v: number };
 type Props = {
   points: UsagePoint[];
   label: string; // nome da série, como "CPU"
-  limits: { aviso: number; critico: number }; // percentuais dos alertas
+  limits: { aviso: number; critico: number }; // limites dos alertas, na unidade do gráfico
   id: string; // identificador do gradiente, único na página
+  unit?: "%" | "ms"; // percentual de 0 a 100 (padrão) ou milissegundos
 };
 
-// UsageChart desenha um percentual de uso entre 0 e 100%, com as linhas dos
-// limites de alerta.
-export default function UsageChart({ points, label, limits, id }: Props) {
+// UsageChart desenha um percentual de uso entre 0 e 100%, ou um tempo em ms,
+// com as linhas dos limites de alerta.
+export default function UsageChart({ points, label, limits, id, unit = "%" }: Props) {
+  const percent = unit === "%";
+  const format = (v: number) => (percent ? `${v}%` : `${v} ms`);
   if (points.length === 0) {
     return <p className="flex h-44 items-center justify-center text-sm text-suave">Sem medições ainda.</p>;
   }
   const color = chartInk.series;
   return (
-    <div role="img" aria-label={`${label} em percentual, ${points.length} pontos`} className="h-44">
+    <div role="img" aria-label={`${label} em ${percent ? "percentual" : "ms"}, ${points.length} pontos`} className="h-44">
       <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 176 }}>
         <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
@@ -43,9 +46,11 @@ export default function UsageChart({ points, label, limits, id }: Props) {
             minTickGap={48}
           />
           <YAxis
-            domain={[0, 100]}
-            ticks={[0, 25, 50, 75, 100]}
-            tickFormatter={(v) => `${v}%`}
+            // Em ms, o eixo vai até o maior valor ou até acima do limite crítico,
+            // para as duas linhas de limite aparecerem.
+            domain={percent ? [0, 100] : [0, (max: number) => Math.max(max, limits.critico * 1.1)]}
+            ticks={percent ? [0, 25, 50, 75, 100] : undefined}
+            tickFormatter={(v) => format(Number(v))}
             axisLine={false}
             tick={axisTick}
             tickLine={false}
@@ -57,7 +62,7 @@ export default function UsageChart({ points, label, limits, id }: Props) {
             cursor={{ stroke: chartInk.axis, strokeDasharray: "3 3" }}
             {...tooltipStyle}
             labelFormatter={(t) => clockSec(Number(t))}
-            formatter={(v) => [`${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`, label]}
+            formatter={(v) => [`${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}${percent ? "%" : " ms"}`, label]}
           />
           <Area
             type="monotone"

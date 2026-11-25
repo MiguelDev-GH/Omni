@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { listSystem } from "../api/system";
+import BandwidthChart from "../charts/BandwidthChart";
 import UsageChart, { type UsagePoint } from "../charts/UsageChart";
 import { Card, PageHeader, Stat } from "../components/Card";
 import EngineBadge, { engineNames } from "../components/EngineBadge";
 import Select from "../components/Select";
+import { formatBytes, type BandwidthPoint } from "../lib/traffic";
 import { useAppStore, type SystemMetrics } from "../store/app";
 
 type Period = "15m" | "1h" | "24h";
@@ -22,6 +24,9 @@ const charts = [
   { key: "memoria", title: "Memória", limits: { aviso: 85, critico: 95 } },
   { key: "disco", title: "Disco", limits: { aviso: 85, critico: 95 } },
 ] as const;
+
+// Os mesmos limites da regra sistema_latencia_disco do backend.
+const diskLatencyLimits = { aviso: 20, critico: 100 };
 
 const percent = (v: number | undefined) =>
   v === undefined ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
@@ -76,10 +81,19 @@ export default function SystemPage() {
     const list = samples ?? [];
     const of = (key: "cpu" | "memoria" | "disco"): UsagePoint[] =>
       list.map((s) => ({ t: Date.parse(s.hora), v: s[key] }));
-    return { cpu: of("cpu"), memoria: of("memoria"), disco: of("disco") };
+    const withIO = list.filter((s) => s.io);
+    return {
+      cpu: of("cpu"),
+      memoria: of("memoria"),
+      disco: of("disco"),
+      throughput: withIO.map((s): BandwidthPoint => ({ t: Date.parse(s.hora), bytes: (s.leitura_bps ?? 0) + (s.escrita_bps ?? 0) })),
+      latency: withIO.map((s): UsagePoint => ({ t: Date.parse(s.hora), v: s.latencia_disco_ms ?? 0 })),
+    };
   }, [samples]);
 
   const now = live ?? samples?.[samples.length - 1];
+  // O I/O da leitura mais recente que tem I/O: a primeira leitura não tem.
+  const lastIO = [...(samples ?? []), ...(live ? [live] : [])].filter((s) => s.io).at(-1);
 
   return (
     <div className="space-y-8">
@@ -106,6 +120,27 @@ export default function SystemPage() {
         ))}
       </div>
 
+      {lastIO ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+          <Stat label="Leitura" value={`${formatBytes(lastIO.leitura_bps ?? 0)}/s`} />
+          <Stat label="Escrita" value={`${formatBytes(lastIO.escrita_bps ?? 0)}/s`} />
+          <Stat label="IOPS" value={(lastIO.iops ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} />
+          <Stat
+            label="Latência do disco"
+            value={`${(lastIO.latencia_disco_ms ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ms`}
+            tone={toneFor(lastIO.latencia_disco_ms, diskLatencyLimits)}
+          />
+        </div>
+      ) : (
+        samples !== null &&
+        samples.length > 0 && (
+          <p className="text-sm text-suave">
+            I/O do disco indisponível: o dispositivo do disco não foi encontrado (como no Windows nativo) ou ainda não há
+            duas leituras para comparar.
+          </p>
+        )
+      )}
+
       <section aria-labelledby="motores" className="space-y-2">
         <h2 id="motores" className="text-sm font-medium text-texto">
           Motores
@@ -126,6 +161,17 @@ export default function SystemPage() {
           </Card>
         ))}
       </div>
+
+      {lastIO && (
+        <div className="grid gap-x-10 gap-y-8 xl:grid-cols-2">
+          <Card title="Leitura e escrita do disco">
+            <BandwidthChart id="sistema-io" label="Leitura e escrita do disco" points={series.throughput} empty="Sem medições ainda." />
+          </Card>
+          <Card title="Latência do disco">
+            <UsageChart id="sistema-latencia" label="Latência do disco" unit="ms" points={series.latency} limits={diskLatencyLimits} />
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -138,10 +138,13 @@ type (
 		P95MS   float64 `json:"p95_ms"`
 	}
 	systemEvent struct {
-		CPU    float64   `json:"cpu"`
-		Memory float64   `json:"memoria"`
-		Disk   float64   `json:"disco"`
-		At     time.Time `json:"hora"`
+		CPU    float64 `json:"cpu"`
+		Memory float64 `json:"memoria"`
+		Disk   float64 `json:"disco"`
+		IO     bool    `json:"io"`
+		// DiskLatency só vale com IO true.
+		DiskLatency float64   `json:"latencia_disco_ms"`
+		At          time.Time `json:"hora"`
 	}
 )
 
@@ -241,6 +244,9 @@ func (w *Watcher) handle(ctx context.Context, ev rawEvent, now time.Time) {
 		w.engine.Observe(Sample{Rule: RuleCPU, Value: s.CPU, At: at})
 		w.engine.Observe(Sample{Rule: RuleMemory, Value: s.Memory, At: at})
 		w.engine.Observe(Sample{Rule: RuleDisk, Value: s.Disk, At: at})
+		if s.IO {
+			w.engine.Observe(Sample{Rule: RuleDiskLatency, Value: s.DiskLatency, At: at})
+		}
 	}
 }
 

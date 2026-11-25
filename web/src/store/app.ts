@@ -28,7 +28,19 @@ export type PortStatus = {
   starttls?: boolean;
 };
 
-export type SystemMetrics = { cpu: number; memoria: number; disco: number; hora: string };
+export type SystemMetrics = {
+  cpu: number;
+  memoria: number;
+  disco: number;
+  hora: string;
+  // I/O do disco; os campos só valem com io true.
+  io?: boolean;
+  leitura_bps?: number;
+  escrita_bps?: number;
+  iops?: number;
+  latencia_disco_ms?: number;
+  disco_ocupado?: number;
+};
 
 export type Toast = { id: number; kind: "erro" | "aviso" | "ok"; title: string; body: string; link?: { to: string; label: string } };
 
