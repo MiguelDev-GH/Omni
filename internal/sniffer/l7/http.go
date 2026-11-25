@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/gopacket/gopacket"
+
+	"github.com/MiguelDev-GH/omni/internal/clientinfo"
 )
 
 const (
@@ -29,8 +31,13 @@ type HTTPExchange struct {
 	Status   int           `json:"status"`
 	Latency  time.Duration `json:"latencia_ns"`
 	ClientIP string        `json:"ip_cliente"`
-	Internal bool          `json:"interno"`
-	At       time.Time     `json:"hora"`
+	// OriginIP é o IP de quem fez a requisição: o do X-Forwarded-For
+	// quando a conexão vem de um proxy local, senão o próprio ClientIP.
+	OriginIP string `json:"ip_origem"`
+	// User é o usuário de uma autenticação Basic; a senha é descartada.
+	User     string    `json:"usuario,omitempty"`
+	Internal bool      `json:"interno"`
+	At       time.Time `json:"hora"`
 }
 
 // HTTPAssembler remonta as conexões das portas de aplicação e emite um
@@ -55,6 +62,8 @@ func (h *HTTPAssembler) Flush(now time.Time) { h.sa.flush(now) }
 
 type pendingRequest struct {
 	method, path string
+	originIP     string
+	user         string
 	internal     bool
 	at           time.Time
 }
@@ -221,6 +230,8 @@ type headers struct {
 	contentLength int64
 	chunked       bool
 	userAgent     string
+	forwardedFor  string
+	basicUser     string
 }
 
 func parseHeaders(lines []string) (headers, bool) {
@@ -242,6 +253,14 @@ func parseHeaders(lines []string) (headers, bool) {
 			hd.chunked = strings.Contains(strings.ToLower(value), "chunked")
 		case "user-agent":
 			hd.userAgent = value
+		case "x-forwarded-for":
+			// Repetido, o cabeçalho vale como uma lista só (RFC 9110, 5.3).
+			if hd.forwardedFor != "" {
+				value = hd.forwardedFor + ", " + value
+			}
+			hd.forwardedFor = value
+		case "authorization":
+			hd.basicUser = clientinfo.BasicUser(value)
 		}
 	}
 	return hd, true
@@ -276,6 +295,8 @@ func (c *httpConn) request(h *httpHalf, head []byte) bool {
 	c.pending = append(c.pending, pendingRequest{
 		method:   parts[0],
 		path:     path,
+		originIP: clientinfo.OriginIP(c.clientIP, hd.forwardedFor),
+		user:     hd.basicUser,
 		internal: strings.HasPrefix(hd.userAgent, InternalUserAgent),
 		at:       h.at,
 	})
@@ -312,6 +333,8 @@ func (c *httpConn) response(h *httpHalf, head []byte) bool {
 		Status:   status,
 		Latency:  max(h.at.Sub(req.at), 0),
 		ClientIP: c.clientIP,
+		OriginIP: req.originIP,
+		User:     req.user,
 		Internal: req.internal,
 		At:       req.at.UTC(),
 	})

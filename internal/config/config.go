@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/MiguelDev-GH/omni/internal/alerts"
+	"github.com/MiguelDev-GH/omni/internal/security"
 )
 
 const (
@@ -53,6 +54,10 @@ type Config struct {
 
 	// Mail configura o envio de alertas por e-mail; desligado sem OMNI_SMTP_HOST.
 	Mail alerts.MailConfig
+
+	// WatchedFiles são os arquivos de configuração cuja integridade é
+	// monitorada (OMNI_ARQUIVOS_MONITORADOS, separados por vírgula).
+	WatchedFiles []string
 
 	// extraOrigins guarda as origens de OMNI_ORIGENS já validadas, para Bind
 	// refazer AllowedOrigins com a porta real.
@@ -106,6 +111,10 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	c.Mail = mail
+	c.WatchedFiles, err = security.ParseWatchList(getenv("OMNI_ARQUIVOS_MONITORADOS"))
+	if err != nil {
+		return Config{}, err
+	}
 	return c, nil
 }
 

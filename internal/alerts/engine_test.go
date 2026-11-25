@@ -179,7 +179,7 @@ func TestForget(t *testing.T) {
 	e := NewEngine(testRules())
 	e.Observe(Sample{Rule: "up", Subject: "a:1", Value: AvailabilityDown, At: t0})
 	e.Observe(Sample{Rule: "p95", Value: 900, At: t0})
-	e.Forget(func(s string) bool { return s == "a:1" })
+	e.Forget(func(_, s string) bool { return s == "a:1" })
 	statuses, _ := e.Snapshot()
 	if len(statuses) != 1 || statuses[0].Rule != "p95" {
 		t.Fatalf("estados = %+v", statuses)

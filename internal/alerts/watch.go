@@ -305,9 +305,14 @@ func (w *Watcher) refreshNames(ctx context.Context, now time.Time) {
 		}
 	}
 	w.names = names
-	// Só portas de alvo ("nome:porta") são esquecidas; métricas globais
-	// não têm recurso.
-	w.engine.Forget(func(subject string) bool {
-		return strings.Contains(subject, ":") && !current[subject]
+	// Só portas de alvo ("nome:porta") são esquecidas. Métricas globais não
+	// têm recurso, e os recursos de segurança (IPs, contas, arquivos) são
+	// cuidados pelos próprios detectores.
+	w.engine.Forget(func(service, subject string) bool {
+		switch service {
+		case ServiceWeb, ServiceDB, ServiceDNS, ServiceSMTP:
+			return strings.Contains(subject, ":") && !current[subject]
+		}
+		return false
 	})
 }

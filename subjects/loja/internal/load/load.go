@@ -23,6 +23,10 @@ type Request struct {
 	Method string
 	Path   string
 	Body   []byte
+	// User e Password, se User não for vazio, vão na autenticação Basic.
+	User, Password string
+	// ForwardedFor simula o IP de origem que um proxy reverso informaria.
+	ForwardedFor string
 }
 
 type Kind struct {
@@ -178,6 +182,12 @@ func send(ctx context.Context, c *http.Client, base string, r Request) (int, err
 		return 0, err
 	}
 	req.Header.Set("User-Agent", UserAgent)
+	if r.User != "" {
+		req.SetBasicAuth(r.User, r.Password)
+	}
+	if r.ForwardedFor != "" {
+		req.Header.Set("X-Forwarded-For", r.ForwardedFor)
+	}
 	if r.Body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
