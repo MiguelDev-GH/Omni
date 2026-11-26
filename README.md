@@ -16,7 +16,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 
 **Documentação:** [guia de instalação](docs/INSTALACAO.md) · [runbooks de operação](docs/RUNBOOKS.md) · [playbooks de incidente](docs/PLAYBOOKS.md) · [testes de navegação](docs/TESTES-NAVEGACAO.md)
 
-> **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes e as capturas `.pcap`. Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
+> **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes, as capturas `.pcap` e o controle das varreduras (parar e rodar em paralelo). Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
 
 > **▶️ Quer rodar agora?** Vá para [Como inicializar e testar](#como-inicializar-e-testar): passo a passo para distribuições Linux, Windows com WSL2 e Windows nativo.
 
@@ -663,6 +663,8 @@ A loja cobaia ganhou a rota `POST /entrar` (autenticação Basic; contas `ana`, 
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
 
+**Planejado (Sprint 17):** parar uma varredura em andamento e iniciar outra enquanto a primeira roda, inclusive no mesmo alvo, só enquanto o limite não for atingido. O limite não é um número fixo: é o que a capacidade de containers do Docker aguenta, pela CPU e pela memória que cada um reserva; sem espaço para mais um, o pedido responde 429 e nada é iniciado. `POST /api/varreduras/{id}/cancelar` vai encerrar o container e marcar a varredura como `cancelada`, e a resposta 409 para o alvo ocupado deixa de existir. Veja a [Sprint 17](docs/SPRINTS.md#sprint-17-controle-das-varreduras).
+
 ### Windows
 
 O Omni não roda completo direto no Windows. O binário compila e a interface abre, mas dois motores ficam desligados:
@@ -707,6 +709,8 @@ Cuidados no WSL2:
 - [x] **Detecção de brute-force e password spraying** pelas respostas 401, com IP de origem atrás do proxy e usuário da autenticação Basic.
 - [x] **Integridade de arquivos de configuração** (SHA-256, permissões e dono).
 - [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
+- [ ] **Parar uma varredura em andamento** (Sprint 17).
+- [ ] **Varreduras simultâneas,** inclusive no mesmo alvo, enquanto os containers couberem na CPU e na memória (Sprint 17).
 - [x] **Novas ferramentas do Arsenal:** ffuf, Nikto, SQLMap e Amass.
 - [ ] **Gitleaks** (Vazamentos, Sprint 13).
 - [x] **Exportação de relatório em PDF** por alvo e intervalo (até 168 h).
@@ -818,7 +822,7 @@ A implementação está dividida em **4 fases**. As Sprints 1 a 8 formam a vers�
 | 1. Fundação | 1. Núcleo do backend · 2. Poller e WebSocket · 3. Frontend base |
 | 2. Observação passiva | 4. Sniffer (camadas 3 e 4) · 5. HTTP · 6. PostgreSQL |
 | 3. Arsenal | 7. Orquestrador Docker e Nmap · 8. Nuclei, testssl e comparação entre scans |
-| 4. Expansão | 9. Página por ferramenta do Arsenal · 10. Sistema · 11. ffuf e Nikto · 12. SQLMap · 13. Amass e Gitleaks · 14. Inspetor de pacotes · 15. Capturas `.pcap` · 16. PDF · backlog com o restante das pendências por camada |
+| 4. Expansão | 9. Página por ferramenta do Arsenal · 10. Sistema · 11. ffuf e Nikto · 12. SQLMap · 13. Amass e Gitleaks · 14. Inspetor de pacotes · 15. Capturas `.pcap` · 16. PDF · 17. Controle das varreduras · backlog com o restante das pendências por camada |
 
 **➡️ O que é feito em cada sprint, com entregas e status: [docs/SPRINTS.md](docs/SPRINTS.md)**
 

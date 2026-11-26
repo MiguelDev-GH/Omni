@@ -27,6 +27,7 @@
 | 14 | Inspetor de pacotes ao vivo | `feat/inspetor-pacotes` | `funcionalidade`, `motor`, `visual` |
 | 15 | Capturas `.pcap` sob demanda | `feat/capturas-pcap` | `funcionalidade`, `motor`, `visual` |
 | 16 | Exportação de relatório em PDF | `feat/relatorio-pdf` | `funcionalidade`, `visual` |
+| 17 | Parar varreduras e rodar várias ao mesmo tempo | `feat/controle-varreduras` | `funcionalidade`, `docker`, `motor`, `visual` |
 
 ## Global Constraints
 
@@ -385,3 +386,50 @@ Entrega: em Relatórios, "Exportar PDF" monta um relatório imprimível do alvo 
 **Testes:** a página monta as seções escolhidas e só elas; `window.print` é chamado depois que os dados carregam (mock); período sem dados mostra "Nenhum dado no período" na seção.
 
 PR `feat(frontend): adiciona exportação de relatório em pdf`, labels `funcionalidade` e `visual`.
+
+---
+
+## Sprint 17: Controle das varreduras
+
+Entrega: parar uma varredura em andamento e rodar várias ao mesmo tempo, inclusive no mesmo alvo, enquanto os containers aguentarem.
+
+**Limite:** a capacidade é a que o Docker informa em `/info` (`NCPU` e `MemTotal`). Cada varredura reserva 1 CPU e o maior `Memory` das suas ferramentas, que rodam em sequência (zero vale 512 MiB). Uma nova só começa se a reserva couber no que sobra, somando todos os alvos; sem nenhuma em andamento, é sempre aceita. Sem espaço, é recusada, sem fila e sem gravar nada no banco.
+
+### Tarefa 17.1: Orquestrador sem trava por alvo e com cancelamento
+
+**Files:** Modify `internal/orchestrator/orchestrator.go`, `internal/orchestrator/docker.go`, `internal/store/scans.go`; Tests
+
+**Interfaces:**
+- Produces: `func (o *Orchestrator) Cancel(scanID int64) error`; `ErrVarreduraNaoEstaRodando`; `ErrLimiteDeVarreduras`; `Runner.Capacity(ctx) (cpus int, memory int64, err error)`; status `store.ScanCanceled = "cancelada"`; evento `SCAN_CANCELADO` com `{"scan_id", "alvo_id", "achados"}`
+- Removes: `ErrVarreduraEmAndamento`; o mapa `running` passa a ser de ID da varredura para o `context.CancelFunc` dela
+
+**Testes:** duas varreduras do mesmo alvo rodam ao mesmo tempo; cancelar uma não afeta a outra; a cancelada fica `cancelada`, mantém os achados das ferramentas concluídas e não roda as seguintes; o container é removido; cancelar varredura terminada → `ErrVarreduraNaoEstaRodando`; desligar o Omni continua marcando `falhou`; com um runner falso de 2 CPUs, a terceira varredura devolve `ErrLimiteDeVarreduras` sem criar registro; o mesmo quando só a memória falta (uma segunda com Nuclei não cabe); a primeira é aceita mesmo numa capacidade menor que a reserva; erro ao ler a capacidade devolve `ErrDockerIndisponivel`; terminar, falhar ou cancelar libera a reserva; pedidos concorrentes nunca passam da capacidade (a checagem e a reserva ficam sob o mesmo mutex); `go test -race` sem corrida.
+
+### Tarefa 17.2: API de cancelamento
+
+**Files:** Modify `internal/api/scans.go`, `cmd/omni/run.go`; Tests
+
+**Interfaces:**
+- Produces: `POST /api/varreduras/{id}/cancelar` → 202; id inexistente → 404; varredura que não está rodando → 409; `POST /api/varreduras` no limite → 429 com a mensagem "sem CPU ou memória para mais uma varredura"
+- Removes: o 409 de `POST /api/varreduras` para alvo com varredura em andamento
+
+**Testes:** cada código de resposta; abaixo do limite, duas criações seguidas no mesmo alvo respondem 202; no limite, a seguinte responde 429.
+
+### Tarefa 17.3: Interface
+
+**Files:** Modify `web/src/pages/ArsenalPage.tsx`, `web/src/pages/ToolPage.tsx`, `web/src/arsenal/common.tsx`, `web/src/realtime/events.ts`; Tests
+
+- O botão de iniciar continua habilitado com uma varredura em andamento enquanto o limite não for atingido. Ao receber o 429, a tela mostra o aviso do limite e sugere parar uma varredura ou esperar o fim de uma.
+- Lista das varreduras em andamento do alvo, cada uma com status, console e botão "Parar".
+- Status "Cancelada" no histórico e em Relatórios; `SCAN_CANCELADO` atualiza a tela e mostra um aviso.
+
+**Testes:** "Parar" chama a rota da varredura certa; é possível iniciar a segunda varredura; a recusa pelo limite aparece na tela; o console de cada uma mostra só a própria saída.
+
+### Tarefa 17.4: Verificação com Docker e documentação
+
+- Contra a cobaia: parar um Nuclei no meio e conferir que o container sumiu; rodar duas varreduras ao mesmo tempo, inclusive duas com Nuclei na primeira execução, porque dividem o volume `omni-nuclei-templates`.
+- Conferir a comparação entre scans quando a varredura mais antiga termina depois da mais nova.
+- Iniciar varreduras até a recusa, conferir que o número bate com as CPUs e a memória de `docker info` e que, depois de parar uma, a nova é aceita.
+- Atualizar o README, `docs/SPRINTS.md` e `docs/TESTES-NAVEGACAO.md`.
+
+PR `feat(orquestrador): permite parar e rodar varreduras em paralelo`, labels `funcionalidade`, `docker`, `motor` e `visual`.

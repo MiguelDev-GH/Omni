@@ -24,6 +24,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
 | [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ✅ Concluída |
+| [17](#sprint-17-controle-das-varreduras) | Expansão | Parar varreduras e rodar várias ao mesmo tempo | ⏳ A fazer |
 | [Backlog](#backlog) | Expansão | Restante das pendências do README | 📋 Backlog |
 
 Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
@@ -278,6 +279,17 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 **Branch:** `feat/relatorio-pdf` · **Labels:** `funcionalidade`, `visual`
 
 **Decisões da Sprint 16:** o PDF é montado no navegador com jsPDF (gráficos em vetor, texto selecionável), em vez da janela de impressão, e cobre no máximo 168 h. Os detalhes estão em [docs/superpowers/plans/2026-11-24-relatorios-pdf.md](superpowers/plans/2026-11-24-relatorios-pdf.md).
+
+### Sprint 17: Controle das varreduras
+
+**Ao final:** o usuário para uma varredura em andamento e, enquanto o limite não for atingido, inicia outras sem esperar a primeira terminar, inclusive no mesmo alvo.
+
+- **Parar:** cada varredura em andamento (na visão geral e na página da ferramenta) tem o botão "Parar". O container é encerrado e removido, as ferramentas que faltavam não rodam, e a varredura fica como `cancelada`. Os achados das ferramentas já concluídas são mantidos.
+- **Rodar em paralelo:** um alvo pode ter várias varreduras ao mesmo tempo, até com a mesma ferramenta. Substitui a regra da Sprint 7, de uma varredura por alvo com 409 na segunda. Cada varredura tem o próprio console, status e botão "Parar".
+- Uma varredura cancelada não entra na comparação entre scans, que continua usando só as concluídas.
+- **Limite:** é o que os containers aguentam, sem número fixo nem variável de configuração. Cada varredura reserva 1 CPU e a memória da sua ferramenta mais pesada (512 MiB, ou 1,5 GiB com o Nuclei), e uma nova só começa se a reserva couber no que sobra das CPUs e da memória informadas pelo Docker, somando todos os alvos. Sem nenhuma varredura em andamento, a primeira é sempre aceita. No limite, o pedido é recusado, sem fila, e a interface explica o motivo. A reserva é liberada quando a varredura termina, falha ou é parada.
+
+**Branch:** `feat/controle-varreduras` · **Labels:** `funcionalidade`, `docker`, `motor`, `visual`
 
 ### Backlog
 
