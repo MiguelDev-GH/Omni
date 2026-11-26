@@ -52,6 +52,7 @@ Variáveis: `LOJA_ADDR` (padrão `127.0.0.1:3000`, só loopback), `LOJA_BANCO` (
 | `User-Agent: Loja-Carga/1` | Sniffer HTTP | A carga é contada (não começa com `Omni-`) |
 | `POST /entrar` (Basic; `ana`/`ana123`, `bia`/`bia123`, `carlos`/`carlos123`, `admin`/`admin`), sem limite de tentativas | Detector de brute-force | `make carga ARGS="-ataque forca-bruta -taxa 2"` e `-ataque spraying` deixam o cartão Segurança vermelho |
 | `carga -ataque ddos` (muitas origens via `X-Forwarded-For`) | Detector de pico de tráfego | "Pico de tráfego (possível DDoS)" vermelho depois de alguns minutos de carga normal |
+| `carga -dns 127.0.0.1:1053 -smtp 127.0.0.1:1025` (com `exemplos/dns-smtp` no ar) | DNS e SMTP do tráfego real | Telas DNS e SMTP com consultas por segundo, taxa de entrega, latência de envio e volume; `-dns-taxa` e `-emails-por-minuto` mudam o ritmo |
 | `Caddyfile` e `compose.yaml` | Integridade de arquivos | Com os dois em `OMNI_ARQUIVOS_MONITORADOS`, editar um deles gera alerta amarelo |
 
 O alvo `loja-tls` existe porque o testssl do Omni testa a primeira porta de aplicação do alvo. O Poller vê a porta 8443 no ar com status 400, a resposta do Caddy para HTTP sem TLS.
