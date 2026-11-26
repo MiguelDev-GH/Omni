@@ -63,14 +63,15 @@ graph TD
         App -->|TCP via lo| DB
 
         subgraph Omni["Omni (binário Go único)"]
-            Sniffer["Sniffer<br/>gopacket + reassembly<br/>(CAP_NET_RAW)"]
-            Poller["Poller<br/>HTTP / DNS / SMTP<br/>+ métricas do sistema"]
-            Orq["Orquestrador Docker<br/>(Docker SDK)"]
-            Agg["Agregador<br/>(janelas de 1s)"]
+            Sniffer["Sniffer<br/>gopacket + reassembly<br/>HTTP · PostgreSQL · DNS · SMTP<br/>(CAP_NET_RAW)"]
+            Poller["Poller<br/>sondas HTTP / TCP / DNS / SMTP"]
+            Coletores["Coletores<br/>CPU, memória, disco e I/O<br/>conexões por porta<br/>tamanho do PostgreSQL · fila SMTP"]
+            Orq["Orquestrador Docker<br/>(cliente da API do Engine)"]
+            Agg["Agregador<br/>(janelas de 1 s e 10 s)"]
+            Alertas["Motor de alertas<br/>+ e-mail"]
             API["API REST"]
             WS["Hub WebSocket"]
             Store[("SQLite (WAL)<br/>agregados")]
-            Pcap[("Arquivos .pcap<br/>rotativos")]
         end
 
         subgraph Docker["Containers efêmeros"]
@@ -83,11 +84,18 @@ graph TD
     Sniffer -.->|escuta lo / any| Proxy
     Sniffer -.-> DB
     Sniffer --> Agg
-    Sniffer --> Pcap
     Poller --> Agg
     Poller -.->|testes ativos| Proxy
+    Coletores -.->|consulta opcional| DB
+    Coletores --> Store
+    Coletores --> WS
     Agg --> Store
     Agg --> WS
+    Agg --> Alertas
+    Poller --> Alertas
+    Coletores --> Alertas
+    Alertas --> Store
+    Alertas --> WS
     Orq -->|inicia / destrói| Tools
     Tools -->|JSON / XML| Orq
     Orq -->|achados normalizados| Store
@@ -106,9 +114,10 @@ graph TD
 | **Poller** | Testes ativos periódicos: disponibilidade e latência HTTP, resolução DNS, conversa SMTP e STARTTLS. |
 | **Coletores do sistema** | CPU, memória, disco e I/O do disco (`gopsutil`), conexões TCP abertas por porta e por processo cliente (`/proc`), tamanho do PostgreSQL (conexão opcional) e fila de saída do servidor de e-mail (diretórios opcionais). |
 | **Orquestrador Docker** | Sobe containers efêmeros do arsenal com limites de CPU e RAM, coleta a saída, normaliza os achados num esquema único e destrói o container. |
-| **Agregador** | Consolida eventos em janelas de 1s (requisições por rota, status HTTP, latência, consultas, banda, protocolos) e grava em lote. |
+| **Agregador** | Consolida o tráfego em janelas de 1 s (banda, pacotes, protocolos, principais origens) e as métricas de aplicação em janelas de 10 s (requisições por rota, status e códigos HTTP, consultas ao banco, DNS e SMTP) e grava no SQLite. |
+| **Motor de alertas** | Compara as métricas com os limites de cada regra, classifica cada recurso em verde, amarelo ou vermelho e avisa as mudanças pelo WebSocket, no banco e por e-mail. |
 | **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. `GET /api/alvos/{id}/relatorio` junta o que o PDF precisa; o navegador monta o arquivo com jsPDF. |
-| **Hub WebSocket** | Envia alertas, métricas e pacotes ao frontend em lotes, com buffer por cliente. |
+| **Hub WebSocket** | Envia alertas, métricas e o andamento das varreduras ao frontend, com buffer por cliente. |
 | **Armazenamento** | SQLite em modo WAL, só com agregados, achados e relatórios das ferramentas. Capturas completas ficam em arquivos `.pcap` com retenção configurável (Sprint 15). |
 
 ### Arsenal (containers)
@@ -131,16 +140,16 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 1. **Cadastro do alvo:** o usuário informa as portas da aplicação, a porta do banco e o domínio. O formulário sugere os serviços que já escutam portas TCP na máquina (aplicações e bancos, sem os serviços do sistema), e um clique preenche host e portas.
 2. **Captura passiva:** o Sniffer aplica um filtro BPF nessas portas. A partir do tráfego gera métricas de requisições, status HTTP, latência, consultas ao banco, banda e protocolos.
 3. **Testes ativos:** o Poller verifica periodicamente se a aplicação está no ar e respondendo bem, e coleta métricas do sistema.
-4. **Agregação:** a cada segundo, o Agregador salva os agregados no SQLite e envia as atualizações em lote pelo WebSocket, e os gráficos se atualizam.
-5. **Varredura de segurança:** sob demanda ou agendada, o Orquestrador roda as ferramentas selecionadas, consolida as vulnerabilidades, compara com o scan anterior e avisa o fim pelo WebSocket.
+4. **Agregação:** a cada segundo (tráfego) e a cada 10 s (HTTP, banco, DNS e SMTP), o Agregador salva os agregados no SQLite e os envia pelo WebSocket, e os gráficos se atualizam.
+5. **Varredura de segurança:** sob demanda (o agendamento ainda não existe), o Orquestrador roda as ferramentas selecionadas, consolida as vulnerabilidades, compara com o scan anterior e avisa o fim pelo WebSocket.
 6. **Relatórios:** o usuário escolhe o alvo e o período (último dia, última semana ou de/até, no máximo 168 h) e baixa um PDF com alertas, disponibilidade, varreduras do Arsenal com os achados e os gráficos do período. Alertas, tráfego, HTTP, banco e sistema são do servidor inteiro.
 
 ## Comunicação em tempo real (WebSocket)
 
 - **Protocolo:** WebSocket puro com `gorilla/websocket` no Go e `react-use-websocket` no React. A reconexão automática fica a cargo da biblioteca do frontend.
-- **Comandos** que alteram estado (criar alvo, iniciar scan) usam a API REST. O WebSocket transporta eventos e comandos leves do Inspetor (pausar captura, mudar filtro).
+- **Comandos** que alteram estado (criar alvo, iniciar scan) usam a API REST. O WebSocket só transporta eventos do servidor para o navegador.
 - **Cada cliente tem um canal com buffer próprio.** Se o cliente ficar lento, mensagens antigas são descartadas em vez de travar o hub.
-- **Pacotes são enviados em lotes** (por exemplo, a cada 500 ms), nunca um a um.
+- **Saídas longas vão em lotes:** a saída das ferramentas do Arsenal sai a cada 500 ms, nunca linha a linha. O Inspetor de pacotes (Sprint 14) seguirá o mesmo princípio.
 
 **Conexão:** o cliente pede um ticket em `POST /api/ws/ticket`, com o token da API, e abre a conexão em `GET /ws?ticket=<ticket>`. O ticket vale por 30 s e só pode ser usado uma vez:
 
@@ -149,7 +158,7 @@ curl -s -X POST -H "Authorization: Bearer $OMNI_TOKEN" 127.0.0.1:<porta>/api/ws/
 # {"ticket":"..."}  →  ws://127.0.0.1:<porta>/ws?ticket=...
 ```
 
-Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta sprint:
+Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos:
 
 ```json
 { "tipo": "STATUS_ALVOS", "dados": { "resultados": [ { "alvo_id": 1, "porta": 3000, "tipo": "http", "no_ar": true, "status_http": 200, "latencia_ms": 1.2, "hora": "2026-11-20T17:31:46Z" } ] } }
@@ -171,15 +180,15 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "SCAN_FALHOU", "dados": { "scan_id": 4, "alvo_id": 1, "erro": "nmap: a ferramenta terminou com código 1", "achados": 0 } }
 ```
 
-- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`); a mesma retenção vale para as métricas de tráfego, HTTP, banco, sistema e para o histórico de alertas, e o histórico de cada alvo traz até 2880 resultados por porta.
+- `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação, TCP na porta do banco e as sondas DNS e SMTP nas portas desses serviços. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`); a mesma retenção vale para as métricas de tráfego, HTTP, banco, sistema e para o histórico de alertas, e o histórico de cada alvo traz até 2880 resultados por porta.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
 - `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem e o I/O desse disco no intervalo: bytes lidos e escritos por segundo, IOPS, tempo médio por operação (`latencia_disco_ms`) e percentual de tempo ocupado. `io` é `false` na primeira leitura e quando o dispositivo não é encontrado (como no Windows nativo). As leituras ficam no banco por `OMNI_RETENCAO_VERIFICACOES` e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
-- `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta; as portas da aplicação contam como HTTP.
+- `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta: as portas da aplicação contam como HTTP, e as portas DNS e SMTP dos alvos, como DNS e SMTP.
 - `ESTADO_MOTORES` sai a cada 5 s e a cada mudança, com o estado do sniffer: `ativo`, `inativo` (sem alvos cadastrados) ou `sem-permissao` (falta `CAP_NET_RAW`; o resto do Omni segue no ar).
-- As janelas com tráfego ficam 24 h no banco e saem em `GET /api/trafego` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 3600 janelas).
+- As janelas com tráfego ficam no banco por `OMNI_RETENCAO_VERIFICACOES` e saem em `GET /api/trafego` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 3600 janelas).
 - `METRICAS_HTTP` sai a cada 10 s: o sniffer remonta os fluxos TCP das portas da aplicação (`gopacket/reassembly`, até 4 MiB em buffer por conexão, fluxos ociosos fechados em 2 min), pareia requisição e resposta (inclusive em pipeline e fora de ordem) e agrega contagem, classes de status e latência p50/p95 por rota normalizada (`/users/123` vira `/users/:id`). Cabeçalhos, query strings e corpos nunca são guardados, e o tráfego com User-Agent `Omni-` (Poller e Arsenal) fica fora. Rotas: `GET /api/requisicoes` (janelas, últimos 15 minutos) e `GET /api/requisicoes/rotas` (as 100 rotas de mais volume das últimas 24 h).
-- `METRICAS_BANCO` sai a cada 10 s com as consultas ao PostgreSQL na porta do banco dos alvos (consultas simples e Parse/Bind/Execute, com erros). O SQL é normalizado: literais viram `?`, comentários somem e listas viram `(?)`. Mensagens de senha nunca são lidas, e conexões com TLS são ignoradas. Rotas: `GET /api/consultas` e `GET /api/consultas/lentas?limite=` (padrão 20, as de maior p95 em 24 h). As métricas HTTP e de banco ficam 24 h no banco, como as de tráfego.
+- `METRICAS_BANCO` sai a cada 10 s com as consultas ao PostgreSQL na porta do banco dos alvos (consultas simples e Parse/Bind/Execute, com erros). O SQL é normalizado: literais viram `?`, comentários somem e listas viram `(?)`. Mensagens de senha nunca são lidas, e conexões com TLS são ignoradas. Rotas: `GET /api/consultas` e `GET /api/consultas/lentas?limite=` (padrão 20, as de maior p95 em 24 h). As métricas HTTP, de banco, DNS e SMTP seguem a mesma retenção (`OMNI_RETENCAO_VERIFICACOES`).
 - `METRICAS_HTTP` traz também `codigos`, a contagem das respostas de erro (status 400 ou maior) pelo código exato.
 - `METRICAS_BANCO` traz os rollbacks pedidos pela aplicação em `tipos.ROLLBACK` e as transações abortadas por erro em `transacoes_falhas` (o `ReadyForQuery` do PostgreSQL passa a informar o estado `E`; cada transação conta uma vez).
 - `METRICAS_DNS` e `METRICAS_SMTP` saem a cada 10 s com o que o sniffer viu nas portas DNS e SMTP dos alvos; veja [Tráfego real](#tráfego-real). Rotas: `GET /api/dns`, `GET /api/smtp` e `GET /api/smtp/fila`.
@@ -203,7 +212,7 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 
 `make loja` sobe a loja cobaia (PostgreSQL, Caddy, API e carga) até Ctrl+C, sem credenciais: ela não conhece o Omni. `make loja port=3001` troca a porta da API (padrão 3000) e o Caddy acompanha. Para cadastrar os alvos no Omni, rode `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja-cadastrar` (token e porta saem no terminal do `make backend`) ou use a página de Alvos.
 
-**Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker) e notificações.
+**Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker), troca de tema e botão Sair. Os avisos (quedas, alertas, fim de varreduras) aparecem como notificações flutuantes no canto da tela.
 
 **Barra lateral:**
 
@@ -234,7 +243,7 @@ Para testar o Omni de ponta a ponta sem uma aplicação real, a pasta [subjects/
 
 ## Alertas e notificação por e-mail
 
-O motor de alertas (`internal/alerts`) observa os mesmos eventos que o frontend recebe (`STATUS_ALVOS`, `METRICAS_HTTP`, `METRICAS_BANCO` e `METRICAS_SISTEMA`), compara cada métrica com dois limites e classifica o recurso em três níveis:
+O motor de alertas (`internal/alerts`) observa os mesmos eventos que o frontend recebe (`STATUS_ALVOS`, `METRICAS_HTTP`, `METRICAS_BANCO`, `METRICAS_DNS`, `METRICAS_SMTP`, `FILA_SMTP` e `METRICAS_SISTEMA`), mais os detectores de segurança, compara cada métrica com dois limites e classifica o recurso em três níveis:
 
 | Nível | Significado | Ação |
 |---|---|---|
@@ -267,7 +276,7 @@ Um nível só muda depois que a condição se mantém pelo tempo da regra (colun
 | Pico de tráfego (possível DDoS) | Segurança | 3x o normal | 6x o normal | imediato |
 | Arquivo de configuração alterado | Segurança | conteúdo, permissões ou dono mudaram (por 5 min) | arquivo removido ou ilegível | imediato |
 
-As taxas e o p95 só contam com pelo menos 20 requisições ou consultas na janela de 10 s, para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
+As taxas e o p95 só contam com volume mínimo na janela de 10 s (20 requisições, consultas ao banco ou consultas DNS; 10 envios SMTP), para uma única falha não virar "50% de erro". Cada mudança de nível sai no WebSocket como `ALERTA`, aparece na tela **Alertas** (`/alertas`) e em `GET /api/alertas` (nível atual por recurso, últimas 200 mudanças, regras e estado do e-mail):
 
 ```json
 { "tipo": "ALERTA", "dados": { "id": 3, "regra": "http_p95", "servico": "web", "nome": "Latência p95 das requisições", "recurso": "", "nivel": "amarelo", "nivel_anterior": "verde", "valor": 1234.5, "limite": 1000, "unidade": "ms", "hora": "2026-11-21T20:10:00Z" } }
@@ -427,7 +436,7 @@ A loja cobaia ganhou a rota `POST /entrar` (autenticação Basic; contas `ana`, 
   ```bash
   sudo setcap cap_net_raw,cap_net_admin=eip ./omni
   ```
-- **Interface de captura:** `OMNI_INTERFACE` (padrão `any`, que inclui o loopback). O filtro BPF cobre as portas TCP de todos os alvos e é refeito quando os alvos mudam.
+- **Interface de captura:** `OMNI_INTERFACE` (padrão `any`, que inclui o loopback). O filtro BPF cobre as portas TCP de todos os alvos (aplicação, banco e SMTP) e a porta UDP do DNS, e é refeito quando os alvos mudam.
 - **Docker** instalado, só para o Arsenal. O Omni fala com a API do Docker Engine pelo socket Unix (`/var/run/docker.sock` ou `DOCKER_HOST=unix://...`), então o usuário que roda o Omni precisa de acesso a ele. Os containers rodam com `network_mode: host`, 1 CPU e 512 MiB; o Nuclei recebe 1,5 GiB, porque carregar os templates passa de 512 MiB. Os templates do Nuclei ficam no volume `omni-nuclei-templates` e são baixados na primeira varredura.
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
@@ -540,7 +549,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 ## Limitações conhecidas
 
 - **Scans locais não representam a visão de um atacante externo.** Eles enxergam portas ligadas só a `127.0.0.1` e ignoram firewall e security groups da nuvem. Por isso aparecem rotulados como "visão interna".
-- **O tráfego gerado pelos próprios scans** precisa ser marcado e filtrado das métricas, pela origem ou por um User-Agent próprio. Sem isso, os gráficos de requisições e de status HTTP ficam poluídos.
+- **O tráfego gerado pelo próprio Omni** fica fora das métricas só quando é identificável: o HTTP do Poller e do Arsenal pelo User-Agent `Omni-` e a sonda SMTP pelo `EHLO omni-sonda.localhost`. O Nmap e o testssl não mandam esse User-Agent, então as varreduras deles ainda aparecem no tráfego.
 - **Aplicações que usam SQLite como banco** não geram tráfego de rede, então não há gráfico de consultas para elas.
 - **Traceroute** só faz sentido para destinos externos ao servidor.
 - **O Amass precisa de acesso à internet:** em modo passivo, ele consulta fontes públicas (certificados, DNS passivo) sobre o domínio do alvo, sem mandar tráfego ao alvo. Sem internet, a varredura termina sem subdomínios.
@@ -597,6 +606,6 @@ O plano técnico detalhado (arquivos, interfaces e testes de cada tarefa) fica e
 
 | Camada | Tecnologias |
 |---|---|
-| **Backend** | Go, `gopacket/gopacket` (fork mantido), `gopacket/reassembly`, cliente mínimo da API do Docker Engine (sem o Docker SDK), `gorilla/websocket`, `gopsutil`, SQLite |
-| **Frontend** | React + TypeScript, Tailwind CSS, Zustand, TanStack Table, Recharts, `react-use-websocket` |
-| **Arsenal** | Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl.sh, Gitleaks |
+| **Backend** | Go, `gopacket/gopacket` (fork mantido), `gopacket/reassembly`, cliente mínimo da API do Docker Engine (sem o Docker SDK), `gorilla/websocket`, `gopsutil`, SQLite (`modernc.org/sqlite`), `jackc/pgx` (tamanho do PostgreSQL) |
+| **Frontend** | React + TypeScript, React Router, Tailwind CSS, Zustand, TanStack Table, Recharts, `react-use-websocket`, jsPDF |
+| **Arsenal** | Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl.sh (Gitleaks na Sprint 13) |
