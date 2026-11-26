@@ -20,7 +20,8 @@ const maxRequestLine = 2048
 
 // PacketSummary é uma linha do Inspetor. No HTTP, Info traz só o método e a
 // rota normalizada (ou o status da resposta); no PostgreSQL, só o tipo da
-// mensagem. Cabeçalhos, query string e corpo nunca entram.
+// mensagem. Cabeçalhos, query string e corpo nunca entram. No TCP, Seq, Ack e
+// Payload deixam o Inspetor ligar cada ACK ao segmento que ele confirma.
 type PacketSummary struct {
 	Time     time.Time `json:"hora"`
 	Src      string    `json:"origem"`
@@ -31,6 +32,9 @@ type PacketSummary struct {
 	Length   int       `json:"tamanho"`
 	Flags    string    `json:"flags"`
 	Info     string    `json:"info"`
+	Seq      uint32    `json:"seq"`
+	Ack      uint32    `json:"ack"`
+	Payload  int       `json:"carga"`
 }
 
 // Summarize resume p para o Inspetor. As portas classificam o protocolo como
@@ -57,6 +61,8 @@ func Summarize(p gopacket.Packet, roles PortRoles, dbPorts []int) PacketSummary 
 		s.SrcPort, s.DstPort = int(tr.SrcPort), int(tr.DstPort)
 		s.Protocol = Classify(uint16(tr.SrcPort), uint16(tr.DstPort), false, roles)
 		s.Flags = tcpFlags(tr)
+		s.Seq, s.Ack = tr.Seq, tr.Ack
+		s.Payload = tcpPayloadLen(p.NetworkLayer(), tr)
 		switch {
 		case slices.Contains(roles.App, s.SrcPort) || slices.Contains(roles.App, s.DstPort):
 			s.Info = httpInfo(tr.Payload)
@@ -88,6 +94,27 @@ func (s PacketSummary) MatchesFilter(f ws.InspectorFilter) bool {
 		return false
 	}
 	return f.Protocol == "" || strings.EqualFold(f.Protocol, s.Protocol)
+}
+
+// tcpPayloadLen devolve o tamanho da carga TCP pelo cabeçalho IP, porque a
+// captura corta pacotes grandes (snaplen) e os bytes capturados encolhem. Sem
+// o tamanho no cabeçalho (offload de segmentação), usa os bytes capturados.
+func tcpPayloadLen(ip gopacket.NetworkLayer, t *layers.TCP) int {
+	n := -1
+	switch ip := ip.(type) {
+	case *layers.IPv4:
+		if ip.Length > 0 {
+			n = int(ip.Length) - int(ip.IHL)*4 - int(t.DataOffset)*4
+		}
+	case *layers.IPv6:
+		if ip.Length > 0 {
+			n = int(ip.Length) - int(t.DataOffset)*4
+		}
+	}
+	if n < 0 {
+		return len(t.Payload)
+	}
+	return n
 }
 
 func tcpFlags(t *layers.TCP) string {
