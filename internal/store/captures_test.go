@@ -16,7 +16,7 @@ func TestCapturesRoundTrip(t *testing.T) {
 	s := openTest(t)
 	t0 := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	c, err := s.CreateCapture(ctx, capture.Capture{StartedAt: t0, Duration: 60, Port: 3000})
+	c, err := s.CreateCapture(ctx, capture.Capture{StartedAt: t0, Duration: 60, IP: "10.0.0.1", Port: 3000, Protocol: "HTTP"})
 	require.NoError(t, err)
 	assert.Equal(t, capture.FileName(c.ID), c.File)
 	assert.Equal(t, capture.StatusRecording, c.Status)

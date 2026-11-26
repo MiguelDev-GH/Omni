@@ -206,7 +206,7 @@ func httpFrame(sport, dport uint16) []byte {
 func TestRecordWritesReadablePcap(t *testing.T) {
 	r, st, snif, pub := newRecorder(t)
 	ctx := context.Background()
-	id, err := r.Start(ctx, 150*time.Millisecond, 0)
+	id, err := r.Start(ctx, 150*time.Millisecond, ws.InspectorFilter{})
 	require.NoError(t, err)
 	snif.send(httpFrame(40000, 3000), httpFrame(40001, 3000))
 
@@ -237,17 +237,35 @@ func TestRecordWritesReadablePcap(t *testing.T) {
 
 func TestRecordFiltersByPort(t *testing.T) {
 	r, st, snif, _ := newRecorder(t)
-	id, err := r.Start(context.Background(), 100*time.Millisecond, 5432)
+	id, err := r.Start(context.Background(), 100*time.Millisecond, ws.InspectorFilter{Port: 5432})
 	require.NoError(t, err)
 	snif.send(httpFrame(40000, 3000), httpFrame(40001, 5432), httpFrame(5432, 40002))
-	assert.Equal(t, 2, waitDone(t, st, id).Packets)
+	c := waitDone(t, st, id)
+	assert.Equal(t, 2, c.Packets)
+	assert.Equal(t, 5432, c.Port)
+}
+
+func TestRecordUsesTheInspectorFilter(t *testing.T) {
+	r, st, snif, _ := newRecorder(t)
+	f := ws.InspectorFilter{IP: "::ffff:10.0.0.9", Protocol: "http"}
+	id, err := r.Start(context.Background(), 100*time.Millisecond, f)
+	require.NoError(t, err)
+	snif.send(
+		testutil.TCP("10.0.0.9", "10.0.0.2", 40000, 3000, "PA", []byte("GET / HTTP/1.1\r\n\r\n")),
+		testutil.TCP("10.0.0.1", "10.0.0.2", 40001, 3000, "PA", []byte("GET / HTTP/1.1\r\n\r\n")),
+		testutil.TCP("10.0.0.9", "10.0.0.2", 40002, 5432, "PA", nil),
+	)
+	c := waitDone(t, st, id)
+	assert.Equal(t, 1, c.Packets, "só o HTTP do IP 10.0.0.9 entra")
+	assert.Equal(t, "10.0.0.9", c.IP, "o IP é gravado na forma canônica")
+	assert.Equal(t, "http", c.Protocol)
 }
 
 func TestRecordStopsAtSizeLimit(t *testing.T) {
 	r, st, snif, _ := newRecorder(t)
 	frame := httpFrame(40000, 3000)
 	r.maxFile = headerBytes + 2*int64(recordHeaderBytes+len(frame))
-	id, err := r.Start(context.Background(), 5*time.Second, 0)
+	id, err := r.Start(context.Background(), 5*time.Second, ws.InspectorFilter{})
 	require.NoError(t, err)
 	snif.send(frame, frame, frame, frame)
 
@@ -260,23 +278,25 @@ func TestRecordStopsAtSizeLimit(t *testing.T) {
 func TestStartRejectsSecondCaptureAndBadInput(t *testing.T) {
 	r, st, _, _ := newRecorder(t)
 	ctx := context.Background()
-	_, err := r.Start(ctx, time.Millisecond, 0)
+	_, err := r.Start(ctx, time.Millisecond, ws.InspectorFilter{})
 	assert.ErrorIs(t, err, ErrDuracaoInvalida)
-	_, err = r.Start(ctx, 301*time.Second, 0)
+	_, err = r.Start(ctx, 301*time.Second, ws.InspectorFilter{})
 	assert.ErrorIs(t, err, ErrDuracaoInvalida)
-	_, err = r.Start(ctx, time.Second, 70000)
-	assert.ErrorIs(t, err, ErrPortaInvalida)
+	_, err = r.Start(ctx, time.Second, ws.InspectorFilter{Port: 70000})
+	assert.ErrorIs(t, err, ErrFiltroInvalido)
+	_, err = r.Start(ctx, time.Second, ws.InspectorFilter{IP: "loja.local"})
+	assert.ErrorIs(t, err, ErrFiltroInvalido)
 
-	id, err := r.Start(ctx, 100*time.Millisecond, 0)
+	id, err := r.Start(ctx, 100*time.Millisecond, ws.InspectorFilter{})
 	require.NoError(t, err)
-	_, err = r.Start(ctx, time.Second, 0)
+	_, err = r.Start(ctx, time.Second, ws.InspectorFilter{})
 	assert.ErrorIs(t, err, ErrEmAndamento)
 	assert.ErrorIs(t, r.Delete(ctx, id), ErrAindaGravando)
 	_, _, err = r.Open(ctx, id)
 	assert.ErrorIs(t, err, ErrAindaGravando)
 
 	waitDone(t, st, id)
-	_, err = r.Start(ctx, 100*time.Millisecond, 0)
+	_, err = r.Start(ctx, 100*time.Millisecond, ws.InspectorFilter{})
 	assert.NoError(t, err, "a vez é liberada quando a captura termina")
 }
 
@@ -284,20 +304,20 @@ func TestStartRefusesWithoutSnifferOrSpace(t *testing.T) {
 	r, _, snif, _ := newRecorder(t)
 	ctx := context.Background()
 	snif.state = sniffer.StateNoPermission
-	_, err := r.Start(ctx, time.Second, 0)
+	_, err := r.Start(ctx, time.Second, ws.InspectorFilter{})
 	assert.ErrorIs(t, err, ErrSnifferInativo)
 
 	snif.state = sniffer.StateActive
 	require.NoError(t, os.MkdirAll(r.dir, 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(r.dir, "outra.pcap"), make([]byte, 64), 0o600))
 	r.maxDir = 64
-	_, err = r.Start(ctx, time.Second, 0)
+	_, err = r.Start(ctx, time.Second, ws.InspectorFilter{})
 	assert.ErrorIs(t, err, ErrDiretorioCheio)
 }
 
 func TestEmptyCaptureIsStillAValidFile(t *testing.T) {
 	r, st, _, _ := newRecorder(t)
-	id, err := r.Start(context.Background(), 20*time.Millisecond, 0)
+	id, err := r.Start(context.Background(), 20*time.Millisecond, ws.InspectorFilter{})
 	require.NoError(t, err)
 	c := waitDone(t, st, id)
 	assert.Equal(t, StatusDone, c.Status)
@@ -310,7 +330,7 @@ func TestEmptyCaptureIsStillAValidFile(t *testing.T) {
 
 func TestPacketsSummarizesPages(t *testing.T) {
 	r, st, snif, _ := newRecorder(t)
-	id, err := r.Start(context.Background(), 200*time.Millisecond, 0)
+	id, err := r.Start(context.Background(), 200*time.Millisecond, ws.InspectorFilter{})
 	require.NoError(t, err)
 	frames := make([][]byte, PageSize+3)
 	for i := range frames {
@@ -339,7 +359,7 @@ func TestDeleteAndRetentionRemoveFileAndRow(t *testing.T) {
 	ctx := context.Background()
 	var ids []int64
 	for range 2 {
-		id, err := r.Start(ctx, 10*time.Millisecond, 0)
+		id, err := r.Start(ctx, 10*time.Millisecond, ws.InspectorFilter{})
 		require.NoError(t, err)
 		waitDone(t, st, id)
 		ids = append(ids, id)
@@ -362,7 +382,7 @@ func TestDeleteAndRetentionRemoveFileAndRow(t *testing.T) {
 func TestOpenRefusesMissingFileAndPathsOutsideDir(t *testing.T) {
 	r, st, _, _ := newRecorder(t)
 	ctx := context.Background()
-	id, err := r.Start(ctx, 10*time.Millisecond, 0)
+	id, err := r.Start(ctx, 10*time.Millisecond, ws.InspectorFilter{})
 	require.NoError(t, err)
 	c := waitDone(t, st, id)
 	require.NoError(t, os.Remove(filepath.Join(r.dir, c.File)))

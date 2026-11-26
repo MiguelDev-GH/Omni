@@ -13,11 +13,12 @@ import (
 
 	"github.com/MiguelDev-GH/omni/internal/capture"
 	"github.com/MiguelDev-GH/omni/internal/sniffer"
+	"github.com/MiguelDev-GH/omni/internal/ws"
 )
 
 // Captures grava e serve as capturas .pcap; é o capture.Recorder.
 type Captures interface {
-	Start(ctx context.Context, d time.Duration, port int) (int64, error)
+	Start(ctx context.Context, d time.Duration, f ws.InspectorFilter) (int64, error)
 	List(ctx context.Context) ([]capture.Capture, error)
 	Open(ctx context.Context, id int64) (*os.File, capture.Capture, error)
 	Packets(ctx context.Context, id int64, page int) ([]sniffer.PacketSummary, capture.Capture, error)
@@ -25,13 +26,13 @@ type Captures interface {
 }
 
 type captureRequest struct {
-	Duration int `json:"duracao_s"`
-	Port     int `json:"porta"`
+	Duration int                `json:"duracao_s"`
+	Filter   ws.InspectorFilter `json:"filtro"`
 }
 
-// StartCaptureHandler responde POST /api/capturas {"duracao_s", "porta"}
-// com 202 e o id da captura, que grava em segundo plano. Porta 0 grava todas
-// as portas dos alvos.
+// StartCaptureHandler responde POST /api/capturas {"duracao_s", "filtro"}
+// com 202 e o id da captura, que grava em segundo plano. O filtro é o do
+// Inspetor ({"ip", "porta", "protocolo"}); vazio grava tudo o que o sniffer vê.
 func StartCaptureHandler(c Captures) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req captureRequest
@@ -39,14 +40,14 @@ func StartCaptureHandler(c Captures) http.Handler {
 			writeError(w, status, msg)
 			return
 		}
-		id, err := c.Start(r.Context(), time.Duration(req.Duration)*time.Second, req.Port)
+		id, err := c.Start(r.Context(), time.Duration(req.Duration)*time.Second, req.Filter)
 		switch {
 		case err == nil:
 			writeJSON(w, http.StatusAccepted, map[string]int64{"id": id})
 		case errors.Is(err, capture.ErrDuracaoInvalida):
 			writeField(w, http.StatusBadRequest, err.Error(), "duracao_s")
-		case errors.Is(err, capture.ErrPortaInvalida):
-			writeField(w, http.StatusBadRequest, err.Error(), "porta")
+		case errors.Is(err, capture.ErrFiltroInvalido):
+			writeField(w, http.StatusBadRequest, err.Error(), "filtro")
 		case errors.Is(err, capture.ErrEmAndamento), errors.Is(err, capture.ErrDiretorioCheio):
 			writeError(w, http.StatusConflict, err.Error())
 		case errors.Is(err, capture.ErrSnifferInativo):

@@ -101,14 +101,16 @@ func New(ctx context.Context, dir string, st Store, snif Sniffer, pub ws.Publish
 // Wait espera as gravações em andamento terminarem.
 func (r *Recorder) Wait() { r.wg.Wait() }
 
-// Start começa a gravar por d os pacotes da porta port (0 para todas as
-// portas dos alvos) e devolve o id da captura, sem esperar o fim.
-func (r *Recorder) Start(ctx context.Context, d time.Duration, port int) (int64, error) {
+// Start começa a gravar por d os pacotes que passam no filtro do Inspetor
+// (vazio grava tudo o que o sniffer vê) e devolve o id da captura, sem
+// esperar o fim.
+func (r *Recorder) Start(ctx context.Context, d time.Duration, f ws.InspectorFilter) (int64, error) {
 	if d < r.minDur || d > MaxDuration {
 		return 0, ErrDuracaoInvalida
 	}
-	if port < 0 || port > 65535 {
-		return 0, ErrPortaInvalida
+	f, ok := ws.NormalizeFilter(f)
+	if !ok {
+		return 0, ErrFiltroInvalido
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -128,23 +130,30 @@ func (r *Recorder) Start(ctx context.Context, d time.Duration, port int) (int64,
 	if used >= r.maxDir {
 		return 0, ErrDiretorioCheio
 	}
-	c, err := r.st.CreateCapture(ctx, Capture{StartedAt: time.Now(), Duration: int(d / time.Second), Port: port})
+	// O protocolo de cada pacote sai das portas dos alvos, como no Inspetor.
+	ts, err := r.targets(ctx)
 	if err != nil {
 		return 0, err
 	}
-	f, err := os.OpenFile(filepath.Join(r.dir, c.File), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	c, err := r.st.CreateCapture(ctx, Capture{
+		StartedAt: time.Now(), Duration: int(d / time.Second), IP: f.IP, Port: f.Port, Protocol: f.Protocol,
+	})
+	if err != nil {
+		return 0, err
+	}
+	file, err := os.OpenFile(filepath.Join(r.dir, c.File), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		c.Status, c.Error = StatusFailed, "não foi possível criar o arquivo"
 		r.finish(c, false)
 		return 0, fmt.Errorf("criar o arquivo da captura: %w", err)
 	}
-	rec := &recording{port: port, ch: make(chan packet, bufferSize)}
+	rec := &recording{filter: f, roles: sniffer.RolesFor(ts), db: sniffer.DBPorts(ts), ch: make(chan packet, bufferSize)}
 	r.active = c.ID
 	remove := r.snif.AddRawTap(rec.tap)
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		r.record(c, f, rec, remove, d, min(r.maxFile, r.maxDir-used))
+		r.record(c, file, rec, remove, d, min(r.maxFile, r.maxDir-used))
 	}()
 	r.pub.Publish(ws.Event{Type: EventStarted, Data: c})
 	return c.ID, nil
@@ -158,13 +167,15 @@ type packet struct {
 
 // recording recebe os pacotes do tap, na goroutine da captura.
 type recording struct {
-	port    int
+	filter  ws.InspectorFilter
+	roles   sniffer.PortRoles
+	db      []int
 	ch      chan packet
 	dropped atomic.Int64
 }
 
 func (rec *recording) tap(p gopacket.Packet, link layers.LinkType) {
-	if rec.port != 0 && !hasPort(p, rec.port) {
+	if rec.filter != (ws.InspectorFilter{}) && !sniffer.Summarize(p, rec.roles, rec.db).MatchesFilter(rec.filter) {
 		return
 	}
 	ci := p.Metadata().CaptureInfo
@@ -178,16 +189,6 @@ func (rec *recording) tap(p gopacket.Packet, link layers.LinkType) {
 	default:
 		rec.dropped.Add(1)
 	}
-}
-
-func hasPort(p gopacket.Packet, port int) bool {
-	switch t := p.TransportLayer().(type) {
-	case *layers.TCP:
-		return int(t.SrcPort) == port || int(t.DstPort) == port
-	case *layers.UDP:
-		return int(t.SrcPort) == port || int(t.DstPort) == port
-	}
-	return false
 }
 
 // record grava até d passar, o arquivo chegar a limit bytes ou o Omni

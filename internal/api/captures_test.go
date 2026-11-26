@@ -82,7 +82,7 @@ func newCaptureServer(t *testing.T) (*Server, string, func() int64) {
 	// recordOne só funciona uma vez por servidor: o fim da gravação vem do
 	// cancelamento do contexto do gravador.
 	recordOne := func() int64 {
-		resp := do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "porta": 0}`, true)
+		resp := do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "filtro": {"ip": "", "porta": 0, "protocolo": ""}}`, true)
 		require.Equal(t, http.StatusAccepted, resp.Code, resp.Body.String())
 		id := decode[map[string]int64](t, resp)["id"]
 		snif.send(testutil.TCP("10.0.0.1", "10.0.0.2", 40000, 3000, "PA", []byte("GET /produtos/7 HTTP/1.1\r\n\r\n")))
@@ -136,15 +136,15 @@ func TestCaptureMissingIDIs404(t *testing.T) {
 
 func TestStartCaptureValidatesAndRejectsSecond(t *testing.T) {
 	srv, _, _ := newCaptureServer(t)
-	resp := do(t, srv, "POST", "/api/capturas", `{"duracao_s": 5, "porta": 0}`, true)
+	resp := do(t, srv, "POST", "/api/capturas", `{"duracao_s": 5}`, true)
 	assert.Equal(t, http.StatusBadRequest, resp.Code)
 	assert.Equal(t, "duracao_s", decode[map[string]string](t, resp)["campo"])
-	resp = do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "porta": 70000}`, true)
-	assert.Equal(t, "porta", decode[map[string]string](t, resp)["campo"])
+	resp = do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "filtro": {"porta": 70000}}`, true)
+	assert.Equal(t, "filtro", decode[map[string]string](t, resp)["campo"])
 	assert.Equal(t, http.StatusBadRequest, do(t, srv, "POST", "/api/capturas", `{"duracao": 60}`, true).Code)
 
-	require.Equal(t, http.StatusAccepted, do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "porta": 0}`, true).Code)
-	assert.Equal(t, http.StatusConflict, do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "porta": 0}`, true).Code)
+	require.Equal(t, http.StatusAccepted, do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "filtro": {"ip": "", "porta": 0, "protocolo": ""}}`, true).Code)
+	assert.Equal(t, http.StatusConflict, do(t, srv, "POST", "/api/capturas", `{"duracao_s": 60, "filtro": {"ip": "", "porta": 0, "protocolo": ""}}`, true).Code)
 	assert.Equal(t, http.StatusConflict, do(t, srv, "GET", "/api/capturas/1/arquivo", "", true).Code,
 		"o arquivo só sai depois do fim da gravação")
 	assert.Equal(t, http.StatusConflict, do(t, srv, "DELETE", "/api/capturas/1", "", true).Code)

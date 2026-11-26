@@ -8,7 +8,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/capture"
 )
 
-const captureColumns = "id, file, started_ms, finished_ms, duration_s, port, packets, bytes, dropped, status, error"
+const captureColumns = "id, file, started_ms, finished_ms, duration_s, ip, port, protocol, packets, bytes, dropped, status, error"
 
 // CreateCapture grava uma captura com status "gravando" e o arquivo
 // capture-<id>.pcap, e a devolve com o ID do banco.
@@ -19,8 +19,8 @@ func (s *Store) CreateCapture(ctx context.Context, c capture.Capture) (capture.C
 	}
 	defer func() { _ = tx.Rollback() }()
 	res, err := tx.ExecContext(ctx,
-		"INSERT INTO captures (started_ms, duration_s, port, status) VALUES (?, ?, ?, ?)",
-		c.StartedAt.UnixMilli(), c.Duration, c.Port, capture.StatusRecording)
+		"INSERT INTO captures (started_ms, duration_s, ip, port, protocol, status) VALUES (?, ?, ?, ?, ?, ?)",
+		c.StartedAt.UnixMilli(), c.Duration, c.IP, c.Port, c.Protocol, capture.StatusRecording)
 	if err != nil {
 		return c, err
 	}
@@ -119,7 +119,7 @@ func (s *Store) queryCaptures(ctx context.Context, query string, args ...any) ([
 			started  int64
 			finished sql.NullInt64
 		)
-		if err := rows.Scan(&c.ID, &c.File, &started, &finished, &c.Duration, &c.Port,
+		if err := rows.Scan(&c.ID, &c.File, &started, &finished, &c.Duration, &c.IP, &c.Port, &c.Protocol,
 			&c.Packets, &c.Bytes, &c.Dropped, &c.Status, &c.Error); err != nil {
 			return nil, err
 		}
