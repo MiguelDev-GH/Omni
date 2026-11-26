@@ -91,7 +91,8 @@ func write(conn *websocket.Conn, kind int, msg []byte) error {
 	return conn.WriteMessage(kind, msg)
 }
 
-// readLoop descarta o que o cliente envia e mantém o deadline renovado pelos pongs.
+// readLoop lê os comandos INSPETOR do cliente, descarta as outras mensagens e
+// mantém o deadline renovado pelos pongs.
 func readLoop(conn *websocket.Conn, h *Hub, c *client) {
 	defer h.unsubscribe(c)
 	conn.SetReadLimit(readLimit)
@@ -102,8 +103,16 @@ func readLoop(conn *websocket.Conn, h *Hub, c *client) {
 		return conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
 			return
+		}
+		if cmd, ok := parseInspectorCommand(msg); ok {
+			var f *InspectorFilter
+			if cmd.Active {
+				f = &cmd.Filter
+			}
+			h.setInspect(c, f)
 		}
 	}
 }

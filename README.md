@@ -371,7 +371,7 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 - **Protocolo:** WebSocket puro com `gorilla/websocket` no Go e `react-use-websocket` no React. A reconexão automática fica a cargo da biblioteca do frontend.
 - **Comandos** que alteram estado (criar alvo, iniciar scan) usam a API REST. O WebSocket só transporta eventos do servidor para o navegador.
 - **Cada cliente tem um canal com buffer próprio.** Se o cliente ficar lento, mensagens antigas são descartadas em vez de travar o hub.
-- **Saídas longas vão em lotes:** a saída das ferramentas do Arsenal sai a cada 500 ms, nunca linha a linha. O Inspetor de pacotes (Sprint 14) seguirá o mesmo princípio.
+- **Saídas longas vão em lotes:** a saída das ferramentas do Arsenal sai a cada 500 ms, nunca linha a linha, e os pacotes do Inspetor saem a cada 250 ms, com no máximo 500 por lote.
 
 **Conexão:** o cliente pede um ticket em `POST /api/ws/ticket`, com o token da API, e abre a conexão em `GET /ws?ticket=<ticket>`. O ticket vale por 30 s e só pode ser usado uma vez:
 
@@ -419,6 +419,7 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos:
 - O Docker informa o estado no `ESTADO_MOTORES` a cada 5 s: `ativo` ou `indisponivel`.
 - `ALERTA` sai quando uma métrica muda de nível (verde, amarelo ou vermelho); veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
 - `SCAN_LOG` leva a saída da ferramenta em lotes a cada 500 ms (no máximo 20 000 linhas por ferramenta); `SCAN_CONCLUIDO` traz quantos achados são novos em relação à varredura anterior.
+- `PACOTES` só vai aos navegadores que assinaram o Inspetor com `{"tipo":"INSPETOR","dados":{"ativo":true,"filtro":{"ip":"","porta":0,"protocolo":""}}}`: a cada 250 ms, no máximo 500 pacotes já filtrados, cada um com hora, origem, destino, portas, protocolo, tamanho, flags TCP e `info` (no HTTP só método e rota, no PostgreSQL só o tipo da mensagem). `descartados` conta o que não coube. Sem nenhum assinante, o sniffer nem monta os resumos.
 
 ## Interface (frontend)
 
@@ -439,7 +440,7 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 **Barra lateral:**
 
 - **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, DNS, SMTP, Status HTTP, Sistema
-- **Tráfego:** Inspetor de pacotes (Sprint 14), Capturas `.pcap` (Sprint 15)
+- **Tráfego:** Inspetor de pacotes, Capturas `.pcap` (Sprint 15)
 - **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl e Vazamentos (Sprint 13)
 - **Relatórios:** histórico, comparação entre scans e exportação em PDF (o PDF é gerado na própria página Relatórios; o item "Exportação em PDF" do menu ainda aparece como "em breve")
 

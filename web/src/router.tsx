@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import Layout from "./components/Layout";
 import AlertsPage from "./pages/AlertsPage";
+import InspectorPage from "./pages/InspectorPage";
 import ArsenalPage from "./pages/ArsenalPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import OverviewPage from "./pages/OverviewPage";
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       { path: "/dns", element: <ProbeServicePage kind="dns" /> },
       { path: "/smtp", element: <ProbeServicePage kind="smtp" /> },
       { path: "/sistema", element: <SystemPage /> },
+      { path: "/inspetor", element: <InspectorPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

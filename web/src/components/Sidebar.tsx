@@ -20,6 +20,7 @@ const routes: Record<string, string> = {
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",
   Sistema: "/sistema",
+  "Inspetor de pacotes": "/inspetor",
 };
 
 // Só o primeiro item de cada rota acende como ativo, para a seção atual
