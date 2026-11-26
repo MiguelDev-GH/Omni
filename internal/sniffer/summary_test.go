@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/MiguelDev-GH/omni/internal/sniffer/testutil"
@@ -48,6 +50,21 @@ func TestSummaryTCPFlags(t *testing.T) {
 		p := decode(testutil.TCP("10.0.0.1", "10.0.0.2", 40000, 3000, flags, nil))
 		assert.Equal(t, want, Summarize(p, PortRoles{App: []int{3000}}, nil).Flags, flags)
 	}
+}
+
+func TestSummaryTCPSequence(t *testing.T) {
+	p := decode(testutil.TCPSeq("10.0.0.1", "10.0.0.2", 40000, 3000, "PA", 1000, 7000, []byte("GET / HTTP/1.1\r\n\r\n")))
+	s := Summarize(p, PortRoles{App: []int{3000}}, nil)
+	assert.Equal(t, uint32(1000), s.Seq)
+	assert.Equal(t, uint32(7000), s.Ack)
+	assert.Equal(t, 18, s.Payload)
+}
+
+func TestSummaryPayloadFromIPHeaderWhenTruncated(t *testing.T) {
+	frame := testutil.TCPSeq("10.0.0.1", "10.0.0.2", 3000, 40000, "PA", 1, 1, make([]byte, 5000))
+	p := gopacket.NewPacket(frame[:1600], layers.LinkTypeEthernet, gopacket.Default)
+	assert.Equal(t, 5000, Summarize(p, PortRoles{App: []int{3000}}, nil).Payload,
+		"a carga sai do cabeçalho IP, não dos bytes capturados")
 }
 
 func TestSummaryUDPWithoutKnownPort(t *testing.T) {
