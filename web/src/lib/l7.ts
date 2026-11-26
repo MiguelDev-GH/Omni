@@ -69,3 +69,14 @@ export function lastRate<T extends Windowed>(windows: T[], pick: (w: T) => numbe
 export function formatRate(rate: number | null): string {
   return rate === null ? "—" : rate.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 }
+
+// lastFresh devolve a janela mais recente que passa em ok, se ela tiver
+// menos de STALE_MS; senão, undefined.
+export function lastFresh<T extends Windowed>(windows: T[], ok: (w: T) => boolean, now = Date.now()): T | undefined {
+  for (let i = windows.length - 1; i >= 0; i--) {
+    const w = windows[i]!;
+    if (now - Date.parse(w.inicio) >= STALE_MS) return undefined;
+    if (ok(w)) return w;
+  }
+  return undefined;
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getQueue, listDNS, listSMTP, type QueueInfo, type SMTPWindow } from "../api/dnsSmtp";
 import CountChart from "../charts/CountChart";
 import { Card, Stat } from "../components/Card";
-import { formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS, mergeL7 } from "../lib/l7";
+import { formatMs, formatRate, l7Series, lastFresh, lastRate, L7_POINTS, L7_STEP_MS, mergeL7 } from "../lib/l7";
 import { useAppStore } from "../store/app";
 
 const HOUR_MS = 60 * 60_000;
@@ -60,7 +60,9 @@ function DNSTraffic() {
 
   const queries = dns.reduce((s, w) => s + w.consultas, 0);
   const failures = dns.reduce((s, w) => s + w.falhas, 0);
-  const last = dns[dns.length - 1];
+  // A janela mais recente com respostas, se for recente: janelas vazias ou só
+  // com timeouts não têm tempo de resolução.
+  const lastAnswered = lastFresh(dns, (w) => w.consultas - (w.rcodes.TIMEOUT ?? 0) > 0);
   const rcodes = useMemo(() => sumCounts(dns.map((w) => w.rcodes)), [dns]);
   const series = useMemo(() => l7Series(dns, (w) => ({ n: w.consultas }), { n: 0 }), [dns]);
 
@@ -70,7 +72,7 @@ function DNSTraffic() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6">
         <Stat label="Consultas por segundo" value={formatRate(lastRate(dns, (w) => w.consultas))} />
         <Stat label="Falhas em 15 minutos" value={percent(failures, queries)} tone={failures > 0 ? "text-aviso" : undefined} />
-        <Stat label="Resolução p95 (10 s)" value={last ? formatMs(last.p95_ms) : "—"} />
+        <Stat label="Resolução p95 (10 s)" value={lastAnswered ? formatMs(lastAnswered.p95_ms) : "—"} />
       </div>
       <div className="grid gap-x-10 gap-y-8 xl:grid-cols-2">
         <Card title="Consultas nos últimos 15 minutos">

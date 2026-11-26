@@ -105,3 +105,20 @@ test("SMTP queue shows when it is not configured", async () => {
   expect(await trafficValue("Fila de saída")).toBe("não configurada");
   expect(await trafficValue("Taxa de entrega")).toBe("—");
 });
+
+test("DNS p95 uses the newest fresh window with answers", async () => {
+  renderPage("dns", target, {
+    dns: [
+      { inicio: ago(25), consultas: 10, falhas: 0, rcodes: { NOERROR: 10 }, p50_ms: 1, p95_ms: 12 },
+      { inicio: ago(15), consultas: 2, falhas: 2, rcodes: { TIMEOUT: 2 }, p50_ms: 0, p95_ms: 0 },
+    ],
+  });
+  expect(await trafficValue("Resolução p95 (10 s)")).toBe("12 ms");
+});
+
+test("DNS p95 is blank when the data is old", async () => {
+  renderPage("dns", target, {
+    dns: [{ inicio: ago(120), consultas: 10, falhas: 0, rcodes: { NOERROR: 10 }, p50_ms: 1, p95_ms: 12 }],
+  });
+  expect(await trafficValue("Resolução p95 (10 s)")).toBe("—");
+});
