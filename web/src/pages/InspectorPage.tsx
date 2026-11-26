@@ -5,15 +5,19 @@ import Select from "../components/Select";
 import {
   appendRows,
   emptyFilter,
+  linkAcks,
   MAX_ROWS,
   onPackets,
+  pruneAcks,
   setInspector,
+  type AckIndex,
   type InspectorFilter,
   type Packet,
 } from "../realtime/inspector";
 import { useAppStore } from "../store/app";
 
-type Row = Packet & { id: number };
+// confirma é o id do segmento que este ACK confirma, quando ele está na tabela.
+type Row = Packet & { id: number; confirma?: number };
 
 const protocols = ["HTTP", "HTTPS", "PostgreSQL", "MySQL", "DNS", "SMTP", "TCP", "UDP", "ICMP"];
 
@@ -22,7 +26,7 @@ const protocolOptions = [{ value: "", label: "Todos os protocolos" }, ...protoco
 const ROW_HEIGHT = 32;
 
 // As colunas ficam numa grade, porque a lista virtualizada não é uma <table>.
-const columns = "grid grid-cols-[6.5rem_minmax(9rem,1fr)_minmax(9rem,1fr)_5.5rem_4.5rem_minmax(10rem,1.5fr)] gap-x-3";
+const columns = "grid grid-cols-[3.5rem_6.5rem_minmax(9rem,1fr)_minmax(9rem,1fr)_5.5rem_4.5rem_minmax(10rem,1.5fr)] gap-x-3";
 
 const time = (iso: string) => {
   const d = new Date(iso);
@@ -33,6 +37,12 @@ const time = (iso: string) => {
 const endpoint = (ip: string, port: number) => (port ? (ip.includes(":") ? `[${ip}]:${port}` : `${ip}:${port}`) : ip);
 
 const count = (n: number) => n.toLocaleString("pt-BR");
+
+const number = (id: number) => `Nº ${count(id + 1)}`;
+
+// info mostra, num ACK sem conteúdo próprio, qual pacote ele confirma.
+const info = (r: Row) =>
+  r.info || (r.confirma !== undefined ? `${r.flags} · confirma ${number(r.confirma)}` : r.flags);
 
 // validFilter confere o formulário e devolve o filtro ou a mensagem de erro.
 function validFilter(ip: string, port: string, protocolo: string): InspectorFilter | string {
@@ -55,6 +65,7 @@ export default function InspectorPage() {
   const [filterError, setFilterError] = useState("");
   const [selected, setSelected] = useState<Row | null>(null);
   const nextId = useRef(0);
+  const acks = useRef<AckIndex>(new Map());
   const scroller = useRef<HTMLDivElement>(null);
 
   // Assina enquanto a página está aberta e não pausada; sair da página ou
@@ -63,8 +74,15 @@ export default function InspectorPage() {
     if (paused) return;
     setInspector(true, filter);
     const off = onPackets((b) => {
-      const batch = b.pacotes.map((p) => ({ ...p, id: nextId.current++ }));
-      setRows((prev) => appendRows(prev, batch));
+      const batch = linkAcks(
+        acks.current,
+        b.pacotes.map((p) => ({ ...p, id: nextId.current++ })),
+      );
+      setRows((prev) => {
+        const next = appendRows(prev, batch);
+        if (acks.current.size > 2 * MAX_ROWS) pruneAcks(acks.current, next[0]!.id);
+        return next;
+      });
       if (b.descartados) setDropped((d) => d + b.descartados);
     });
     return () => {
@@ -93,12 +111,28 @@ export default function InspectorPage() {
       return;
     }
     setFilterError("");
+    acks.current.clear();
     setRows([]);
     setSelected(null);
     setFilter(f);
   }
 
+  // rowById acha a linha pelo id: os ids da tabela são contíguos.
+  function rowById(id: number): { row: Row; index: number } | null {
+    const index = rows.length ? id - rows[0]!.id : -1;
+    const row = rows[index];
+    return row?.id === id ? { row, index } : null;
+  }
+
+  function jumpTo(id: number) {
+    const found = rowById(id);
+    if (!found) return;
+    setSelected(found.row);
+    virtual.scrollToIndex(found.index, { align: "center" });
+  }
+
   function clear() {
+    acks.current.clear();
     setRows([]);
     setDropped(0);
     setSelected(null);
@@ -182,7 +216,7 @@ export default function InspectorPage() {
         <div className="min-w-0 overflow-x-auto">
           <div role="table" aria-label="Pacotes" aria-rowcount={rows.length} className="min-w-[46rem] text-sm">
             <div role="row" className={`${columns} pb-2 text-xs font-medium text-suave`}>
-              {["Hora", "Origem", "Destino", "Protocolo", "Tamanho", "Info"].map((h) => (
+              {["Nº", "Hora", "Origem", "Destino", "Protocolo", "Tamanho", "Info"].map((h) => (
                 <span key={h} role="columnheader" className={h === "Tamanho" ? "text-right" : ""}>
                   {h}
                 </span>
@@ -198,6 +232,7 @@ export default function InspectorPage() {
                   {virtual.getVirtualItems().map((v) => {
                     const r = rows[v.index]!;
                     const active = selected?.id === r.id;
+                    const confirmed = selected?.confirma === r.id;
                     return (
                       <div
                         key={r.id}
@@ -213,10 +248,13 @@ export default function InspectorPage() {
                           }
                         }}
                         className={`${columns} absolute inset-x-0 cursor-pointer items-center border-b border-borda/40 font-mono text-xs ${
-                          active ? "bg-elevado" : "hover:bg-elevado/60"
+                          active ? "bg-elevado" : confirmed ? "bg-destaque/10" : "hover:bg-elevado/60"
                         }`}
                         style={{ height: ROW_HEIGHT, transform: `translateY(${v.start}px)` }}
                       >
+                        <span role="cell" className="text-apagado tabular-nums">
+                          {count(r.id + 1)}
+                        </span>
                         <span role="cell" className="text-suave tabular-nums">
                           {time(r.hora)}
                         </span>
@@ -233,7 +271,7 @@ export default function InspectorPage() {
                           {count(r.tamanho)}
                         </span>
                         <span role="cell" className="truncate text-suave">
-                          {r.info || r.flags}
+                          {info(r)}
                         </span>
                       </div>
                     );
@@ -249,6 +287,7 @@ export default function InspectorPage() {
           {selected ? (
             <dl className="space-y-2 text-sm">
               {[
+                ["Nº", count(selected.id + 1)],
                 ["Hora", time(selected.hora)],
                 ["Origem", endpoint(selected.origem, selected.porta_origem)],
                 ["Destino", endpoint(selected.destino, selected.porta_destino)],
@@ -256,12 +295,27 @@ export default function InspectorPage() {
                 ["Tamanho", `${count(selected.tamanho)} bytes`],
                 ["Flags TCP", selected.flags || "—"],
                 ["Info", selected.info || "—"],
+                ...(selected.flags
+                  ? [
+                      ["Seq", String(selected.seq)],
+                      ["Ack", hasAck(selected) ? String(selected.ack) : "—"],
+                      ["Carga", `${count(selected.carga)} bytes`],
+                    ]
+                  : []),
               ].map(([k, v]) => (
                 <div key={k} className="grid grid-cols-[6rem_1fr] gap-2">
                   <dt className="text-suave">{k}</dt>
                   <dd className="font-mono text-xs break-all">{v}</dd>
                 </div>
               ))}
+              {hasAck(selected) && (
+                <div className="grid grid-cols-[6rem_1fr] gap-2">
+                  <dt className="text-suave">Confirma</dt>
+                  <dd className="font-mono text-xs">
+                    <Confirms row={selected} target={selected.confirma} lookup={rowById} onJump={jumpTo} />
+                  </dd>
+                </div>
+              )}
             </dl>
           ) : (
             <p className="text-sm text-suave">Clique numa linha para ver o pacote aqui.</p>
@@ -269,5 +323,31 @@ export default function InspectorPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+const hasAck = (r: Packet) => r.flags.split(",").includes("ACK");
+
+// Confirms diz qual segmento o ACK confirma e leva até ele na tabela.
+function Confirms({
+  row,
+  target,
+  lookup,
+  onJump,
+}: {
+  row: Row;
+  target: number | undefined;
+  lookup: (id: number) => { row: Row } | null;
+  onJump: (id: number) => void;
+}) {
+  if (target === undefined)
+    return <span className="text-suave">Nenhum segmento da tabela bate com o Ack {row.ack}.</span>;
+  const found = lookup(target);
+  if (!found) return <span className="text-suave">{number(target)}, que já saiu da tabela.</span>;
+  return (
+    <button type="button" className="text-left text-destaque hover:underline" onClick={() => onJump(target)}>
+      {number(target)} · {found.row.info || found.row.flags}
+      <span className="block text-suave">ACK cumulativo: confirma também o que veio antes</span>
+    </button>
   );
 }

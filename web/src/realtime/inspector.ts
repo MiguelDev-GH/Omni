@@ -11,6 +11,10 @@ export type Packet = {
   tamanho: number;
   flags: string;
   info: string;
+  // No TCP: número de sequência, de confirmação e tamanho da carga em bytes.
+  seq: number;
+  ack: number;
+  carga: number;
 };
 
 export type InspectorFilter = { ip: string; porta: number; protocolo: string };
@@ -64,7 +68,10 @@ function isPacket(v: unknown): v is Packet {
     typeof v.protocolo === "string" &&
     typeof v.tamanho === "number" &&
     typeof v.flags === "string" &&
-    typeof v.info === "string"
+    typeof v.info === "string" &&
+    typeof v.seq === "number" &&
+    typeof v.ack === "number" &&
+    typeof v.carga === "number"
   );
 }
 
@@ -83,4 +90,39 @@ export function appendRows<T>(rows: T[], next: T[], max = MAX_ROWS): T[] {
   if (next.length === 0) return rows;
   const all = rows.concat(next);
   return all.length > max ? all.slice(all.length - max) : all;
+}
+
+// AckIndex guarda, por sentido da conexão e fim do segmento no espaço de
+// sequência, o id do último pacote que termina ali.
+export type AckIndex = Map<string, number>;
+
+const hasFlag = (p: Packet, f: string) => p.flags.split(",").includes(f);
+
+const flowKey = (ip: string, port: number, toIp: string, toPort: number, seq: number) =>
+  `${ip}|${port}|${toIp}|${toPort}|${seq}`;
+
+// seqEnd devolve o número que o ACK do segmento vai trazer, ou null se o
+// pacote não ocupa espaço de sequência (ACK puro), já que ninguém o confirma.
+function seqEnd(p: Packet): number | null {
+  const used = p.carga + (hasFlag(p, "SYN") ? 1 : 0) + (hasFlag(p, "FIN") ? 1 : 0);
+  return used > 0 ? (p.seq + used) >>> 0 : null;
+}
+
+// linkAcks marca em confirma o id do segmento que cada ACK confirma: o último
+// pacote do sentido oposto que termina no número do ACK. Como o ACK do TCP é
+// cumulativo, ele também confirma os segmentos anteriores a esse.
+export function linkAcks<T extends Packet & { id: number }>(index: AckIndex, rows: T[]): (T & { confirma?: number })[] {
+  return rows.map((r) => {
+    if (r.flags === "") return r;
+    let confirma: number | undefined;
+    if (hasFlag(r, "ACK")) confirma = index.get(flowKey(r.destino, r.porta_destino, r.origem, r.porta_origem, r.ack));
+    const end = seqEnd(r);
+    if (end !== null) index.set(flowKey(r.origem, r.porta_origem, r.destino, r.porta_destino, end), r.id);
+    return confirma === undefined ? r : { ...r, confirma };
+  });
+}
+
+// pruneAcks esquece os segmentos com id menor que minId, que já saíram da tabela.
+export function pruneAcks(index: AckIndex, minId: number): void {
+  for (const [k, id] of index) if (id < minId) index.delete(k);
 }
