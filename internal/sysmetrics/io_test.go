@@ -2,6 +2,8 @@ package sysmetrics
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -88,4 +90,19 @@ func TestSamplerReadsRealDiskOnLinux(t *testing.T) {
 	assert.True(t, snap.IO)
 	assert.GreaterOrEqual(t, snap.DiskBusy, 0.0)
 	assert.LessOrEqual(t, snap.DiskBusy, 100.0)
+}
+
+// TestDeviceForResolvesSymlinkedDevices: no LVM, /dev/mapper/vg-lv é um link
+// para /dev/dm-0, que é o nome usado nos contadores de disco.
+func TestDeviceForResolvesSymlinkedDevices(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "dm-0")
+	require.NoError(t, os.WriteFile(real, nil, 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "mapper"), 0o700))
+	link := filepath.Join(dir, "mapper", "ubuntu--vg-ubuntu--lv")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("sem permissão para criar links:", err)
+	}
+	parts := []disk.PartitionStat{{Device: link, Mountpoint: "/"}}
+	assert.Equal(t, "dm-0", deviceFor("/var/lib/omni", parts))
 }
