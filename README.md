@@ -440,7 +440,7 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 **Barra lateral:**
 
 - **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, DNS, SMTP, Status HTTP, Sistema
-- **Tráfego:** Inspetor de pacotes, Capturas `.pcap`
+- **Tráfego:** Inspetor de pacotes, com as gravações `.pcap`
 - **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl e Vazamentos (Sprint 13)
 - **Relatórios:** histórico, comparação entre scans e exportação em PDF (o PDF é gerado na própria página Relatórios; o item "Exportação em PDF" do menu ainda aparece como "em breve")
 
@@ -664,7 +664,7 @@ A loja cobaia ganhou a rota `POST /entrar` (autenticação Basic; contas `ana`, 
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
 
-**Capturas pela API:** `POST /api/capturas` com `{"duracao_s": 60, "porta": 0}` (10 a 300 s; porta 0 grava todas as portas dos alvos) responde 202 `{"id": ...}` e grava em segundo plano; 409 se já houver uma gravando ou o diretório passou de 1 GiB, 503 com o sniffer parado. `GET /api/capturas` lista, `GET /api/capturas/{id}/arquivo` devolve o `.pcap`, `GET /api/capturas/{id}/pacotes?pagina=` traz os resumos do Inspetor (500 por página) e `DELETE /api/capturas/{id}` apaga o arquivo e o registro. O WebSocket avisa `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`.
+**Capturas pela API:** `POST /api/capturas` com `{"duracao_s": 60, "filtro": {"ip": "", "porta": 3000, "protocolo": "HTTP"}}` (10 a 300 s; o filtro é o do Inspetor, e vazio grava todas as portas dos alvos) responde 202 `{"id": ...}` e grava em segundo plano; 409 se já houver uma gravando ou o diretório passou de 1 GiB, 503 com o sniffer parado. `GET /api/capturas` lista, `GET /api/capturas/{id}/arquivo` devolve o `.pcap`, `GET /api/capturas/{id}/pacotes?pagina=` traz os resumos do Inspetor (500 por página) e `DELETE /api/capturas/{id}` apaga o arquivo e o registro. O WebSocket avisa `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`.
 
 **Planejado (Sprint 17):** parar uma varredura em andamento e iniciar outra enquanto a primeira roda, inclusive no mesmo alvo, só enquanto o limite não for atingido. O limite não é um número fixo: é o que a capacidade de containers do Docker aguenta, pela CPU e pela memória que cada um reserva; sem espaço para mais um, o pedido responde 429 e nada é iniciado. `POST /api/varreduras/{id}/cancelar` vai encerrar o container e marcar a varredura como `cancelada`, e a resposta 409 para o alvo ocupado deixa de existir. Veja a [Sprint 17](docs/SPRINTS.md#sprint-17-controle-das-varreduras).
 

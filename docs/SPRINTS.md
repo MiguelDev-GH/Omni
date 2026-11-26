@@ -286,7 +286,7 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 
 ### Sprint 15: Capturas `.pcap`
 
-**Ao final:** `/capturas` grava capturas de 10 s a 5 min em `.pcap`, lista, baixa, apaga e abre cada uma na tabela do Inspetor.
+**Ao final:** o Inspetor grava em `.pcap`, de 10 s a 5 min, o tráfego que passa no filtro aplicado, e lista, baixa, apaga e abre cada gravação na própria tabela.
 
 - Limites: 100 MiB por arquivo, 1 GiB no diretório, uma captura por vez, retenção configurável (`OMNI_RETENCAO_CAPTURAS`, padrão 24 h), arquivos com permissão `0600`.
 
@@ -301,9 +301,11 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - O limite de tamanho é o menor entre 100 MiB e o que falta para o diretório chegar a 1 GiB; ao chegar nele, a captura termina como `concluida`. Com o diretório já em 1 GiB, o pedido responde 409.
 - Uma captura por vez (409 para a segunda). Enquanto grava, baixar, abrir e apagar respondem 409. As que ficaram gravando quando o Omni parou viram `falhou` na próxima subida, mas o arquivo continua lá até a retenção.
 - `OMNI_CAPTURAS` tem como padrão o diretório `capturas` ao lado do banco, criado com permissão `0700`; cada arquivo é `capture-<id>.pcap`, com `0600`. A API nunca devolve o nome do arquivo, e um nome com diretório vindo do banco é recusado.
-- O Inspetor em modo arquivo é uma rota própria, `/inspetor/captura/:id`, com 500 pacotes por página. A tabela virtualizada saiu do `InspectorPage` para o componente `PacketTable`, usado pelas duas telas; os resumos usam as portas dos alvos de agora para classificar os protocolos.
+- A gravação fica dentro do Inspetor, e não numa seção Capturas própria como o plano previa: quem está olhando o tráfego grava dali mesmo, com o filtro aplicado (IP, porta e protocolo), e o arquivo grava o que a tabela mostra. O item "Capturas" saiu do menu, e `/capturas` redireciona para `/inspetor`. O Inspetor nunca grava sozinho, porque a gravação guarda cookies e corpos que o fluxo ao vivo esconde.
+- O filtro da gravação passa pela mesma validação do WebSocket (`ws.NormalizeFilter`) e pelo mesmo `MatchesFilter` do resumo; com filtro, o tap resume cada pacote para decidir se ele entra.
+- "Abrir" troca a tabela do ao vivo para o arquivo, na mesma página, com 500 pacotes por página, e desliga a assinatura do fluxo até "Voltar ao vivo". A tabela virtualizada saiu do `InspectorPage` para o componente `PacketTable`, usado nos dois modos; os resumos do arquivo usam as portas dos alvos de agora para classificar os protocolos.
 - O download busca o arquivo com o token e salva por `Blob`, porque um link direto para a API não leva o cabeçalho `Authorization`.
-- A tela relê a lista a cada segundo só enquanto uma captura grava, em vez de ouvir `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`; os dois eventos saem no WebSocket para outros clientes.
+- O Inspetor relê a lista a cada segundo só enquanto uma captura grava, em vez de ouvir `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`; os dois eventos saem no WebSocket para outros clientes.
 
 ### Sprint 16: Exportação em PDF
 
