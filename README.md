@@ -16,7 +16,7 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 
 **Documentação:** [guia de instalação](docs/INSTALACAO.md) · [runbooks de operação](docs/RUNBOOKS.md) · [playbooks de incidente](docs/PLAYBOOKS.md) · [testes de navegação](docs/TESTES-NAVEGACAO.md)
 
-> **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes, as capturas `.pcap` e o controle das varreduras (parar e rodar em paralelo). Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
+> **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes e o controle das varreduras (parar e rodar em paralelo). Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
 
 > **▶️ Quer rodar agora?** Vá para [Como inicializar e testar](#como-inicializar-e-testar): passo a passo para distribuições Linux, Windows com WSL2 e Windows nativo.
 
@@ -340,7 +340,7 @@ graph TD
 | **Motor de alertas** | Compara as métricas com os limites de cada regra, classifica cada recurso em verde, amarelo ou vermelho e avisa as mudanças pelo WebSocket, no banco e por e-mail. |
 | **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. `GET /api/alvos/{id}/relatorio` junta o que o PDF precisa; o navegador monta o arquivo com jsPDF. |
 | **Hub WebSocket** | Envia alertas, métricas e o andamento das varreduras ao frontend, com buffer por cliente. |
-| **Armazenamento** | SQLite em modo WAL, só com agregados, achados e relatórios das ferramentas. Capturas completas ficam em arquivos `.pcap` com retenção configurável (Sprint 15). |
+| **Armazenamento** | SQLite em modo WAL, só com agregados, achados e relatórios das ferramentas. Capturas completas ficam em arquivos `.pcap` com retenção configurável (`OMNI_RETENCAO_CAPTURAS`). |
 
 ### Arsenal (containers)
 
@@ -440,7 +440,7 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 **Barra lateral:**
 
 - **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, DNS, SMTP, Status HTTP, Sistema
-- **Tráfego:** Inspetor de pacotes, Capturas `.pcap` (Sprint 15)
+- **Tráfego:** Inspetor de pacotes, Capturas `.pcap`
 - **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl e Vazamentos (Sprint 13)
 - **Relatórios:** histórico, comparação entre scans e exportação em PDF (o PDF é gerado na própria página Relatórios; o item "Exportação em PDF" do menu ainda aparece como "em breve")
 
@@ -664,6 +664,8 @@ A loja cobaia ganhou a rota `POST /entrar` (autenticação Basic; contas `ana`, 
 
 **Arsenal pela API:** `GET /api/ferramentas` lista as ferramentas; `POST /api/varreduras` com `{"alvo_id": 1, "ferramentas": ["nmap", "nuclei", "testssl"]}` responde 202 `{"id": ...}` e roda em segundo plano (400 para ferramenta desconhecida ou alvo fora do escopo, 409 se o alvo já tem varredura em andamento, 503 com o Docker parado). `GET /api/varreduras?alvo_id=`, `GET /api/varreduras/{id}`, `GET /api/varreduras/{id}/achados` e `GET /api/varreduras/{id}/comparacao` (novos e resolvidos em relação à varredura concluída anterior de cada ferramenta) completam o fluxo. Varreduras interrompidas pelo desligamento do Omni ficam como `falhou`.
 
+**Capturas pela API:** `POST /api/capturas` com `{"duracao_s": 60, "porta": 0}` (10 a 300 s; porta 0 grava todas as portas dos alvos) responde 202 `{"id": ...}` e grava em segundo plano; 409 se já houver uma gravando ou o diretório passou de 1 GiB, 503 com o sniffer parado. `GET /api/capturas` lista, `GET /api/capturas/{id}/arquivo` devolve o `.pcap`, `GET /api/capturas/{id}/pacotes?pagina=` traz os resumos do Inspetor (500 por página) e `DELETE /api/capturas/{id}` apaga o arquivo e o registro. O WebSocket avisa `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`.
+
 **Planejado (Sprint 17):** parar uma varredura em andamento e iniciar outra enquanto a primeira roda, inclusive no mesmo alvo, só enquanto o limite não for atingido. O limite não é um número fixo: é o que a capacidade de containers do Docker aguenta, pela CPU e pela memória que cada um reserva; sem espaço para mais um, o pedido responde 429 e nada é iniciado. `POST /api/varreduras/{id}/cancelar` vai encerrar o container e marcar a varredura como `cancelada`, e a resposta 409 para o alvo ocupado deixa de existir. Veja a [Sprint 17](docs/SPRINTS.md#sprint-17-controle-das-varreduras).
 
 ### Windows
@@ -752,7 +754,8 @@ Cuidados no WSL2:
 - [x] **Limites de CPU e RAM nos containers do Arsenal** (1 CPU e 512 MiB; 1,5 GiB para o Nuclei).
 - [ ] **Limites de CPU e RAM para o próprio Omni,** para não derrubar a produção.
 - [x] **Histórico de CPU, memória, disco e I/O** numa página própria.
-- [ ] **Inspetor de pacotes** ao vivo (Sprint 14) e **capturas `.pcap`** sob demanda, com retenção configurável (Sprint 15).
+- [ ] **Inspetor de pacotes** ao vivo (Sprint 14).
+- [x] **Capturas `.pcap`** sob demanda, com retenção configurável (Sprint 15).
 
 ## Segurança da própria plataforma
 
@@ -769,7 +772,7 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
 - **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto: `instrumentisto/nmap:7.95`, `projectdiscovery/nuclei:v3.4.10`, `drwetter/testssl.sh:3.2`, `ghcr.io/sullo/nikto:2.6.1`, `secsi/ffuf:2.3.0`, `caffix/amass:v3.23.3` e o SQLMap fixado num commit (`googlesky/sqlmap:upstream-5db2e62…`).
 - **Conexão com o PostgreSQL só de leitura e opcional:** papel com `pg_monitor`, DSN num arquivo com permissão 600 e senha fora dos logs.
-- **Retenção de dados configurável,** já que capturas podem conter dados pessoais (LGPD). As capturas `.pcap` (Sprint 15) ficam com permissão `0600`, têm tamanho máximo e são apagadas depois do prazo de `OMNI_RETENCAO_CAPTURAS`.
+- **Retenção de dados configurável,** já que capturas podem conter dados pessoais (LGPD). As capturas `.pcap` ficam com permissão `0600`, têm tamanho máximo e são apagadas depois do prazo de `OMNI_RETENCAO_CAPTURAS`.
 - **Regras das ferramentas novas (Sprints 11 a 13):** toda opção vinda da interface (rota e parâmetro do SQLMap, lista de palavras do ffuf, caminho do código-fonte do Gitleaks) é validada no backend contra uma lista fechada ou um padrão estrito; o SQLMap roda só com nível 1 e risco 1 e nunca com opções de extração (`--dump`, `--os-shell`, `--file-*`); o código-fonte é montado **somente leitura** no container do Gitleaks, e o valor dos segredos encontrados nunca é gravado nem mostrado.
 
 ## Limitações conhecidas

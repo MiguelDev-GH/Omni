@@ -22,7 +22,7 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ✅ Concluída |
 | [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | ✅ Concluída |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | 🚧 Em andamento |
-| [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
+| [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ✅ Concluída |
 | [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ✅ Concluída |
 | [17](#sprint-17-controle-das-varreduras) | Expansão | Parar varreduras e rodar várias ao mesmo tempo | ⏳ A fazer |
 | [Backlog](#backlog) | Expansão | Restante das pendências do README | 📋 Backlog |
@@ -291,6 +291,19 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - Limites: 100 MiB por arquivo, 1 GiB no diretório, uma captura por vez, retenção configurável (`OMNI_RETENCAO_CAPTURAS`, padrão 24 h), arquivos com permissão `0600`.
 
 **Branch:** `feat/capturas-pcap` · **Labels:** `funcionalidade`, `motor`, `visual`
+
+**Decisões da Sprint 15:**
+
+- A migração é a `019_captures.sql`, não a `011` que o plano previa: da 011 à 018 já estavam na `main` quando a sprint começou.
+- O gravador (`internal/capture`) não abre uma segunda captura: liga um tap bruto no motor do sniffer (`Engine.AddRawTap`), que recebe cada pacote como veio da fonte. Por isso a captura só grava as portas dos alvos, e sem o sniffer ativo o pedido responde 503. Vários taps podem ficar ligados juntos, sem trava na goroutine da captura (cópia na escrita).
+- O tap recebe também o tipo de enlace da fonte, porque o cabeçalho do `.pcap` precisa dele: na interface `any` é `LINUX_SLL`, não Ethernet. O cabeçalho sai com o primeiro pacote, e uma captura sem pacotes fica com cabeçalho Ethernet, ainda legível.
+- O tap nunca bloqueia: os pacotes esperam a gravação num canal de 4096, e o excesso vira `descartados` na captura.
+- O limite de tamanho é o menor entre 100 MiB e o que falta para o diretório chegar a 1 GiB; ao chegar nele, a captura termina como `concluida`. Com o diretório já em 1 GiB, o pedido responde 409.
+- Uma captura por vez (409 para a segunda). Enquanto grava, baixar, abrir e apagar respondem 409. As que ficaram gravando quando o Omni parou viram `falhou` na próxima subida, mas o arquivo continua lá até a retenção.
+- `OMNI_CAPTURAS` tem como padrão o diretório `capturas` ao lado do banco, criado com permissão `0700`; cada arquivo é `capture-<id>.pcap`, com `0600`. A API nunca devolve o nome do arquivo, e um nome com diretório vindo do banco é recusado.
+- O Inspetor em modo arquivo é uma rota própria, `/inspetor/captura/:id`, com 500 pacotes por página. A tabela virtualizada saiu do `InspectorPage` para o componente `PacketTable`, usado pelas duas telas; os resumos usam as portas dos alvos de agora para classificar os protocolos.
+- O download busca o arquivo com o token e salva por `Blob`, porque um link direto para a API não leva o cabeçalho `Authorization`.
+- A tela relê a lista a cada segundo só enquanto uma captura grava, em vez de ouvir `CAPTURA_INICIADA` e `CAPTURA_CONCLUIDA`; os dois eventos saem no WebSocket para outros clientes.
 
 ### Sprint 16: Exportação em PDF
 
