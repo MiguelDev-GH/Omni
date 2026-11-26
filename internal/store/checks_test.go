@@ -129,3 +129,36 @@ func TestPruneChecksDeletesOlder(t *testing.T) {
 	require.Len(t, got, 2)
 	assert.Equal(t, t0.Add(time.Hour), got[0].At)
 }
+
+func TestCheckHistoryKeepsProbeDetails(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	id := newTarget(t, s)
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	noTLS := false
+	dns := poller.Result{TargetID: id, Port: 1053, Kind: "dns", Up: true, Degraded: true, Detail: "NXDOMAIN", LatencyMS: 1, At: at}
+	smtp := poller.Result{TargetID: id, Port: 1025, Kind: "smtp", Up: true, StartTLS: &noTLS, Detail: "aceita destinatário postmaster", LatencyMS: 2, At: at.Add(time.Second)}
+	web := result(id, at.Add(2*time.Second))
+	for _, r := range []poller.Result{dns, smtp, web} {
+		require.NoError(t, s.InsertCheckResult(ctx, r))
+	}
+
+	for name, get := range map[string]func() ([]poller.Result, error){
+		"CheckHistory": func() ([]poller.Result, error) { return s.CheckHistory(ctx, id, at.Add(-time.Hour), 10) },
+		"ChecksBetween": func() ([]poller.Result, error) {
+			return s.ChecksBetween(ctx, id, at.Add(-time.Hour), at.Add(time.Hour))
+		},
+	} {
+		got, err := get()
+		require.NoError(t, err, name)
+		require.Len(t, got, 3, name)
+		assert.True(t, got[0].Degraded, name)
+		assert.Equal(t, "NXDOMAIN", got[0].Detail, name)
+		assert.Nil(t, got[0].StartTLS, name)
+		require.NotNil(t, got[1].StartTLS, name)
+		assert.False(t, *got[1].StartTLS, name)
+		assert.Equal(t, "aceita destinatário postmaster", got[1].Detail, name)
+		assert.Nil(t, got[2].StartTLS, name)
+		assert.False(t, got[2].Degraded, name)
+	}
+}

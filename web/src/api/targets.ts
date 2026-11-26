@@ -1,5 +1,6 @@
-import { useAppStore } from "../store/app";
+import { useAppStore, type PortStatus } from "../store/app";
 import { apiFetch } from "./client";
+import { sinceQuery } from "./traffic";
 
 export type Target = {
   id: number;
@@ -48,4 +49,10 @@ export function parsePorts(text: string): number[] | null {
   const parts = text.split(/[\s,]+/).filter((p) => p !== "");
   if (!parts.every((p) => /^\d+$/.test(p))) return null;
   return parts.map(Number);
+}
+
+// listHistory busca as verificações das portas do alvo desde since (padrão
+// da API: últimas 24 h), em ordem cronológica.
+export function listHistory(id: number, since?: Date): Promise<PortStatus[]> {
+  return apiFetch<PortStatus[]>(`/api/alvos/${id}/historico${sinceQuery(since)}`);
 }
