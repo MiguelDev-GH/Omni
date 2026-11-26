@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -128,6 +129,8 @@ func TestReportHandlerBuildsWholeReport(t *testing.T) {
 	var rep Report
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &rep))
 	assert.Equal(t, "loja", rep.Target.Name)
+	host, _ := os.Hostname()
+	assert.Equal(t, host, rep.Server)
 	assert.Equal(t, 1, rep.AlertCounts[alerts.Red])
 	assert.Equal(t, reportAlertRows+50, rep.AlertCounts[alerts.Yellow])
 	require.Len(t, rep.Alerts, reportAlertRows)

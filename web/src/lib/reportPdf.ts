@@ -278,9 +278,29 @@ function bySeries(points: { name: string; t: number; v: number }[]): Series[] {
   return [...groups.entries()].map(([name, pts], i) => ({ name, color: palette[i % palette.length] ?? accent, points: pts }));
 }
 
+// isLoopback diz se o host aponta para a própria máquina do Omni.
+export function isLoopback(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\.\d+\.\d+\.\d+$/.test(h);
+}
+
 function header(w: Writer, rep: TargetReport, generatedAt: Date) {
   const doc = w.doc;
-  doc.setFillColor(...tint).rect(0, 0, PAGE_W, 50, "F");
+  const from = new Date(rep.desde);
+  const to = new Date(rep.ate);
+  const ports = targetPorts(rep.alvo);
+  // Com 127.0.0.1 o host é igual em todo relatório; quem identifica a
+  // máquina é o nome do servidor.
+  const meta: [string, string][] = [
+    ["Host", isLoopback(rep.alvo.host) ? `${rep.alvo.host} (esta máquina)` : rep.alvo.host],
+    ["Portas", ports.length > 0 ? ports.join(", ") : "-"],
+    ["Intervalo", `${dateTime(from)} até ${dateTime(to)} (${durationText(to.getTime() - from.getTime())})`],
+    ["Gerado em", dateTime(generatedAt)],
+  ];
+  if (rep.alvo.dominio) meta.unshift(["Domínio", rep.alvo.dominio]);
+  if (rep.servidor) meta.unshift(["Servidor", rep.servidor]);
+
+  doc.setFillColor(...tint).rect(0, 0, PAGE_W, Math.max(50, 33 + meta.length * 4), "F");
   doc.setFont("helvetica", "bold").setFontSize(9);
   w.color(accent);
   doc.text("OMNI", MARGIN, 14);
@@ -291,16 +311,6 @@ function header(w: Writer, rep: TargetReport, generatedAt: Date) {
   w.color(ink);
   doc.text(rep.alvo.nome, MARGIN, 26);
 
-  const from = new Date(rep.desde);
-  const to = new Date(rep.ate);
-  const ports = targetPorts(rep.alvo);
-  const meta: [string, string][] = [
-    ["Host", rep.alvo.host],
-    ["Portas", ports.length > 0 ? ports.join(", ") : "-"],
-    ["Intervalo", `${dateTime(from)} até ${dateTime(to)} (${durationText(to.getTime() - from.getTime())})`],
-    ["Gerado em", dateTime(generatedAt)],
-  ];
-  if (rep.alvo.dominio) meta.splice(1, 0, ["Domínio", rep.alvo.dominio]);
   doc.setFontSize(8.5);
   let y = 33;
   for (const [k, v] of meta) {

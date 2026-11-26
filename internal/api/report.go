@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
 	"sort"
 	"time"
 
@@ -67,10 +68,13 @@ type ReportScan struct {
 
 // Report é a resposta de GET /api/alvos/{id}/relatorio.
 type Report struct {
-	Target   target.Target `json:"alvo"`
-	From     time.Time     `json:"desde"`
-	To       time.Time     `json:"ate"`
-	StepSecs int64         `json:"passo_s"`
+	Target target.Target `json:"alvo"`
+	// Server é o nome da máquina onde o Omni roda, que identifica o relatório
+	// quando o alvo é verificado por 127.0.0.1. Vazio se não der para ler.
+	Server   string    `json:"servidor"`
+	From     time.Time `json:"desde"`
+	To       time.Time `json:"ate"`
+	StepSecs int64     `json:"passo_s"`
 	// AlertCounts conta todas as mudanças de nível do intervalo pelo nível de
 	// chegada; AlertSummary faz o mesmo por regra.
 	AlertCounts  map[alerts.Level]int     `json:"contagem_alertas"`
@@ -128,8 +132,9 @@ func buildReport(ctx context.Context, rs ReportStore, id int64, from, to time.Ti
 		return Report{}, err
 	}
 	step := reportStep(to.Sub(from))
+	server, _ := os.Hostname()
 	rep := Report{
-		Target: t, From: from.UTC(), To: to.UTC(), StepSecs: int64(step / time.Second),
+		Target: t, Server: server, From: from.UTC(), To: to.UTC(), StepSecs: int64(step / time.Second),
 		AlertCounts: map[alerts.Level]int{alerts.Green: 0, alerts.Yellow: 0, alerts.Red: 0},
 	}
 

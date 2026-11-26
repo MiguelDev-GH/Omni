@@ -53,6 +53,9 @@ export type DBSizeSample = { banco: string; bytes: number; hora: string };
 // alvo.
 export type TargetReport = {
   alvo: Target;
+  // servidor é o nome da máquina onde o Omni roda; vazio se o backend não
+  // conseguiu ler.
+  servidor?: string;
   desde: string;
   ate: string;
   passo_s: number;

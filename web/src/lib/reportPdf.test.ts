@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { TargetReport } from "../api/targetReport";
-import { buildReportPdf, niceMax, reportFileName } from "./reportPdf";
+import { buildReportPdf, isLoopback, niceMax, reportFileName } from "./reportPdf";
 
 const from = Date.parse("2026-11-24T00:00:00Z");
 const to = from + 24 * 3_600_000;
@@ -10,6 +10,7 @@ const slots = Array.from({ length: (to - from) / (step * 1000) }, (_, i) => from
 
 export function fixture(over: Partial<TargetReport> = {}): TargetReport {
   return {
+    servidor: "srv-loja-01",
     alvo: { id: 3, nome: "Loja Ação", host: "127.0.0.1", portas_app: [8080, 8443], porta_banco: 5432 },
     desde: iso(from),
     ate: iso(to),
@@ -83,6 +84,22 @@ test("the PDF carries the metrics added after the first report", () => {
   for (const s of ["Disco: leitura e escrita", "IOPS", "Conex", "Tamanho do banco", "Consultas DNS", "NXDOMAIN", "Envios SMTP", "550", "Fila do SMTP", "com falha", "404", "503"]) {
     expect(raw).toContain(s);
   }
+});
+
+test("the header names the server and marks a loopback host", () => {
+  const { raw } = text(fixture());
+  expect(raw).toContain("Servidor");
+  expect(raw).toContain("srv-loja-01");
+  expect(raw).toContain("127.0.0.1 \\(esta m");
+  const remote = text(fixture({ servidor: "", alvo: { id: 3, nome: "api", host: "10.0.0.5", portas_app: [80] } })).raw;
+  expect(remote).toContain("10.0.0.5");
+  expect(remote).not.toContain("esta m");
+  expect(remote).not.toContain("Servidor");
+});
+
+test("isLoopback covers IPv4, IPv6 and localhost", () => {
+  for (const h of ["127.0.0.1", "127.1.2.3", "::1", "[::1]", "localhost", " LOCALHOST "]) expect(isLoopback(h)).toBe(true);
+  for (const h of ["10.0.0.5", "loja.exemplo.com", "1270.0.0.1", ""]) expect(isLoopback(h)).toBe(false);
 });
 
 test("an attack with many IPs lists only the worst changes but keeps exact totals", () => {
