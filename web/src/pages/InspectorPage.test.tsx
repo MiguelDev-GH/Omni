@@ -23,6 +23,9 @@ const packet = (i: number): Packet => ({
   tamanho: 100,
   flags: "PSH,ACK",
   info: `GET /rota-${i}`,
+  seq: 0,
+  ack: 0,
+  carga: 0,
 });
 
 const batch = (from: number, n: number, descartados = 0) =>
@@ -88,5 +91,33 @@ test("clicking a row shows the packet detail", async () => {
   const detail = screen.getByRole("complementary", { name: "Detalhe do pacote" });
   expect(detail).toHaveTextContent("GET /rota-1");
   expect(detail).toHaveTextContent("10.0.0.2:3000");
+  height.mockRestore();
+});
+
+test("an ACK row names the packet it confirms and the detail jumps to it", async () => {
+  const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(512);
+  const user = userEvent.setup();
+  render(<InspectorPage />);
+  const req = { ...packet(0), seq: 101, ack: 501, carga: 18 };
+  const ack: Packet = {
+    ...packet(0),
+    origem: req.destino,
+    porta_origem: req.porta_destino,
+    destino: req.origem,
+    porta_destino: req.porta_origem,
+    flags: "ACK",
+    info: "",
+    seq: 501,
+    ack: 119,
+  };
+  act(() => handlePackets({ pacotes: [req, ack], descartados: 0 }));
+
+  const ackRow = await screen.findByRole("row", { name: /confirma Nº 1/ });
+  await user.click(ackRow);
+  const detail = screen.getByRole("complementary", { name: "Detalhe do pacote" });
+  expect(detail).toHaveTextContent("119");
+  await user.click(screen.getByRole("button", { name: /Nº 1/ }));
+  expect(detail).toHaveTextContent("GET /rota-0");
+  expect(screen.getByRole("row", { name: /GET \/rota-0/ })).toHaveAttribute("aria-selected", "true");
   height.mockRestore();
 });

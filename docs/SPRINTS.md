@@ -269,6 +269,7 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 - A cada 250 ms o Inspetor esvazia a fila e cada cliente recebe no máximo os 500 pacotes **mais recentes** do seu filtro. `descartados` soma os pacotes que não couberam na fila de 4096 e os que passaram do limite do lote daquele cliente.
 - No HTTP, `info` lê só a primeira linha do pacote: `POST /login` (rota normalizada, sem query string) na requisição, `HTTP 404` na resposta e vazio nos pacotes de continuação. No PostgreSQL, só o nome da primeira mensagem do pacote (`Query`, `ReadyForQuery`, `SSLRequest`...).
 - `Summarize` recebe os `PortRoles` do sniffer, e não só as portas de aplicação: as portas DNS e SMTP dos alvos aparecem no Inspetor com o nome do serviço, como nos gráficos.
+- Cada resumo TCP traz `seq`, `ack` e `carga`, e o frontend liga cada ACK ao segmento do sentido oposto que termina no número dele (sequência + carga, +1 em SYN e FIN). ACKs puros não viram alvo, porque nada os confirma, e numa retransmissão vale a cópia mais recente. A carga sai do cabeçalho IP, porque o snaplen de 1600 bytes corta os pacotes do loopback.
 - Comando com IP que não é um endereço, porta fora de 0 a 65535 ou outro `tipo` é ignorado; o handler continua lendo as mensagens seguintes.
 - `@tanstack/react-virtual` fixado em 3.14.26, a última versão com mais de duas semanas de publicada; as 3.14.27 e 3.14.28 saíram na véspera.
 - Numa reconexão do WebSocket, o frontend reenvia a assinatura ativa, porque o servidor esquece o estado do cliente quando a conexão cai.
