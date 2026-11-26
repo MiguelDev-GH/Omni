@@ -57,7 +57,7 @@ func (a *SMTPAssembler) Add(p gopacket.Packet) { a.sa.add(p) }
 func (a *SMTPAssembler) Flush(now time.Time) { a.sa.flush(now) }
 
 type smtpCmd struct {
-	verb string // "MAIL", "RCPT", "DATA", "DOT" (fim do DATA), "STARTTLS" ou "OUTRO"
+	verb string // "MAIL", "RCPT", "DATA", "DOT" (fim do DATA), "STARTTLS", "FIM" (RSET, QUIT) ou "OUTRO"
 	at   time.Time
 }
 
@@ -81,13 +81,29 @@ type smtpConn struct {
 	dead       bool   // STARTTLS aceito: o resto é criptografado
 }
 
+// lost encerra a transação aberta como abortada e passa a ignorar a
+// conexão: depois de um buraco não dá para saber se os bytes seguintes são
+// comandos, corpo de mensagem ou TLS.
 func (c *smtpConn) lost() {
-	*c = smtpConn{emit: c.emit}
+	if !c.dead {
+		c.abortTx()
+	}
+	c.dead = true
+	c.client, c.server, c.pending, c.tail = nil, nil, nil, nil
 }
 
 // closed é chamado quando o fluxo termina (FIN, RST ou ocioso).
 func (c *smtpConn) closed() {
-	c.finishTx()
+	if !c.dead {
+		c.finishTx()
+	}
+}
+
+// abortTx emite a transação aberta, se houver, como abortada.
+func (c *smtpConn) abortTx() {
+	if c.tx != nil {
+		c.done(OutcomeAborted, 0, 0)
+	}
 }
 
 func (c *smtpConn) data(fromClient bool, b []byte, at time.Time) {
@@ -182,7 +198,15 @@ func (c *smtpConn) command(line []byte, at time.Time) {
 		// As linhas seguintes do cliente são credenciais até a resposta final.
 		c.authActive = true
 	case "RSET", "QUIT":
-		c.finishTx()
+		// A transação termina na resposta: com pipelining, o RSET ou QUIT
+		// chega antes da resposta ao fim do DATA.
+		c.push(smtpCmd{verb: "FIM", at: at})
+	case "EHLO", "HELO":
+		// A sonda do próprio Omni se apresenta como omni-*: não é envio real.
+		if arg := bytes.TrimSpace(line[len(verb):]); bytes.HasPrefix(bytes.ToLower(arg), []byte("omni-")) {
+			c.dead = true
+			return
+		}
 		c.push(smtpCmd{verb: "OUTRO", at: at})
 	default:
 		c.push(smtpCmd{verb: "OUTRO", at: at})
@@ -268,6 +292,8 @@ func (c *smtpConn) reply(code int, at time.Time) {
 			c.dead = true
 			c.tx = nil
 		}
+	case "FIM":
+		c.finishTx()
 	}
 }
 

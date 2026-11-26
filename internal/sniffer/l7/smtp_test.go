@@ -37,6 +37,13 @@ func (s *smtpSession) server(line string) *smtpSession {
 	return s
 }
 
+// lose avança a sequência do cliente sem entregar o segmento (pacote perdido).
+func (s *smtpSession) lose(line string) *smtpSession {
+	s.now += time.Millisecond
+	s.c.FromClient([]byte(line))
+	return s
+}
+
 func (s *smtpSession) wait(d time.Duration) *smtpSession {
 	s.now += d
 	return s
@@ -216,4 +223,38 @@ func TestSMTPStatsWindow(t *testing.T) {
 	next := s.Flush(t0.Add(20 * time.Second))
 	assert.Equal(t, uint64(0), next.Attempts)
 	assert.Equal(t, map[string]uint64{}, next.ByCode)
+}
+
+func TestSMTPPipelinedQuitAfterDotIsDelivered(t *testing.T) {
+	s := hello(newSMTPSession()).
+		client("MAIL FROM:<a@b.c>\r\n").server("250 OK\r\n").
+		client("RCPT TO:<d@e.f>\r\n").server("250 OK\r\n").
+		client("DATA\r\n").server("354 Go\r\n").
+		client("x\r\n.\r\nQUIT\r\n").server("250 queued\r\n221 Bye\r\n")
+	got := runSMTP(t, s, 0)
+	require.Len(t, got, 1)
+	assert.Equal(t, OutcomeDelivered, got[0].Outcome)
+}
+
+func TestSMTPGapAbortsAndIgnoresTheRest(t *testing.T) {
+	s := hello(newSMTPSession()).
+		client("MAIL FROM:<a@b.c>\r\n").server("250 OK\r\n").
+		client("RCPT TO:<d@e.f>\r\n").server("250 OK\r\n").
+		lose("DATA\r\n").
+		client("MAIL FROM:<g@h.i>\r\nRCPT TO:<j@k.l>\r\nDATA\r\n").server("354 Go\r\n").
+		client("x\r\n.\r\n").server("250 queued\r\n")
+	got := runSMTP(t, s, s.now+10*time.Second)
+	require.Len(t, got, 1, "depois do buraco a conexão é ignorada: %+v", got)
+	assert.Equal(t, OutcomeAborted, got[0].Outcome)
+	assert.Equal(t, 1, got[0].Recipients)
+}
+
+func TestSMTPIgnoresOmniProbe(t *testing.T) {
+	s := newSMTPSession().
+		client("EHLO omni-sonda.localhost\r\n").server("250-ok\r\n250 SIZE 1\r\n").
+		client("MAIL FROM:<>\r\n").server("250 OK\r\n").
+		client("RCPT TO:<postmaster@loja.local>\r\n").server("550 no\r\n").
+		client("RSET\r\n").server("250 OK\r\n").
+		client("QUIT\r\n").server("221 Bye\r\n")
+	assert.Empty(t, runSMTP(t, s, 3*time.Minute), "a sonda do próprio Omni não conta como envio")
 }
