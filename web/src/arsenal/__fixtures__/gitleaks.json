@@ -1,0 +1,34 @@
+{
+  "vazamentos": [
+    {
+      "regra": "github-pat",
+      "descricao": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access and sensitive content exposure.",
+      "arquivo": "app.py",
+      "linha": 1,
+      "commit": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b",
+      "autor": "Dev Cobaia",
+      "data": "2026-11-23T14:14:38Z",
+      "entropia": 5.121928
+    },
+    {
+      "regra": "aws-access-token",
+      "descricao": "Identified a pattern that may indicate AWS credentials, risking unauthorized cloud resource access and data breaches on AWS platforms.",
+      "arquivo": "config/aws.env",
+      "linha": 1,
+      "commit": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b",
+      "autor": "Dev Cobaia",
+      "data": "2026-11-23T14:14:38Z",
+      "entropia": 4.221928
+    },
+    {
+      "regra": "generic-api-key",
+      "descricao": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "arquivo": "config/aws.env",
+      "linha": 4,
+      "commit": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b",
+      "autor": "Dev Cobaia",
+      "data": "2026-11-23T14:14:38Z",
+      "entropia": 3.9
+    }
+  ]
+}

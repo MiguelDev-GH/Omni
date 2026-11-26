@@ -102,6 +102,20 @@ func TestCreateTarget(t *testing.T) {
 	assert.Equal(t, 1, listLen(t, srv))
 }
 
+func TestCreateTargetRepo(t *testing.T) {
+	srv := newTestServer(t)
+	dir := t.TempDir()
+	got := create(t, srv, `{"nome":"loja","host":"127.0.0.1","portas_app":[3000],"repositorio":"`+dir+`"}`)
+	assert.Equal(t, dir, got.Repo)
+
+	for _, repo := range []string{"/", "/etc", "relativo/x", "/tmp/../etc"} {
+		rec := do(t, srv, "POST", "/api/alvos", `{"nome":"api","host":"127.0.0.1","portas_app":[3000],"repositorio":"`+repo+`"}`, true)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, repo)
+		assert.Equal(t, "repositorio", decode[map[string]string](t, rec)["campo"], repo)
+	}
+	assert.Equal(t, 1, listLen(t, srv))
+}
+
 func TestCreateTargetRejectsShellHost(t *testing.T) {
 	srv := newTestServer(t)
 	rec := do(t, srv, "POST", "/api/alvos", `{"nome":"api","host":"127.0.0.1; rm -rf /","portas_app":[3000]}`, true)

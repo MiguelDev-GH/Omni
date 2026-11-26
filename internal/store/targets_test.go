@@ -92,3 +92,23 @@ func TestTargetDNSAndSMTPPortsRoundTrip(t *testing.T) {
 	assert.Equal(t, 0, list[0].DNSPort)
 	assert.Equal(t, 2525, list[0].SMTPPort)
 }
+
+func TestTargetRepoRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+
+	in := sample()
+	in.Repo = "/srv/loja"
+	created, err := s.CreateTarget(ctx, in)
+	require.NoError(t, err)
+	got, err := s.GetTarget(ctx, created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "/srv/loja", got.Repo)
+
+	got.Repo = ""
+	require.NoError(t, s.UpdateTarget(ctx, got))
+	list, err := s.ListTargets(ctx)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Empty(t, list[0].Repo)
+}

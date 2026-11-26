@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -24,6 +25,8 @@ type fakeDocker struct {
 	mu      sync.Mutex
 	calls   []string
 	archive []byte
+	// created é o corpo de POST /containers/create.
+	created []byte
 	// output é o arquivo servido por GET /containers/c1/archive; nil dá 404.
 	output []byte
 }
@@ -36,6 +39,10 @@ func (f *fakeDocker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/images/img:1/json":
 		w.WriteHeader(http.StatusOK)
 	case r.URL.Path == "/containers/create":
+		b, _ := io.ReadAll(r.Body)
+		f.mu.Lock()
+		f.created = b
+		f.mu.Unlock()
 		w.WriteHeader(http.StatusCreated)
 		_, _ = io.WriteString(w, `{"Id":"c1"}`)
 	case r.Method == http.MethodPut && r.URL.Path == "/containers/c1/archive":
@@ -147,5 +154,33 @@ func TestRunRejectsBadFilePaths(t *testing.T) {
 		fd.mu.Lock()
 		assert.Empty(t, fd.calls, "nenhum container criado para %q", name)
 		fd.mu.Unlock()
+	}
+}
+
+func TestRunMountsRepoReadOnly(t *testing.T) {
+	d, fd := fakeRunnerFor(t)
+	_, err := d.Run(context.Background(), Spec{Image: "img:1", Binds: []Bind{{Source: "/srv/loja", Target: "/repo"}}}, io.Discard)
+	require.NoError(t, err)
+	var body struct {
+		HostConfig struct {
+			Mounts []mount
+		}
+	}
+	require.NoError(t, json.Unmarshal(fd.created, &body))
+	assert.Equal(t, []mount{{Type: "bind", Source: "/srv/loja", Target: "/repo", ReadOnly: true}}, body.HostConfig.Mounts)
+}
+
+func TestRunRejectsBadBinds(t *testing.T) {
+	for _, b := range []Bind{
+		{Source: "/srv/loja", Target: "/"},
+		{Source: "/srv/loja", Target: "/repo/x"},
+		{Source: "/", Target: "/repo"},
+		{Source: "relativo", Target: "/repo"},
+		{Source: "/srv/../etc", Target: "/repo"},
+	} {
+		d, fd := fakeRunnerFor(t)
+		_, err := d.Run(context.Background(), Spec{Image: "img:1", Binds: []Bind{b}}, io.Discard)
+		require.ErrorIs(t, err, ErrBindInvalido, b)
+		assert.Nil(t, fd.created, "nenhum container criado")
 	}
 }

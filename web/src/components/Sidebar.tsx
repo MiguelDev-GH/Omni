@@ -16,6 +16,7 @@ const routes: Record<string, string> = {
   SQLMap: "/arsenal/sqlmap",
   ffuf: "/arsenal/ffuf",
   Amass: "/arsenal/amass",
+  Vazamentos: "/arsenal/vazamentos",
   testssl: "/arsenal/testssl",
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",

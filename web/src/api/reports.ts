@@ -72,3 +72,17 @@ export async function getReport(scanId: number, tool: string): Promise<unknown |
     throw err;
   }
 }
+
+// Leak nunca traz o valor do segredo nem o trecho casado: o backend os
+// descarta ao ler a saída do Gitleaks.
+export type Leak = {
+  regra: string;
+  descricao: string;
+  arquivo: string;
+  linha: number;
+  commit: string;
+  autor: string;
+  data: string;
+  entropia: number;
+};
+export type GitleaksReport = { vazamentos: Leak[] };

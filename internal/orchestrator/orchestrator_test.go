@@ -328,3 +328,39 @@ func TestLogBatcherTruncates(t *testing.T) {
 	assert.Len(t, lines[0], maxLineLen)
 	assert.Equal(t, "(saída truncada)", lines[len(lines)-1])
 }
+
+func TestStartMountsTargetRepo(t *testing.T) {
+	r := &fakeRunner{stdout: []byte("[]")}
+	o, st, _, tg := setup(t, r)
+	tg.Repo = t.TempDir()
+	require.NoError(t, st.UpdateTarget(context.Background(), tg))
+
+	_, err := o.Start(context.Background(), tg.ID, []string{"gitleaks", "nmap"}, nil)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return len(r.specs) == 2
+	}, 2*time.Second, 5*time.Millisecond)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	assert.Equal(t, []Bind{{Source: tg.Repo, Target: "/repo"}}, r.specs[0].Binds)
+	assert.Nil(t, r.specs[1].Binds, "só o gitleaks recebe o código-fonte")
+}
+
+func TestStartGitleaksNeedsRepo(t *testing.T) {
+	o, _, _, tg := setup(t, &fakeRunner{})
+	_, err := o.Start(context.Background(), tg.ID, []string{"gitleaks"}, nil)
+	assert.ErrorIs(t, err, ErrFaltaDadoDoAlvo)
+	_, err = o.Start(context.Background(), tg.ID, []string{"amass"}, nil)
+	assert.ErrorIs(t, err, ErrFaltaDadoDoAlvo)
+}
+
+func TestCheckBinds(t *testing.T) {
+	tg := target.Target{Repo: "/srv/loja"}
+	assert.NoError(t, checkBinds(tg, nil))
+	assert.NoError(t, checkBinds(tg, []Bind{{Source: "/srv/loja", Target: "/repo"}}))
+	assert.ErrorIs(t, checkBinds(tg, []Bind{{Source: "/srv/outra", Target: "/repo"}}), ErrBindInvalido)
+	assert.ErrorIs(t, checkBinds(tg, []Bind{{Source: "/srv/loja", Target: "/app"}}), ErrBindInvalido)
+	assert.ErrorIs(t, checkBinds(target.Target{}, []Bind{{Source: "", Target: "/repo"}}), ErrBindInvalido)
+}

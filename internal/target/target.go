@@ -3,6 +3,8 @@ package target
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -26,6 +28,9 @@ type Target struct {
 	DNSPort int `json:"porta_dns,omitempty"`
 	// SMTPPort é a porta de um servidor SMTP no host.
 	SMTPPort int `json:"porta_smtp,omitempty"`
+	// Repo é o diretório do código-fonte da aplicação neste servidor, que o
+	// Gitleaks lê montado como somente leitura.
+	Repo string `json:"repositorio,omitempty"`
 }
 
 // ValidationError indica o primeiro campo inválido de um Target.
@@ -37,7 +42,7 @@ type ValidationError struct {
 func (e *ValidationError) Error() string { return e.Field + ": " + e.Message }
 
 // Validate confere os campos na ordem nome, host, portas_app, porta_banco,
-// dominio, porta_dns e porta_smtp.
+// dominio, porta_dns, porta_smtp e repositorio.
 func (t Target) Validate() error {
 	if n := utf8.RuneCountInString(strings.TrimSpace(t.Name)); n < 1 || n > maxNameLen {
 		return &ValidationError{"nome", "nome deve ter de 1 a 64 caracteres"}
@@ -86,7 +91,50 @@ func (t Target) Validate() error {
 			return &ValidationError{"porta_smtp", "porta já usada neste alvo"}
 		}
 	}
+	if t.Repo != "" {
+		if msg := checkRepo(t.Repo); msg != "" {
+			return &ValidationError{"repositorio", msg}
+		}
+	}
 	return nil
+}
+
+// forbiddenRepoDirs são diretórios do sistema que nunca viram repositório,
+// nem eles nem o que está dentro deles.
+var forbiddenRepoDirs = []string{"/proc", "/sys", "/dev", "/etc", "/boot", "/root"}
+
+// checkRepo devolve o motivo de recusa do caminho do repositório, ou "".
+// O caminho é conferido como foi escrito e depois de seguir os links
+// simbólicos, para que um link não aponte para um diretório proibido.
+func checkRepo(p string) string {
+	if !filepath.IsAbs(p) {
+		return "o caminho do código-fonte deve ser absoluto"
+	}
+	if filepath.Clean(p) != p {
+		return "o caminho do código-fonte não pode ter barras repetidas, . ou .."
+	}
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return "o diretório do código-fonte não existe"
+	}
+	for _, c := range []string{p, real} {
+		if c == "/" || forbiddenRepo(c) {
+			return "o código-fonte não pode estar na raiz nem em um diretório do sistema"
+		}
+	}
+	if fi, err := os.Stat(real); err != nil || !fi.IsDir() {
+		return "o caminho do código-fonte deve ser um diretório"
+	}
+	return ""
+}
+
+func forbiddenRepo(p string) bool {
+	for _, d := range forbiddenRepoDirs {
+		if p == d || strings.HasPrefix(p, d+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func isHostname(s string) bool {

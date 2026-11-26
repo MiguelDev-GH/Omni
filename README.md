@@ -712,8 +712,7 @@ Cuidados no WSL2:
 - [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
 - [ ] **Parar uma varredura em andamento** (Sprint 17).
 - [ ] **Varreduras simultâneas,** inclusive no mesmo alvo, enquanto os containers couberem na CPU e na memória (Sprint 17).
-- [x] **Novas ferramentas do Arsenal:** ffuf, Nikto, SQLMap e Amass.
-- [ ] **Gitleaks** (Vazamentos, Sprint 13).
+- [x] **Novas ferramentas do Arsenal:** ffuf, Nikto, SQLMap, Amass e Gitleaks (Vazamentos).
 - [x] **Exportação de relatório em PDF** por alvo e intervalo (até 168 h).
 
 ### Camada 6: Apresentação (TLS)

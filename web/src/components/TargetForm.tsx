@@ -5,7 +5,7 @@ import { createTarget, parsePorts, updateTarget, type Target, type TargetInput }
 import { useAppStore } from "../store/app";
 import DiscoveredServices from "./DiscoveredServices";
 
-type Field = "nome" | "host" | "portas_app" | "porta_banco" | "dominio" | "porta_dns" | "porta_smtp";
+type Field = "nome" | "host" | "portas_app" | "porta_banco" | "dominio" | "porta_dns" | "porta_smtp" | "repositorio";
 
 const singlePorts = ["porta_banco", "porta_dns", "porta_smtp"] as const;
 
@@ -20,6 +20,7 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
     dominio: initial?.dominio ?? "",
     porta_dns: initial?.porta_dns ? String(initial.porta_dns) : "",
     porta_smtp: initial?.porta_smtp ? String(initial.porta_smtp) : "",
+    repositorio: initial?.repositorio ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
       input[field] = Number(v);
     }
     if (values.dominio.trim() !== "") input.dominio = values.dominio.trim();
+    if (values.repositorio.trim() !== "") input.repositorio = values.repositorio.trim();
 
     setSaving(true);
     try {
@@ -126,6 +128,11 @@ export default function TargetForm({ initial, onDone, onCancel }: Props) {
         {input("dominio", "Domínio (opcional)", "A sonda de DNS resolve este nome e a de SMTP testa postmaster@domínio")}
         {input("porta_dns", "Porta DNS (opcional)", "Servidor DNS no mesmo host, ex.: 53")}
         {input("porta_smtp", "Porta SMTP (opcional)", "Servidor de e-mail no mesmo host, ex.: 25 ou 587")}
+        {input(
+          "repositorio",
+          "Código-fonte (opcional)",
+          "Caminho absoluto da pasta neste servidor, ex.: /srv/loja. O Gitleaks a lê como somente leitura",
+        )}
       </div>
       <div className="flex gap-2">
         <button

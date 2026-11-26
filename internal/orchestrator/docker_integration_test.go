@@ -5,9 +5,12 @@ package orchestrator
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -135,4 +138,39 @@ func TestDockerRunnerExitCodeAndCleanup(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "código")
 	assert.Contains(t, logs.String(), "unrecognized option")
+}
+
+// TestDockerRunnerGitleaks roda o Gitleaks de verdade num diretório com um
+// token gerado na hora, montado como somente leitura, e confere que o valor
+// não aparece nem na saída nem nos achados.
+func TestDockerRunnerGitleaks(t *testing.T) {
+	r, err := NewDockerRunner()
+	require.NoError(t, err)
+	if err := r.Available(context.Background()); err != nil {
+		t.Skip(err)
+	}
+	const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 36)
+	_, err = rand.Read(b)
+	require.NoError(t, err)
+	for i := range b {
+		b[i] = alnum[int(b[i])%len(alnum)]
+	}
+	secret := "ghp_" + string(b)
+	repo := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "app.py"), []byte("TOKEN = \""+secret+"\"\n"), 0o644))
+
+	tg := target.Target{Name: "t", Host: "127.0.0.1", AppPorts: []int{3000}, Repo: repo}
+	args, err := arsenal.GitleaksArgs(tg, nil)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	var logs bytes.Buffer
+	out, err := r.Run(ctx, Spec{Image: arsenal.GitleaksImage, Args: args, Binds: []Bind{{Source: repo, Target: arsenal.RepoMount}}}, &logs)
+	require.NoError(t, err, logs.String())
+	assert.NotContains(t, string(out)+logs.String(), secret, "--redact tira o valor da saída")
+	list, err := arsenal.ParseGitleaksJSON(bytes.NewReader(out))
+	require.NoError(t, err, string(out))
+	require.Len(t, list, 1)
+	assert.Equal(t, "github-pat em app.py:1", list[0].Title)
 }

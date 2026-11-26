@@ -1,6 +1,8 @@
 package target
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -48,6 +50,45 @@ func TestValidate(t *testing.T) {
 			var ve *ValidationError
 			require.ErrorAs(t, err, &ve)
 			assert.Equal(t, c.field, ve.Field)
+		})
+	}
+}
+
+func TestValidateRepo(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "arquivo.txt")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o600))
+	link := filepath.Join(dir, "etc")
+	require.NoError(t, os.Symlink("/etc", link))
+
+	cases := []struct {
+		repo  string
+		valid bool
+	}{
+		{dir, true},
+		{"/", false},
+		{"/etc", false},
+		{"/etc/ssl", false},
+		{"/proc/self", false},
+		{"/root", false},
+		{"relativo/x", false},
+		{"/tmp/../etc", false},
+		{dir + "/", false},
+		{filepath.Join(dir, "nao-existe"), false},
+		{file, false},
+		{link, false},
+	}
+	for _, c := range cases {
+		t.Run(c.repo, func(t *testing.T) {
+			tg := Target{Name: "api", Host: "127.0.0.1", AppPorts: []int{3000}, Repo: c.repo}
+			err := tg.Validate()
+			if c.valid {
+				assert.NoError(t, err)
+				return
+			}
+			var ve *ValidationError
+			require.ErrorAs(t, err, &ve)
+			assert.Equal(t, "repositorio", ve.Field)
 		})
 	}
 }

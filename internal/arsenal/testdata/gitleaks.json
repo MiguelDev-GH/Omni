@@ -1,0 +1,42 @@
+[
+ {
+  "RuleID": "github-pat",
+  "Description": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access and sensitive content exposure.",
+  "StartLine": 1,
+  "EndLine": 1,
+  "StartColumn": 17,
+  "EndColumn": 56,
+  "Match": "GITHUB_TOKEN = \"omni-fixture-segredo-github-0001\"",
+  "Secret": "omni-fixture-segredo-github-0001",
+  "File": "app.py",
+  "SymlinkFile": "",
+  "Commit": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b",
+  "Entropy": 5.121928,
+  "Author": "Dev Cobaia",
+  "Email": "dev@loja.test",
+  "Date": "2026-11-23T14:14:38Z",
+  "Message": "configuração inicial",
+  "Tags": [],
+  "Fingerprint": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b:app.py:github-pat:1"
+ },
+ {
+  "RuleID": "aws-access-token",
+  "Description": "Identified a pattern that may indicate AWS credentials, risking unauthorized cloud resource access and data breaches on AWS platforms.",
+  "StartLine": 1,
+  "EndLine": 1,
+  "StartColumn": 19,
+  "EndColumn": 38,
+  "Match": "AWS_ACCESS_KEY_ID=omni-fixture-segredo-aws-0002",
+  "Secret": "omni-fixture-segredo-aws-0002",
+  "File": "config/aws.env",
+  "SymlinkFile": "",
+  "Commit": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b",
+  "Entropy": 4.221928,
+  "Author": "Dev Cobaia",
+  "Email": "dev@loja.test",
+  "Date": "2026-11-23T14:14:38Z",
+  "Message": "configuração inicial",
+  "Tags": [],
+  "Fingerprint": "2a84462ef4bcfd4e166ef2689dc0b9fb238bd26b:config/aws.env:aws-access-token:1"
+ }
+]
