@@ -108,7 +108,16 @@ func (s *stream) ReassembledSG(sg reassembly.ScatterGather, _ reassembly.Assembl
 	s.p.data(fromClient, sg.Fetch(n), sg.CaptureInfo(0).Timestamp)
 }
 
-func (s *stream) ReassemblyComplete(reassembly.AssemblerContext) bool { return true }
+// closer é implementado pelos parsers que precisam saber quando a conexão
+// terminou (FIN, RST ou fechada por ociosidade).
+type closer interface{ closed() }
+
+func (s *stream) ReassemblyComplete(reassembly.AssemblerContext) bool {
+	if c, ok := s.p.(closer); ok {
+		c.closed()
+	}
+	return true
+}
 
 type captureContext struct{ ci gopacket.CaptureInfo }
 

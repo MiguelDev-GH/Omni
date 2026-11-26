@@ -65,6 +65,10 @@ type Config struct {
 	// OMNI_PG_DSN_ARQUIVO). Vazio desliga a medição.
 	PGDSN string
 
+	// SMTPQueueDirs são os diretórios da fila de saída do servidor de e-mail
+	// (OMNI_SMTP_FILA_DIRS, separados por vírgula); vazio desliga a contagem.
+	SMTPQueueDirs []string
+
 	// extraOrigins guarda as origens de OMNI_ORIGENS já validadas, para Bind
 	// refazer AllowedOrigins com a porta real.
 	extraOrigins []string
@@ -124,6 +128,11 @@ func Load(getenv func(string) string) (Config, error) {
 	c.PGDSN, err = pgDSN(getenv, os.ReadFile)
 	if err != nil {
 		return Config{}, err
+	}
+	for _, dir := range strings.Split(getenv("OMNI_SMTP_FILA_DIRS"), ",") {
+		if dir = strings.TrimSpace(dir); dir != "" {
+			c.SMTPQueueDirs = append(c.SMTPQueueDirs, dir)
+		}
 	}
 	return c, nil
 }

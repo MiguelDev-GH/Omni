@@ -361,3 +361,71 @@ func TestWatcherDiskLatencyIgnoredWithoutIO(t *testing.T) {
 		}
 	}
 }
+
+// levelsOf devolve o último nível de cada regra nos alertas.
+func levelsOf(got []Alert) map[string]Level {
+	levels := map[string]Level{}
+	for _, a := range got {
+		levels[a.Rule] = a.Level
+	}
+	return levels
+}
+
+func TestWatcherDNSFailureRate(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 30; i += 10 {
+		at := t0.Add(time.Duration(i) * time.Second)
+		w.handle(context.Background(), mkEvent(eventDNS, map[string]any{"consultas": 30, "falhas": 9}), at)
+	}
+	if lvl := levelsOf(*got)[RuleDNSTrafficFailures]; lvl != Red {
+		t.Fatalf("30%% de falhas por 30 s = %q, quer vermelho (%+v)", lvl, *got)
+	}
+}
+
+func TestWatcherDNSFailureRateNeedsVolume(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 60; i += 10 {
+		w.handle(context.Background(), mkEvent(eventDNS, map[string]any{"consultas": 19, "falhas": 19}), t0.Add(time.Duration(i)*time.Second))
+	}
+	if _, ok := levelsOf(*got)[RuleDNSTrafficFailures]; ok {
+		t.Fatalf("menos de 20 consultas não deveria alertar: %+v", *got)
+	}
+}
+
+func TestWatcherSMTPRejectionRate(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 30; i += 10 {
+		w.handle(context.Background(), mkEvent(eventSMTP, map[string]any{"tentativas": 10, "rejeitados": 1, "abortados": 1}),
+			t0.Add(time.Duration(i)*time.Second))
+	}
+	if lvl := levelsOf(*got)[RuleSMTPRejections]; lvl != Yellow {
+		t.Fatalf("20%% de rejeição = %q, quer amarelo (%+v)", lvl, *got)
+	}
+
+	w, got = newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 60; i += 10 {
+		w.handle(context.Background(), mkEvent(eventSMTP, map[string]any{"tentativas": 5, "rejeitados": 5}), t0.Add(time.Duration(i)*time.Second))
+	}
+	if _, ok := levelsOf(*got)[RuleSMTPRejections]; ok {
+		t.Fatalf("5 tentativas não deveriam gerar amostra: %+v", *got)
+	}
+}
+
+func TestWatcherSMTPQueue(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 300; i += 30 {
+		w.handle(context.Background(), mkEvent(eventQueue, map[string]any{"mensagens": 250, "hora": t0.Add(time.Duration(i) * time.Second)}),
+			t0.Add(time.Duration(i)*time.Second))
+	}
+	if lvl := levelsOf(*got)[RuleSMTPQueue]; lvl != Red {
+		t.Fatalf("fila com 250 mensagens por 5 min = %q, quer vermelho (%+v)", lvl, *got)
+	}
+
+	w, got = newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 300; i += 30 {
+		w.handle(context.Background(), mkEvent(eventQueue, map[string]any{"mensagens": 0, "erro": "sem permissão"}), t0.Add(time.Duration(i)*time.Second))
+	}
+	if _, ok := levelsOf(*got)[RuleSMTPQueue]; ok {
+		t.Fatalf("uma contagem com erro não vira amostra: %+v", *got)
+	}
+}

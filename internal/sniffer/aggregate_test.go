@@ -18,7 +18,7 @@ func decode(frame []byte) gopacket.Packet {
 }
 
 func TestClassify(t *testing.T) {
-	app := []int{3000}
+	app := PortRoles{App: []int{3000}}
 	cases := []struct {
 		src, dst uint16
 		udp      bool
@@ -46,7 +46,7 @@ func TestClassify(t *testing.T) {
 }
 
 func TestAggregatorFlush(t *testing.T) {
-	a := NewAggregator([]int{3000})
+	a := NewAggregator(PortRoles{App: []int{3000}})
 	big := testutil.TCP("10.0.0.1", "10.0.0.2", 40000, 3000, "PA", make([]byte, 500))
 	db := testutil.TCP("10.0.0.3", "10.0.0.2", 40001, 5432, "PA", make([]byte, 100))
 	dns := testutil.UDP("10.0.0.3", "10.0.0.53", 5353, 53, make([]byte, 20))
@@ -78,7 +78,7 @@ func TestAggregatorFlush(t *testing.T) {
 }
 
 func TestAggregatorCountsIPv6(t *testing.T) {
-	a := NewAggregator([]int{3000})
+	a := NewAggregator(PortRoles{App: []int{3000}})
 	v4 := testutil.TCP("10.0.0.1", "10.0.0.2", 40000, 3000, "S", nil)
 	v6 := testutil.TCP("fd00::1", "fd00::2", 40000, 3000, "S", nil)
 	a.Add(decode(v4))
@@ -91,7 +91,7 @@ func TestAggregatorCountsIPv6(t *testing.T) {
 }
 
 func TestAggregatorKeepsTopTenSources(t *testing.T) {
-	a := NewAggregator(nil)
+	a := NewAggregator(PortRoles{})
 	for i := 1; i <= 15; i++ {
 		f := testutil.TCP(fmt.Sprintf("10.0.0.%d", i), "10.0.0.200", 40000, 9999, "PA", make([]byte, i*10))
 		a.Add(decode(f))
@@ -100,4 +100,13 @@ func TestAggregatorKeepsTopTenSources(t *testing.T) {
 	require.Len(t, w.TopSources, maxTopSources)
 	assert.Equal(t, "10.0.0.15", w.TopSources[0].IP)
 	assert.Equal(t, "10.0.0.6", w.TopSources[9].IP)
+}
+
+func TestClassifyCustomDNSAndSMTPPorts(t *testing.T) {
+	roles := PortRoles{App: []int{3000}, DNS: []int{1053}, SMTP: []int{1025}}
+	assert.Equal(t, "DNS", Classify(40000, 1053, true, roles))
+	assert.Equal(t, "DNS", Classify(1053, 40000, true, roles))
+	assert.Equal(t, "SMTP", Classify(41000, 1025, false, roles))
+	assert.Equal(t, "SMTP", Classify(1025, 41000, false, roles))
+	assert.Equal(t, "UDP", Classify(40000, 1054, true, roles))
 }

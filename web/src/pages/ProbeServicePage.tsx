@@ -4,6 +4,7 @@ import { listHistory } from "../api/targets";
 import CountChart from "../charts/CountChart";
 import { Card, Notice, PageHeader, Stat } from "../components/Card";
 import { summarizeProbes } from "../lib/probes";
+import TrafficServiceSection from "./TrafficServiceSection";
 import { portKey, useAppStore, type PortStatus } from "../store/app";
 
 type Kind = "dns" | "smtp";
@@ -116,6 +117,8 @@ export default function ProbeServicePage({ kind }: { kind: Kind }) {
         </p>
       )}
 
+      <h2 className="text-lg font-semibold tracking-tight">Sonda ativa</h2>
+
       <Card title="Latência da sonda (ms)">
         <CountChart id={`latencia-${kind}`} points={latency} label="Latência (ms)" empty="Sem verificações ainda." />
       </Card>
@@ -151,6 +154,8 @@ export default function ProbeServicePage({ kind }: { kind: Kind }) {
           </table>
         )}
       </Card>
+
+      <TrafficServiceSection kind={kind} />
     </div>
   );
 }

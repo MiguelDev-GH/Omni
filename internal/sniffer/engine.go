@@ -21,6 +21,10 @@ const (
 	EventHTTP = "METRICAS_HTTP"
 	// EventDB leva a l7.DBWindow dos últimos 10 s.
 	EventDB = "METRICAS_BANCO"
+	// EventDNS leva a l7.DNSWindow dos últimos 10 s.
+	EventDNS = "METRICAS_DNS"
+	// EventSMTP leva a l7.SMTPWindow dos últimos 10 s.
+	EventSMTP = "METRICAS_SMTP"
 
 	StateActive       = "ativo"
 	StateNoPermission = "sem-permissao"
@@ -40,6 +44,8 @@ type TrafficStore interface {
 	InsertTrafficWindow(ctx context.Context, w Window) error
 	InsertHTTPWindow(ctx context.Context, w l7.HTTPWindow) error
 	InsertDBWindow(ctx context.Context, w l7.DBWindow) error
+	InsertDNSWindow(ctx context.Context, w l7.DNSWindow) error
+	InsertSMTPWindow(ctx context.Context, w l7.SMTPWindow) error
 	// PruneTraffic apaga as janelas de todas as métricas do sniffer anteriores a before.
 	PruneTraffic(ctx context.Context, before time.Time) error
 }
@@ -100,7 +106,7 @@ func (e *Engine) Run(ctx context.Context) error {
 			slog.Error("sniffer: listar alvos", "erro", err)
 		}
 		if bpf := BPFForTargets(ts); bpf != "" {
-			e.captureFrom(ctx, bpf, appPorts(ts), dbPorts(ts))
+			e.captureFrom(ctx, bpf, RolesFor(ts), dbPorts(ts))
 		} else {
 			e.setState(StateInactive, nil)
 		}
@@ -114,7 +120,7 @@ func (e *Engine) Run(ctx context.Context) error {
 
 // captureFrom abre a fonte com bpf e agrega até ctx acabar, a fonte fechar ou
 // o filtro dos alvos mudar.
-func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
+func (e *Engine) captureFrom(ctx context.Context, bpf string, roles PortRoles, db []int) {
 	src, err := e.open(bpf)
 	if err != nil {
 		if errors.Is(err, ErrSemPermissao) {
@@ -130,11 +136,11 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 	capCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pkts := src.Packets(capCtx)
-	agg := NewAggregator(app)
+	agg := NewAggregator(roles)
 	agg.Flush(time.Now())
 	httpStats := l7.NewHTTPStats()
 	httpStats.Flush(time.Now())
-	httpAsm := l7.NewHTTPAssembler(app, func(ex l7.HTTPExchange) {
+	httpAsm := l7.NewHTTPAssembler(roles.App, func(ex l7.HTTPExchange) {
 		httpStats.Add(ex)
 		if e.onHTTP != nil {
 			e.onHTTP(ex)
@@ -144,6 +150,12 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 	dbStats.Flush(time.Now())
 	pgAsm := l7.NewPostgresAssembler(db, dbStats.Add)
 	pgAsm.OnTxFailed(func(time.Time) { dbStats.AddTxFailure() })
+	dnsStats := l7.NewDNSStats()
+	dnsStats.Flush(time.Now())
+	dnsTracker := l7.NewDNSTracker(roles.DNS, dnsStats.Add)
+	smtpStats := l7.NewSMTPStats()
+	smtpStats.Flush(time.Now())
+	smtpAsm := l7.NewSMTPAssembler(roles.SMTP, smtpStats.Add)
 	var dropped uint64
 	flush := func(now time.Time) {
 		w := agg.Flush(now)
@@ -154,8 +166,12 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 	flushL7 := func(now time.Time) {
 		httpAsm.Flush(now)
 		pgAsm.Flush(now)
+		dnsTracker.Flush(now)
+		smtpAsm.Flush(now)
 		e.emitHTTP(ctx, httpStats.Flush(now))
 		e.emitDB(ctx, dbStats.Flush(now))
+		e.emitDNS(ctx, dnsStats.Flush(now))
+		e.emitSMTP(ctx, smtpStats.Flush(now))
 	}
 
 	winT := time.NewTicker(e.window)
@@ -178,6 +194,8 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, app, db []int) {
 			agg.Add(p)
 			httpAsm.Add(p)
 			pgAsm.Add(p)
+			dnsTracker.Add(p)
+			smtpAsm.Add(p)
 		case now := <-winT.C:
 			flush(now)
 		case now := <-l7T.C:
@@ -222,6 +240,24 @@ func (e *Engine) emitDB(ctx context.Context, w l7.DBWindow) {
 		}
 	}
 	e.pub.Publish(ws.Event{Type: EventDB, Data: w})
+}
+
+func (e *Engine) emitDNS(ctx context.Context, w l7.DNSWindow) {
+	if w.Queries > 0 {
+		if err := e.st.InsertDNSWindow(ctx, w); err != nil && ctx.Err() == nil {
+			slog.Error("sniffer: gravar janela dns", "erro", err)
+		}
+	}
+	e.pub.Publish(ws.Event{Type: EventDNS, Data: w})
+}
+
+func (e *Engine) emitSMTP(ctx context.Context, w l7.SMTPWindow) {
+	if w.Attempts > 0 {
+		if err := e.st.InsertSMTPWindow(ctx, w); err != nil && ctx.Err() == nil {
+			slog.Error("sniffer: gravar janela smtp", "erro", err)
+		}
+	}
+	e.pub.Publish(ws.Event{Type: EventSMTP, Data: w})
 }
 
 // setState grava o estado, registra a mudança no log e publica o estado.
@@ -269,15 +305,6 @@ func dbPorts(ts []target.Target) []int {
 		if t.DBPort > 0 && t.DBPort != 3306 {
 			ports = append(ports, t.DBPort)
 		}
-	}
-	return ports
-}
-
-// appPorts devolve só as portas de aplicação, que o classificador trata como HTTP.
-func appPorts(ts []target.Target) []int {
-	var ports []int
-	for _, t := range ts {
-		ports = append(ports, t.AppPorts...)
 	}
 	return ports
 }

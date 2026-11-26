@@ -1,5 +1,6 @@
 import { formatAlertValue, type Alert, type Level } from "../api/alerts";
 import type { ConnSnapshot } from "../api/connections";
+import type { DNSWindow, QueueSnapshot, SMTPWindow } from "../api/dnsSmtp";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
@@ -47,6 +48,18 @@ function isConnSnapshot(v: unknown): v is ConnSnapshot {
     Array.isArray(v.portas) &&
     v.portas.every((p) => isObject(p) && typeof p.porta === "number" && typeof p.estabelecidas === "number" && Array.isArray(p.clientes))
   );
+}
+
+function isDNSWindow(v: unknown): v is DNSWindow {
+  return isObject(v) && typeof v.inicio === "string" && typeof v.consultas === "number" && isObject(v.rcodes);
+}
+
+function isSMTPWindow(v: unknown): v is SMTPWindow {
+  return isObject(v) && typeof v.inicio === "string" && typeof v.tentativas === "number" && isObject(v.codigos);
+}
+
+function isQueueSnapshot(v: unknown): v is QueueSnapshot {
+  return isObject(v) && typeof v.hora === "string" && typeof v.mensagens === "number";
 }
 
 const levels: Level[] = ["verde", "amarelo", "vermelho"];
@@ -123,6 +136,15 @@ export function handleEvent(raw: string): void {
       break;
     case "METRICAS_BANCO":
       if (isDBWindow(dados)) st.addDB([dados]);
+      break;
+    case "METRICAS_DNS":
+      if (isDNSWindow(dados)) st.addDNS([dados]);
+      break;
+    case "METRICAS_SMTP":
+      if (isSMTPWindow(dados)) st.addSMTP([dados]);
+      break;
+    case "FILA_SMTP":
+      if (isQueueSnapshot(dados)) st.setQueue(dados);
       break;
     case "METRICAS_CONEXOES":
       if (isConnSnapshot(dados)) st.addConnections([dados]);

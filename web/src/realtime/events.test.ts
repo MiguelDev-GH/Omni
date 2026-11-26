@@ -156,3 +156,14 @@ test("METRICAS_CONEXOES stores the snapshot and ignores malformed ones", () => {
   expect(useAppStore.getState().connections).toHaveLength(1);
   expect(useAppStore.getState().connections[0]?.portas[0]?.estabelecidas).toBe(2);
 });
+
+test("METRICAS_DNS, METRICAS_SMTP and FILA_SMTP are stored", () => {
+  send({ tipo: "METRICAS_DNS", dados: { inicio: "2026-11-25T12:00:00Z", consultas: 5, falhas: 1, rcodes: { NOERROR: 4 }, p50_ms: 1, p95_ms: 2 } });
+  send({ tipo: "METRICAS_SMTP", dados: { inicio: "2026-11-25T12:00:00Z", tentativas: 3, entregues: 3, rejeitados: 0, abortados: 0, codigos: {}, p50_ms: 1, p95_ms: 2 } });
+  send({ tipo: "FILA_SMTP", dados: { hora: "2026-11-25T12:00:00Z", mensagens: 9 } });
+  send({ tipo: "METRICAS_DNS", dados: { inicio: "2026-11-25T12:00:10Z" } });
+  const st = useAppStore.getState();
+  expect(st.dns).toHaveLength(1);
+  expect(st.smtp[0]?.tentativas).toBe(3);
+  expect(st.queue?.mensagens).toBe(9);
+});

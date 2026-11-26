@@ -193,3 +193,14 @@ func TestLoadReadsPGDSNFromFile(t *testing.T) {
 	_, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_PG_DSN_ARQUIVO": filepath.Join(t.TempDir(), "nao-existe")}))
 	require.Error(t, err)
 }
+
+func TestLoadSMTPQueueDirs(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok}))
+	require.NoError(t, err)
+	assert.Empty(t, c.SMTPQueueDirs)
+
+	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok,
+		"OMNI_SMTP_FILA_DIRS": " /var/spool/postfix/active , ,/var/spool/postfix/deferred"}))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/var/spool/postfix/active", "/var/spool/postfix/deferred"}, c.SMTPQueueDirs)
+}

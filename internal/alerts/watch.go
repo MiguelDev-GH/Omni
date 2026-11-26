@@ -22,6 +22,9 @@ const (
 	eventHTTP    = "METRICAS_HTTP"
 	eventDB      = "METRICAS_BANCO"
 	eventSystem  = "METRICAS_SISTEMA"
+	eventDNS     = "METRICAS_DNS"
+	eventSMTP    = "METRICAS_SMTP"
+	eventQueue   = "FILA_SMTP"
 	watchBuffer  = 512
 	namesRefresh = 10 * time.Second
 )
@@ -31,6 +34,8 @@ const (
 const (
 	minHTTPRequests = 20
 	minDBQueries    = 20
+	minDNSQueries   = 20
+	minSMTPAttempts = 10
 )
 
 // A taxa de falhas das sondas DNS e SMTP é calculada sobre as últimas
@@ -82,7 +87,7 @@ func NewWatcher(e *Engine, tl TargetLister) *Watcher {
 // ignorados; com o buffer cheio, o evento é descartado.
 func (w *Watcher) Feed(eventType string, data any) {
 	switch eventType {
-	case eventStatus, eventHTTP, eventDB, eventSystem:
+	case eventStatus, eventHTTP, eventDB, eventSystem, eventDNS, eventSMTP, eventQueue:
 	default:
 		return
 	}
@@ -136,6 +141,20 @@ type (
 		Queries uint64  `json:"consultas"`
 		Errors  uint64  `json:"erros"`
 		P95MS   float64 `json:"p95_ms"`
+	}
+	dnsEvent struct {
+		Queries  uint64 `json:"consultas"`
+		Failures uint64 `json:"falhas"`
+	}
+	smtpEvent struct {
+		Attempts uint64 `json:"tentativas"`
+		Rejected uint64 `json:"rejeitados"`
+		Aborted  uint64 `json:"abortados"`
+	}
+	queueEvent struct {
+		Messages int       `json:"mensagens"`
+		Err      string    `json:"erro"`
+		At       time.Time `json:"hora"`
 	}
 	systemEvent struct {
 		CPU    float64 `json:"cpu"`
@@ -231,6 +250,46 @@ func (w *Watcher) handle(ctx context.Context, ev rawEvent, now time.Time) {
 		detail := fmt.Sprintf("%d de %d consultas nos últimos 10 s", d.Errors, d.Queries)
 		w.engine.Observe(Sample{Rule: RuleDBErrors, Value: rate, Detail: detail, At: now})
 		w.engine.Observe(Sample{Rule: RuleDBP95, Value: d.P95MS, At: now})
+	case eventDNS:
+		var d dnsEvent
+		if err := decode(ev.data, &d); err != nil {
+			slog.Error("alertas: ler METRICAS_DNS", "erro", err)
+			return
+		}
+		if d.Queries < minDNSQueries {
+			return
+		}
+		rate := float64(d.Failures) / float64(d.Queries) * 100
+		detail := fmt.Sprintf("%d de %d consultas nos últimos 10 s", d.Failures, d.Queries)
+		w.engine.Observe(Sample{Rule: RuleDNSTrafficFailures, Value: rate, Detail: detail, At: now})
+	case eventSMTP:
+		var s smtpEvent
+		if err := decode(ev.data, &s); err != nil {
+			slog.Error("alertas: ler METRICAS_SMTP", "erro", err)
+			return
+		}
+		if s.Attempts < minSMTPAttempts {
+			return
+		}
+		// Abortadas (conexão caída ou ociosa no meio) contam como os timeouts do enunciado.
+		failed := s.Rejected + s.Aborted
+		rate := float64(failed) / float64(s.Attempts) * 100
+		detail := fmt.Sprintf("%d de %d envios recusados ou interrompidos nos últimos 10 s", failed, s.Attempts)
+		w.engine.Observe(Sample{Rule: RuleSMTPRejections, Value: rate, Detail: detail, At: now})
+	case eventQueue:
+		var q queueEvent
+		if err := decode(ev.data, &q); err != nil {
+			slog.Error("alertas: ler FILA_SMTP", "erro", err)
+			return
+		}
+		if q.Err != "" {
+			return
+		}
+		at := q.At
+		if at.IsZero() {
+			at = now
+		}
+		w.engine.Observe(Sample{Rule: RuleSMTPQueue, Value: float64(q.Messages), At: at})
 	case eventSystem:
 		var s systemEvent
 		if err := decode(ev.data, &s); err != nil {

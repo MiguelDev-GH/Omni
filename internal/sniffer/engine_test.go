@@ -2,6 +2,9 @@ package sniffer
 
 import (
 	"context"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -22,7 +25,35 @@ type fakeStore struct {
 	windows []Window
 	http    []l7.HTTPWindow
 	db      []l7.DBWindow
+	dns     []l7.DNSWindow
+	smtp    []l7.SMTPWindow
 	pruned  []time.Time
+}
+
+func (f *fakeStore) InsertDNSWindow(_ context.Context, w l7.DNSWindow) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dns = append(f.dns, w)
+	return nil
+}
+
+func (f *fakeStore) InsertSMTPWindow(_ context.Context, w l7.SMTPWindow) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.smtp = append(f.smtp, w)
+	return nil
+}
+
+func (f *fakeStore) savedDNS() []l7.DNSWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]l7.DNSWindow(nil), f.dns...)
+}
+
+func (f *fakeStore) savedSMTP() []l7.SMTPWindow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]l7.SMTPWindow(nil), f.smtp...)
 }
 
 func (f *fakeStore) ListTargets(context.Context) ([]target.Target, error) {
@@ -283,4 +314,48 @@ func TestEngineRecordsDBWindows(t *testing.T) {
 	require.Len(t, w.Top, 1)
 	assert.Equal(t, "SELECT * FROM u WHERE email = ?", w.Top[0].Query)
 	assert.NotEmpty(t, pub.ofType(EventDB))
+}
+
+func dnsPayload(t *testing.T, id uint16, resp bool) []byte {
+	t.Helper()
+	d := &layers.DNS{ID: id, QR: resp, RD: true, Questions: []layers.DNSQuestion{
+		{Name: []byte("loja.local"), Type: layers.DNSTypeA, Class: layers.DNSClassIN},
+	}}
+	buf := gopacket.NewSerializeBuffer()
+	require.NoError(t, d.SerializeTo(buf, gopacket.SerializeOptions{FixLengths: true}))
+	return buf.Bytes()
+}
+
+func TestEnginePublishesDNSAndSMTPWindows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dns-smtp.pcap")
+	frames := [][]byte{
+		testutil.UDP("127.0.0.1", "127.0.0.1", 40000, 1053, dnsPayload(t, 1, false)),
+		testutil.UDP("127.0.0.1", "127.0.0.1", 1053, 40000, dnsPayload(t, 1, true)),
+	}
+	c := testutil.NewConn("127.0.0.1", 41000, "127.0.0.1", 1025)
+	frames = append(frames, c.Handshake()...)
+	frames = append(frames,
+		c.FromServer([]byte("220 ok\r\n")),
+		c.FromClient([]byte("MAIL FROM:<a@b.c>\r\n")), c.FromServer([]byte("250 ok\r\n")),
+		c.FromClient([]byte("RCPT TO:<d@e.f>\r\n")), c.FromServer([]byte("250 ok\r\n")),
+		c.FromClient([]byte("DATA\r\n")), c.FromServer([]byte("354 go\r\n")),
+		c.FromClient([]byte("x\r\n.\r\n")), c.FromServer([]byte("250 queued\r\n")),
+	)
+	testutil.WritePCAP(t, path, frames...)
+
+	st := &fakeStore{targets: []target.Target{{ID: 1, AppPorts: []int{3000}, Domain: "loja.local", DNSPort: 1053, SMTPPort: 1025}}}
+	pub := &fakePub{}
+	e := NewEngine(func(string) (Source, error) { return OpenFile(path) }, st, pub)
+	startEngine(t, e)
+
+	require.Eventually(t, func() bool { return len(st.savedDNS()) > 0 && len(st.savedSMTP()) > 0 }, 2*time.Second, 10*time.Millisecond)
+	assert.Equal(t, uint64(1), st.savedDNS()[0].Queries)
+	assert.Equal(t, uint64(1), st.savedSMTP()[0].Delivered)
+	assert.NotEmpty(t, pub.ofType(EventDNS))
+	assert.NotEmpty(t, pub.ofType(EventSMTP))
+	var dnsBytes uint64
+	for _, w := range st.savedWindows() {
+		dnsBytes += w.ByProtocol["DNS"]
+	}
+	assert.Positive(t, dnsBytes, "a porta DNS do alvo é classificada como DNS")
 }

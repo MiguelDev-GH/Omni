@@ -32,7 +32,7 @@ type SourceCount struct {
 // Aggregator soma os pacotes da janela atual. Não é seguro para uso
 // concorrente; o motor o usa de uma única goroutine.
 type Aggregator struct {
-	appPorts   []int
+	roles      PortRoles
 	start      time.Time
 	bytes      uint64
 	packets    uint64
@@ -40,9 +40,10 @@ type Aggregator struct {
 	sources    map[string]*SourceCount
 }
 
-// NewAggregator cria um agregador que classifica appPorts como HTTP.
-func NewAggregator(appPorts []int) *Aggregator {
-	a := &Aggregator{appPorts: appPorts}
+// NewAggregator cria um agregador que classifica as portas dos alvos pelo
+// papel de cada uma (veja Classify).
+func NewAggregator(roles PortRoles) *Aggregator {
+	a := &Aggregator{roles: roles}
 	a.reset(time.Time{})
 	return a
 }
@@ -73,9 +74,9 @@ func (a *Aggregator) Add(p gopacket.Packet) {
 	proto := "IP"
 	switch tr := p.TransportLayer().(type) {
 	case *layers.TCP:
-		proto = Classify(uint16(tr.SrcPort), uint16(tr.DstPort), false, a.appPorts)
+		proto = Classify(uint16(tr.SrcPort), uint16(tr.DstPort), false, a.roles)
 	case *layers.UDP:
-		proto = Classify(uint16(tr.SrcPort), uint16(tr.DstPort), true, a.appPorts)
+		proto = Classify(uint16(tr.SrcPort), uint16(tr.DstPort), true, a.roles)
 	}
 
 	a.bytes += size

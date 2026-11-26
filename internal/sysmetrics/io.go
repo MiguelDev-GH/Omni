@@ -28,7 +28,13 @@ func deviceFor(p string, parts []disk.PartitionStat) string {
 		mp := part.Mountpoint
 		inside := p == mp || mp == "/" || strings.HasPrefix(p, strings.TrimSuffix(mp, "/")+"/")
 		if inside && len(mp) > best {
-			best, device = len(mp), path.Base(filepath.ToSlash(part.Device))
+			dev := part.Device
+			// No LVM, /dev/mapper/vg-lv é um link para /dev/dm-0, o nome
+			// usado nos contadores de disco.
+			if real, err := filepath.EvalSymlinks(dev); err == nil {
+				dev = real
+			}
+			best, device = len(mp), path.Base(filepath.ToSlash(dev))
 		}
 	}
 	return device
@@ -69,6 +75,7 @@ type Sampler struct {
 	prev     disk.IOCountersStat
 	prevAt   time.Time
 	hasPrev  bool
+	warned   bool // o aviso de dispositivo sem contadores já saiu
 }
 
 func NewSampler(diskPath string) *Sampler {
@@ -97,6 +104,10 @@ func (s *Sampler) Sample(ctx context.Context) (Snapshot, error) {
 	cur, ok := counters[s.device]
 	if err != nil || !ok {
 		s.hasPrev = false
+		if !s.warned {
+			s.warned = true
+			slog.Warn("disco: dispositivo sem contadores de I/O; I/O desligado", "dispositivo", s.device)
+		}
 		return snap, nil
 	}
 	if s.hasPrev {
