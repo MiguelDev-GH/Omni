@@ -107,7 +107,7 @@ func TestSampleReadsRealConnections(t *testing.T) {
 	c, err := net.Dial("tcp", ln.Addr().String())
 	require.NoError(t, err)
 	defer func() { _ = c.Close() }()
-	defer func() { (<-accepted).Close() }()
+	defer func() { _ = (<-accepted).Close() }()
 
 	port := ln.Addr().(*net.TCPAddr).Port
 	snap, err := sample(context.Background(), func(context.Context) ([]target.Target, error) {
