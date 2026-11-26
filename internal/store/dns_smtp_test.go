@@ -70,3 +70,40 @@ func TestQueueSnapshotsRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 }
+
+func TestDNSAndSMTPBetweenFilterByInterval(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := range 3 {
+		start := at.Add(time.Duration(i) * 10 * time.Second)
+		require.NoError(t, s.InsertDNSWindow(ctx, l7.DNSWindow{Start: start, Queries: uint64(i + 1)}))
+		require.NoError(t, s.InsertSMTPWindow(ctx, l7.SMTPWindow{Start: start, Attempts: uint64(i + 1)}))
+	}
+
+	dns, err := s.DNSBetween(ctx, at.Add(10*time.Second), at.Add(30*time.Second))
+	require.NoError(t, err)
+	require.Len(t, dns, 2)
+	assert.Equal(t, uint64(2), dns[0].Queries)
+	assert.Equal(t, map[string]uint64{}, dns[0].ByRCode)
+
+	smtp, err := s.SMTPBetween(ctx, at, at.Add(20*time.Second))
+	require.NoError(t, err)
+	require.Len(t, smtp, 2)
+	assert.Equal(t, uint64(1), smtp[0].Attempts)
+}
+
+func TestQueueBetweenKeepsPeakPerStep(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i, n := range []int{3, 9, 1} {
+		require.NoError(t, s.AddQueueSnapshot(ctx, mailqueue.Snapshot{At: at.Add(time.Duration(i) * 30 * time.Second), Messages: n}))
+	}
+
+	got, err := s.QueueBetween(ctx, at, at.Add(2*time.Minute), time.Minute)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, mailqueue.Snapshot{At: at, Messages: 9}, got[0])
+	assert.Equal(t, 1, got[1].Messages)
+}

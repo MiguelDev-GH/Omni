@@ -44,3 +44,23 @@ func TestConnectionsSinceRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 }
+
+func TestConnectionsBetweenKeepsPeakPerStep(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i, n := range []int{1, 4, 2, 7} {
+		require.NoError(t, s.AddConnSnapshot(ctx, connSnapshot(at.Add(time.Duration(i)*30*time.Second), n)))
+	}
+
+	got, err := s.ConnectionsBetween(ctx, at, at.Add(90*time.Second), time.Minute)
+	require.NoError(t, err)
+	require.Len(t, got, 2, "a coleta de 90 s fica de fora")
+	assert.Equal(t, at, got[0].At)
+	require.Len(t, got[0].Ports, 2)
+	assert.Equal(t, 3000, got[0].Ports[0].Port)
+	assert.Equal(t, 4, got[0].Ports[0].Established)
+	assert.Equal(t, 2, got[0].Ports[1].Established)
+	assert.Equal(t, at.Add(time.Minute), got[1].At)
+	assert.Equal(t, 2, got[1].Ports[0].Established)
+}
