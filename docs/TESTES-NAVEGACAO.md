@@ -23,8 +23,9 @@ make check                  # tudo: Go, frontend e loja cobaia
 | `src/pages/OverviewPage.test.tsx` | tela Geral: histórico, protocolos, principais origens e atualização ao vivo |
 | `src/pages/AlertsPage.test.tsx` | tela Alertas: nível por serviço (Web, Banco, DNS, SMTP, Sistema, Segurança), histórico, e-mail ativo ou não, atualização ao vivo |
 | `src/pages/TargetsPage.test.tsx` | tela Alvos: criar, editar, excluir, validação de portas, portas DNS/SMTP e estado de cada porta |
-| `src/pages/RequestsPage.test.tsx`, `QueriesPage.test.tsx` | métricas de requisições HTTP e de consultas ao banco |
-| `src/pages/SystemPage.test.tsx` | tela Sistema: CPU, memória e disco |
+| `src/pages/RequestsPage.test.tsx`, `QueriesPage.test.tsx` | métricas de requisições HTTP (por segundo, códigos de erro, conexões ativas) e de consultas ao banco (por segundo, rollbacks, transações que falharam, pools e tamanho) |
+| `src/pages/SystemPage.test.tsx` | tela Sistema: CPU, memória, disco e I/O do disco |
+| `src/pages/ProbeServicePage.test.tsx` | telas DNS e SMTP: sonda ativa (disponibilidade, latência, STARTTLS) e tráfego real (consultas por segundo, taxa de entrega, volume, fila) |
 | `src/pages/ArsenalPage.test.tsx`, `ToolPage.test.tsx`, `src/arsenal/*.test.tsx` | Arsenal: iniciar varredura, console ao vivo e relatório de cada ferramenta |
 | `src/pages/ReportsPage.test.tsx` | Relatórios: histórico e comparação entre scans |
 | `src/realtime/*.test.ts*` | WebSocket: ticket, reconexão e tratamento de cada tipo de evento |
@@ -59,6 +60,10 @@ No backend, `cmd/omni/run_test.go` sobe o Omni de verdade numa porta aleatória 
 | NAV-15 | Sistema | Histórico de CPU, memória e disco | |
 | NAV-16 | Alvos → Novo alvo, com porta inválida (`abc`) | Erro no campo, sem salvar | |
 | NAV-17 | Alvos → Editar a loja: domínio `loja.local`, porta DNS `1053`, porta SMTP `1025` | Salva; a coluna DNS/SMTP mostra as portas e o estado fica "No ar" | |
+| NAV-18 | Tela DNS, com `make carga ARGS="-dns 127.0.0.1:1053"` em `subjects/loja` | Sonda ativa com disponibilidade e latência; Tráfego real com cerca de 5 consultas por segundo e respostas `NOERROR` | |
+| NAV-19 | Tela SMTP, com `make carga ARGS="-smtp 127.0.0.1:1025"` | Sonda com "Sem STARTTLS"; Tráfego real com taxa de entrega perto de 100% e e-mails no último minuto | |
+| NAV-20 | Requisições na API e Consultas no banco com a loja em carga | Requisições/consultas por segundo, conexões ativas, códigos de erro, pools (processo `loja`) e rollbacks | |
+| NAV-21 | Sistema | Leitura, escrita, IOPS e latência do disco com gráficos (no Linux ou WSL2) | |
 
 ### 2.3 Alertas e notificação
 
