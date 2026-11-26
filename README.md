@@ -18,10 +18,13 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 
 > **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes e as capturas `.pcap`. Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
 
+> **▶️ Quer rodar agora?** Vá para [Como inicializar e testar](#como-inicializar-e-testar): passo a passo para distribuições Linux, Windows com WSL2 e Windows nativo.
+
 ---
 
 ## Sumário
 
+- [Como inicializar e testar](#como-inicializar-e-testar)
 - [Visão geral](#visão-geral)
 - [Arquitetura](#arquitetura)
 - [Componentes](#componentes)
@@ -40,6 +43,225 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Roadmap](#roadmap)
 - [Stack](#stack)
+
+---
+
+## Como inicializar e testar
+
+Este é o caminho curto para rodar e testar. A configuração completa (todas as variáveis, serviço do systemd e desinstalação) está no [guia de instalação](docs/INSTALACAO.md).
+
+| Onde | O que funciona | Passo a passo |
+|---|---|---|
+| Linux | Tudo | [Linux](#linux) |
+| Windows com WSL2 | Tudo, para o que roda dentro do WSL | [Windows com WSL2](#windows-com-wsl2) |
+| Windows nativo | Interface e Poller; sem Sniffer e sem Arsenal | [Windows nativo](#windows-nativo) |
+
+### Linux
+
+#### 1. Instalar as dependências
+
+| Ferramenta | Versão | Para quê |
+|---|---|---|
+| Go | 1.24 ou mais nova | Compilar o backend |
+| Node.js e npm | Node 22.12 ou mais novo | Compilar a interface |
+| gcc e libpcap (com os cabeçalhos) | | Captura de pacotes |
+| make, git, openssl, `setcap` | | Build, token e permissões |
+| Docker Engine com Compose v2 | | Arsenal e aplicação cobaia |
+
+Debian e Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y git make gcc openssl libpcap-dev libcap2-bin golang-go
+```
+
+Arch e derivadas:
+
+```bash
+sudo pacman -S --needed git make gcc openssl libpcap libcap go nodejs npm docker docker-compose
+```
+
+Fedora:
+
+```bash
+sudo dnf install -y git make gcc openssl libpcap-devel libcap golang nodejs npm
+```
+
+- **Go:** confira com `go version`. Se o pacote da distribuição for anterior a 1.24, instale pelo [site oficial](https://go.dev/doc/install).
+- **Node.js:** confira com `node --version`. Os repositórios do Debian e do Ubuntu podem trazer uma versão antiga demais; nesse caso, use o [nvm](https://github.com/nvm-sh/nvm) (`nvm install 24`) ou o [site oficial](https://nodejs.org/).
+- **Docker:** no Debian, Ubuntu e Fedora, siga o [guia oficial do Docker Engine](https://docs.docker.com/engine/install/). Depois, em qualquer distribuição, ligue o serviço e libere o seu usuário (saia da sessão e entre de novo):
+  ```bash
+  sudo systemctl enable --now docker
+  sudo usermod -aG docker $USER
+  docker compose version   # precisa responder sem sudo
+  ```
+
+#### 2. Baixar e compilar
+
+```bash
+git clone https://github.com/MiguelDev-GH/Omni.git
+cd Omni
+make build               # compila a interface e gera ./omni
+```
+
+#### 3. Iniciar o Omni
+
+```bash
+export OMNI_TOKEN=$(openssl rand -hex 32)   # mínimo de 32 caracteres
+echo $OMNI_TOKEN                            # guarde: é a senha do painel
+OMNI_ADDR=127.0.0.1:8080 make backend       # pede a senha do sudo (setcap)
+```
+
+Abra <http://127.0.0.1:8080> e informe o token. Ctrl+C encerra o Omni.
+
+Sem `OMNI_ADDR`, o Omni escolhe uma porta livre a cada execução, e o endereço sai no log (`painel=http://127.0.0.1:<porta>`). Sem `make backend`, o binário roda com `./omni`, mas o sniffer fica em `sem-permissao` até você aplicar `sudo setcap cap_net_raw,cap_net_admin=eip ./omni`.
+
+#### 4. Testar com a aplicação cobaia
+
+Com o Omni no ar, abra mais dois terminais na raiz do repositório.
+
+Terminal 2, a loja de exemplo (PostgreSQL, Caddy, API e gerador de carga):
+
+```bash
+make loja                # fica rodando até Ctrl+C
+```
+
+Terminal 3, o cadastro dos alvos `loja` e `loja-tls`:
+
+```bash
+OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:8080 make loja-cadastrar
+```
+
+No painel, confira:
+
+| Faça | Deve aparecer |
+|---|---|
+| Abra a tela Geral | Requisições, status 2xx/4xx/5xx e protocolos `HTTP` e `PostgreSQL` |
+| Abra Requisições na API e Consultas no banco | Rotas como `/produtos/:id` e as consultas mais lentas |
+| Pare o terminal 2 com Ctrl+C | Alerta de queda |
+| Rode `make loja` de novo | Serviço restaurado |
+| No Arsenal, rode o Nmap no alvo `loja` | Portas 3000 e 5433 (a primeira execução baixa a imagem) |
+
+O roteiro completo está em [subjects/loja/README.md](subjects/loja/README.md#roteiro-de-teste-do-omni). Para desligar os containers da loja (o Ctrl+C não os para): `make -C subjects/loja derrubar`.
+
+Para testar as sondas de DNS e SMTP e os e-mails de alerta, veja [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp) e [Configurar o e-mail](#configurar-o-e-mail).
+
+#### 5. Rodar os testes automatizados
+
+`make check` roda formatação, lint, typecheck, build e testes do backend, da interface e da loja, parando na primeira falha. Ele precisa do [golangci-lint v2](https://golangci-lint.run/welcome/install/) e das dependências da interface (instaladas pelo `make build`).
+
+```bash
+make check
+```
+
+Para rodar só uma parte:
+
+```bash
+go test ./...                            # backend
+(cd web && npm test)                     # interface
+(cd subjects/loja && go test ./...)      # loja cobaia
+```
+
+### Windows com WSL2
+
+É o caminho para ter o Omni completo no Windows.
+
+1. No PowerShell como administrador, instale uma distribuição e reinicie o computador se for pedido:
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+2. No Docker Desktop, se ele estiver instalado, desligue a integração da distribuição em *Settings → Resources → WSL integration*.
+3. Dentro do terminal da distribuição, siga os passos de [Linux](#linux), clonando o repositório na sua pasta do Linux (`cd ~`), e não em `/mnt/c`.
+4. Abra o painel no navegador do Windows, em <http://localhost:8080>.
+
+Os motivos de cada cuidado estão em [Windows](#windows).
+
+### Windows nativo
+
+Serve para desenvolver e para testar a interface e o Poller. O Sniffer fica inativo e o Arsenal indisponível. Os comandos abaixo são para o PowerShell.
+
+**Dependências:** [Git](https://git-scm.com/download/win), [Go](https://go.dev/doc/install) 1.24 ou mais novo, [Node.js](https://nodejs.org/) 22.12 ou mais novo e, para a loja cobaia, o [Docker Desktop](https://www.docker.com/products/docker-desktop/). O `make` não é necessário.
+
+#### 1. Baixar e compilar
+
+O `core.autocrlf=input` mantém o fim de linha dos arquivos como no Linux; sem ele, testes que leem arquivos de exemplo falham.
+
+```powershell
+git clone -c core.autocrlf=input https://github.com/MiguelDev-GH/Omni.git
+cd Omni
+```
+
+Compile a interface, copie o resultado para dentro do backend e gere o executável:
+
+```powershell
+cd web
+npm ci
+npm run build
+cd ..
+Get-ChildItem internal\web\static -Exclude placeholder.html | Remove-Item -Recurse -Force
+Copy-Item web\dist\* internal\web\static -Recurse -Force
+go build -o omni.exe ./cmd/omni
+```
+
+#### 2. Iniciar o Omni
+
+```powershell
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$env:OMNI_TOKEN = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+$env:OMNI_TOKEN          # guarde: é a senha do painel
+$env:OMNI_ADDR = "127.0.0.1:8080"
+.\omni.exe
+```
+
+Abra <http://127.0.0.1:8080> e informe o token. Ctrl+C encerra o Omni.
+
+#### 3. Testar com a aplicação cobaia
+
+O `compose.yaml` da loja usa a rede do host, que não serve no Docker Desktop. Suba só o PostgreSQL, publicando a porta:
+
+```powershell
+docker run -d --name loja-postgres -p 127.0.0.1:5433:5432 -e POSTGRES_USER=loja -e POSTGRES_PASSWORD=loja-cobaia -e POSTGRES_DB=loja postgres:17.6-alpine
+```
+
+Em um segundo terminal, na pasta `subjects\loja`, inicie a API:
+
+```powershell
+go run ./cmd/loja
+```
+
+Em um terceiro terminal, também em `subjects\loja`, cadastre os alvos e gere carga:
+
+```powershell
+$env:OMNI_TOKEN = "<token>"
+$env:OMNI_URL = "http://127.0.0.1:8080"
+go run ./cmd/cadastrar
+go run ./cmd/carga
+```
+
+No painel, o alvo `loja` aparece no ar nas portas 3000 e 5433. Pare a API com Ctrl+C para ver o alerta de queda e inicie de novo para ver o serviço restaurado. O alvo `loja-tls` aparece fora do ar, porque o Caddy não foi iniciado. Os gráficos de requisições e consultas ficam vazios, porque dependem do Sniffer.
+
+Para remover o banco depois do teste:
+
+```powershell
+docker rm -f -v loja-postgres
+```
+
+#### 4. Rodar os testes automatizados
+
+```powershell
+go test ./...
+```
+
+```powershell
+cd web; npm run lint; npm run typecheck; npm test; cd ..
+```
+
+```powershell
+cd subjects\loja; go test ./...; cd ..\..
+```
+
+No Windows nativo, alguns testes de `internal/config`, `internal/security`, `internal/sniffer` e `internal/store` falham, porque dependem do comportamento do Linux (caminhos, permissões e nomes de arquivo). Os testes da interface e da loja passam. O `go test -race` exige um gcc de 64 bits. Para a verificação completa, use o Linux ou o WSL2.
 
 ---
 
