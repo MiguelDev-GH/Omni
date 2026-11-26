@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -33,16 +34,30 @@ type CaptureStats struct {
 // BPFForTargets monta o filtro de captura com as portas TCP de todos os alvos,
 // sem repetição e em ordem crescente. Sem portas, devolve "".
 func BPFForTargets(ts []target.Target) string {
-	ports := TargetPorts(ts)
-	parts := make([]string, len(ports))
-	for i, p := range ports {
-		parts[i] = fmt.Sprintf("tcp port %d", p)
+	var parts []string
+	for _, p := range TargetPorts(ts) {
+		parts = append(parts, fmt.Sprintf("tcp port %d", p))
+	}
+	for _, p := range dnsPorts(ts) {
+		parts = append(parts, fmt.Sprintf("udp port %d", p))
 	}
 	return strings.Join(parts, " or ")
 }
 
-// TargetPorts devolve as portas de aplicação e de banco de todos os alvos,
-// sem repetição e em ordem crescente.
+// dnsPorts devolve as portas DNS dos alvos, sem repetição e em ordem crescente.
+func dnsPorts(ts []target.Target) []int {
+	var ports []int
+	for _, t := range ts {
+		if t.DNSPort > 0 && !slices.Contains(ports, t.DNSPort) {
+			ports = append(ports, t.DNSPort)
+		}
+	}
+	sort.Ints(ports)
+	return ports
+}
+
+// TargetPorts devolve as portas TCP de todos os alvos (aplicação, banco e
+// SMTP), sem repetição e em ordem crescente.
 func TargetPorts(ts []target.Target) []int {
 	seen := map[int]bool{}
 	var ports []int
@@ -57,6 +72,7 @@ func TargetPorts(ts []target.Target) []int {
 			add(p)
 		}
 		add(t.DBPort)
+		add(t.SMTPPort)
 	}
 	sort.Ints(ports)
 	return ports

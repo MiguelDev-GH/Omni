@@ -101,6 +101,8 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	srv.Handle("GET /api/consultas", api.QueriesHandler(st))
 	srv.Handle("GET /api/consultas/lentas", api.SlowQueriesHandler(st))
+	srv.Handle("GET /api/dns", api.DNSHandler(st))
+	srv.Handle("GET /api/smtp", api.SMTPHandler(st))
 	srv.Handle("GET /api/alertas/historico", api.AlertHistoryHandler(st))
 	srv.Handle("GET /api/alvos/{id}/relatorio", api.ReportHandler(st))
 	srv.Handle("GET /api/alertas", alerts.Handler(engine, alerts.EmailInfo{Enabled: cfg.Mail.Enabled(), Recipients: len(cfg.Mail.To)}))

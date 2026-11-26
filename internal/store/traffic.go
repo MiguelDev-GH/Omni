@@ -81,7 +81,7 @@ func (s *Store) queryTraffic(ctx context.Context, query string, args ...any) ([]
 }
 
 // snifferTables são as tabelas de métricas do sniffer, todas com start_ms.
-var snifferTables = []string{"traffic_windows", "http_windows", "http_routes", "db_windows", "db_queries"}
+var snifferTables = []string{"traffic_windows", "http_windows", "http_routes", "db_windows", "db_queries", "dns_windows", "smtp_windows"}
 
 // PruneTraffic apaga as janelas de todas as métricas do sniffer que
 // começaram antes de before.

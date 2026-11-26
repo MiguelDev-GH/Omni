@@ -69,3 +69,9 @@ func TestBPFForTargets(t *testing.T) {
 	assert.Equal(t, "tcp port 3000 or tcp port 5432 or tcp port 8080", BPFForTargets(ts))
 	assert.Equal(t, "", BPFForTargets(nil))
 }
+
+func TestBPFIncludesDNSUDPAndSMTP(t *testing.T) {
+	ts := []target.Target{{AppPorts: []int{3000}, DNSPort: 1053, SMTPPort: 1025}}
+	assert.Equal(t, "tcp port 1025 or tcp port 3000 or udp port 1053", BPFForTargets(ts))
+	assert.Equal(t, "udp port 1053", BPFForTargets([]target.Target{{DNSPort: 1053}}))
+}
