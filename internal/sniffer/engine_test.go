@@ -386,3 +386,39 @@ func TestEngineTapReceivesSummaries(t *testing.T) {
 	assert.Equal(t, "GET /produtos/:id", got[0].Info)
 	assert.Equal(t, testutil.Start, got[0].Time)
 }
+
+func TestEngineRawTapsReceivePacketsUntilRemoved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.pcap")
+	req := testutil.TCP("10.0.0.1", "10.0.0.2", 40000, 3000, "PA", []byte("GET / HTTP/1.1\r\n\r\n"))
+	testutil.WritePCAP(t, path, req)
+
+	st := &fakeStore{targets: appTarget}
+	e := NewEngine(func(string) (Source, error) { return OpenFile(path) }, st, &fakePub{})
+	var mu sync.Mutex
+	var links []layers.LinkType
+	var kept, removed int
+	e.AddRawTap(func(p gopacket.Packet, link layers.LinkType) {
+		mu.Lock()
+		defer mu.Unlock()
+		kept++
+		links = append(links, link)
+	})
+	remove := e.AddRawTap(func(gopacket.Packet, layers.LinkType) {
+		mu.Lock()
+		defer mu.Unlock()
+		removed++
+	})
+	remove()
+	remove()
+	startEngine(t, e)
+
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return kept > 0
+	}, 2*time.Second, 10*time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Zero(t, removed, "o tap removido não recebe pacotes")
+	assert.Equal(t, layers.LinkTypeEthernet, links[0], "o tipo de enlace vem da fonte")
+}

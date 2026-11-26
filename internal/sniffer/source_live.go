@@ -32,7 +32,8 @@ func OpenLive(iface string, bpf string) (Source, error) {
 		return nil, fmt.Errorf("filtro de captura %q: %w", bpf, err)
 	}
 	return &packetSource{
-		src: gopacket.NewPacketSource(h, h.LinkType()),
+		src:  gopacket.NewPacketSource(h, h.LinkType()),
+		link: h.LinkType(),
 		stats: func() CaptureStats {
 			s, err := h.Stats()
 			if err != nil {

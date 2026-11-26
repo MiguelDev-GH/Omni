@@ -23,6 +23,7 @@ func OpenFile(path string) (Source, error) {
 	src := gopacket.NewPacketSource(counted, r.LinkType())
 	return &packetSource{
 		src:   src,
+		link:  r.LinkType(),
 		stats: func() CaptureStats { return CaptureStats{Received: counted.n.Load()} },
 		close: f.Close,
 	}, nil
