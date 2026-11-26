@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { QueryStats } from "../api/queries";
 import { useAppStore } from "../store/app";
+import { connSnapshot } from "../test/connections";
 import { json, mockFetch } from "../test/fetch";
 import QueriesPage from "./QueriesPage";
 
@@ -14,6 +15,7 @@ const slow: QueryStats[] = [
 
 function renderPage() {
   const calls = mockFetch((c) => {
+    if (c.url.startsWith("/api/conexoes")) return json(200, [connSnapshot(new Date(Date.now() - 2_000).toISOString(), 1)]);
     if (c.url.startsWith("/api/consultas/lentas")) return json(200, slow);
     if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
@@ -47,4 +49,23 @@ test("live windows feed the chart and stats", async () => {
   expect(screen.getByRole("img", { name: "Consultas a cada 10 s, 2 pontos" })).toBeInTheDocument();
   expect(screen.getByText("Consultas em 15 minutos").nextElementSibling).toHaveTextContent("40");
   expect(screen.getByText("p95 dos últimos 10 s").nextElementSibling).toHaveTextContent("12 ms");
+});
+
+test("shows queries per second", async () => {
+  renderPage();
+  await screen.findByRole("table", { name: "Consultas mais lentas" });
+  act(() =>
+    useAppStore.getState().addDB([
+      { inicio: new Date(Date.now() - 12_000).toISOString(), consultas: 120, erros: 0, tipos: { SELECT: 120 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  expect(screen.getByText("Consultas por segundo").nextElementSibling).toHaveTextContent("12");
+});
+
+test("Queries page lists the client pools of the database port", async () => {
+  renderPage();
+  const table = await screen.findByRole("table", { name: "Pools de conexões" });
+  const rows = within(table).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["loja54324", "(sem permissão para ver)54321"]);
+  expect(screen.getByText("Conexões abertas no banco").nextElementSibling).toHaveTextContent("5");
 });

@@ -3,7 +3,8 @@ import { listQueries, listSlowQueries, type QueryStats } from "../api/queries";
 import CountChart from "../charts/CountChart";
 import { queryColor } from "../charts/colors";
 import { Card, PageHeader, Stat } from "../components/Card";
-import { formatMs, l7Series, L7_POINTS, L7_STEP_MS } from "../lib/l7";
+import { formatMs, formatRate, l7Series, lastRate, L7_POINTS, L7_STEP_MS } from "../lib/l7";
+import { latestEstablished, latestPools, useConnHistory } from "../lib/connections";
 import { useAppStore } from "../store/app";
 
 const REFRESH_MS = 30_000;
@@ -50,6 +51,10 @@ export default function QueriesPage() {
   const total = db.reduce((sum, w) => sum + w.consultas, 0);
   const errors = db.reduce((sum, w) => sum + w.erros, 0);
   const last = db[db.length - 1];
+  const connections = useAppStore((s) => s.connections);
+  const connError = useConnHistory();
+  const pools = useMemo(() => latestPools(connections), [connections]);
+  const dbConns = latestEstablished(connections, "banco");
 
   return (
     <div className="space-y-8">
@@ -58,8 +63,11 @@ export default function QueriesPage() {
         literais viram <code className="font-mono">?</code> e senhas nunca são lidas. Conexões com TLS ficam de fora.
       </PageHeader>
       {loadError && <p className="text-sm text-erro">Não foi possível carregar o histórico de consultas.</p>}
+      {connError && <p className="text-sm text-erro">Não foi possível carregar o histórico de conexões.</p>}
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5">
+        <Stat label="Conexões abertas no banco" value={dbConns === null ? "—" : dbConns.toLocaleString("pt-BR")} />
+        <Stat label="Consultas por segundo" value={formatRate(lastRate(db, (w) => w.consultas))} />
         <Stat label="Consultas em 15 minutos" value={total.toLocaleString("pt-BR")} />
         <Stat label="Erros em 15 minutos" value={errors.toLocaleString("pt-BR")} />
         <Stat label="p95 dos últimos 10 s" value={last ? formatMs(last.p95_ms) : "—"} />
@@ -67,6 +75,31 @@ export default function QueriesPage() {
 
       <Card title="Consultas nos últimos 15 minutos">
         <CountChart id="db-page" points={series} label="Consultas" color={queryColor} empty="Sem consultas capturadas ainda." />
+      </Card>
+
+      <Card title="Pools de conexões ao banco" plane>
+        {pools.length === 0 ? (
+          <p className="text-sm text-suave">Nenhuma conexão aberta com o banco agora.</p>
+        ) : (
+          <table aria-label="Pools de conexões" className="tabela">
+            <thead>
+              <tr>
+                <th>Processo cliente</th>
+                <th className="text-right">Porta</th>
+                <th className="text-right">Conexões</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pools.map((p) => (
+                <tr key={`${p.porta}-${p.processo}`}>
+                  <td className={`font-mono text-xs ${p.processo ? "" : "text-suave"}`}>{p.processo || "(sem permissão para ver)"}</td>
+                  <td className="text-right font-mono text-xs tabular-nums">{p.porta}</td>
+                  <td className="text-right font-mono text-xs tabular-nums">{p.conexoes.toLocaleString("pt-BR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       <Card title="Consultas mais lentas nas últimas 24 horas" plane>

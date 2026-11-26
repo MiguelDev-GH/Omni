@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { statusKey, type Alert, type AlertStatus } from "../api/alerts";
+import type { ConnSnapshot } from "../api/connections";
 import type { Target } from "../api/targets";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
+import { mergeConnections } from "../lib/connections";
 import { mergeL7 } from "../lib/l7";
 import { mergeWindows } from "../lib/traffic";
 import { applyTema, initialTema, saveTema, type Tema } from "../lib/tema";
@@ -64,6 +66,8 @@ export type AppState = {
   addHTTP: (list: HTTPWindow[]) => void;
   db: DBWindow[]; // cronológico, no máximo L7_POINTS
   addDB: (list: DBWindow[]) => void;
+  connections: ConnSnapshot[]; // cronológico, no máximo MAX_CONN_POINTS
+  addConnections: (list: ConnSnapshot[]) => void;
   scanLogs: Record<number, string[]>; // por id de varredura
   appendScanLog: (scanId: number, lines: string[]) => void;
   // scanEvents conta os eventos de fim de varredura, para as telas recarregarem.
@@ -126,6 +130,8 @@ export const useAppStore = create<AppState>()((set) => ({
   addHTTP: (list) => set((st) => ({ http: mergeL7(st.http, list) })),
   db: [],
   addDB: (list) => set((st) => ({ db: mergeL7(st.db, list) })),
+  connections: [],
+  addConnections: (list) => set((st) => ({ connections: mergeConnections(st.connections, list) })),
   scanLogs: {},
   appendScanLog: (scanId, lines) =>
     set((st) => ({ scanLogs: { ...st.scanLogs, [scanId]: [...(st.scanLogs[scanId] ?? []), ...lines].slice(-MAX_LOG_LINES) } })),

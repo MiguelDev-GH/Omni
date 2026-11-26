@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { RouteStats } from "../api/requests";
 import { useAppStore } from "../store/app";
+import { connSnapshot } from "../test/connections";
 import { json, mockFetch } from "../test/fetch";
 import RequestsPage, { sortRoutes } from "./RequestsPage";
 
@@ -15,6 +16,7 @@ const routes: RouteStats[] = [
 
 function renderPage() {
   const calls = mockFetch((c) => {
+    if (c.url.startsWith("/api/conexoes")) return json(200, [connSnapshot(new Date(Date.now() - 10_000).toISOString(), 7)]);
     if (c.url.startsWith("/api/requisicoes/rotas")) return json(200, routes);
     if (c.url.startsWith("/api/requisicoes")) return json(200, []);
     return json(500, { erro: "inesperado" });
@@ -55,4 +57,37 @@ test("shows an empty state without requests", async () => {
   const router = createMemoryRouter([{ path: "/", element: <RequestsPage /> }]);
   render(<RouterProvider router={router} />);
   expect(await screen.findByText("Nenhuma requisição registrada nas últimas 24 horas.")).toBeInTheDocument();
+});
+
+test("shows requests per second from the last window", async () => {
+  renderPage();
+  await screen.findByText("/lenta");
+  expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("—");
+  act(() =>
+    useAppStore.getState().addHTTP([
+      { inicio: new Date(Date.now() - 12_000).toISOString(), requisicoes: 55, status: { "2xx": 55 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("5,5");
+});
+
+test("lists error codes summed over the loaded windows", async () => {
+  renderPage();
+  await screen.findByText("/lenta");
+  expect(screen.getByText("Nenhuma resposta de erro nos últimos 15 minutos.")).toBeInTheDocument();
+  act(() =>
+    useAppStore.getState().addHTTP([
+      { inicio: "2026-11-21T12:00:00Z", requisicoes: 9, status: { "4xx": 5, "5xx": 1 }, codigos: { "404": 4, "401": 1, "503": 1 }, p50_ms: 1, p95_ms: 2 },
+      { inicio: "2026-11-21T12:00:10Z", requisicoes: 3, status: { "4xx": 3 }, codigos: { "404": 3 }, p50_ms: 1, p95_ms: 2 },
+      { inicio: "2026-11-21T12:00:20Z", requisicoes: 1, status: { "2xx": 1 }, p50_ms: 1, p95_ms: 2 },
+    ]),
+  );
+  const rows = within(screen.getByRole("table", { name: "Códigos de erro" })).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["4047", "5031", "4011"]);
+});
+
+test("Requests page shows active connections chart for app ports", async () => {
+  renderPage();
+  expect(await screen.findByRole("img", { name: "Conexões ativas a cada 5 s, 1 pontos" })).toBeInTheDocument();
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("7");
 });

@@ -6,6 +6,7 @@ export type HTTPWindow = {
   inicio: string;
   requisicoes: number;
   status: Record<string, number>; // "2xx", "3xx", "4xx", "5xx"
+  codigos?: Record<string, number>; // respostas de erro por código, como "404"
   p50_ms: number;
   p95_ms: number;
   rotas?: RouteStats[];

@@ -13,6 +13,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/alerts"
 	"github.com/MiguelDev-GH/omni/internal/api"
 	"github.com/MiguelDev-GH/omni/internal/config"
+	"github.com/MiguelDev-GH/omni/internal/connstats"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
 	"github.com/MiguelDev-GH/omni/internal/orchestrator"
 	"github.com/MiguelDev-GH/omni/internal/poller"
@@ -93,6 +94,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/alvos/{id}/historico", api.HistoryHandler(st))
 	srv.Handle("GET /api/trafego", api.TrafficHandler(st))
 	srv.Handle("GET /api/sistema", api.SystemHandler(st))
+	srv.Handle("GET /api/conexoes", api.ConnectionsHandler(st))
 	srv.Handle("GET /api/requisicoes", api.RequestsHandler(st))
 	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	srv.Handle("GET /api/consultas", api.QueriesHandler(st))
@@ -158,6 +160,11 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	go func() {
 		defer wg.Done()
 		orch.MonitorDocker(bgCtx, dockerEvery)
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		connstats.Run(bgCtx, pub, st, st.ListTargets, connstats.DefaultInterval, cfg.CheckRetention)
 	}()
 	go func() {
 		defer wg.Done()

@@ -1,4 +1,5 @@
 import { formatAlertValue, type Alert, type Level } from "../api/alerts";
+import type { ConnSnapshot } from "../api/connections";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
 import type { TrafficWindow } from "../api/traffic";
@@ -37,6 +38,15 @@ function isHTTPWindow(v: unknown): v is HTTPWindow {
 
 function isDBWindow(v: unknown): v is DBWindow {
   return isObject(v) && typeof v.inicio === "string" && typeof v.consultas === "number" && typeof v.erros === "number";
+}
+
+function isConnSnapshot(v: unknown): v is ConnSnapshot {
+  return (
+    isObject(v) &&
+    typeof v.hora === "string" &&
+    Array.isArray(v.portas) &&
+    v.portas.every((p) => isObject(p) && typeof p.porta === "number" && typeof p.estabelecidas === "number" && Array.isArray(p.clientes))
+  );
 }
 
 const levels: Level[] = ["verde", "amarelo", "vermelho"];
@@ -113,6 +123,9 @@ export function handleEvent(raw: string): void {
       break;
     case "METRICAS_BANCO":
       if (isDBWindow(dados)) st.addDB([dados]);
+      break;
+    case "METRICAS_CONEXOES":
+      if (isConnSnapshot(dados)) st.addConnections([dados]);
       break;
     case "ESTADO_MOTORES":
       if (isObject(dados) && isEngineState(dados.sniffer)) st.setEngine("sniffer", dados.sniffer);

@@ -29,6 +29,7 @@ function renderPage(history: TrafficWindow[] = [], targets: unknown[] = [{ id: 1
     if (c.url === "/api/alvos") return json(200, targets);
     if (c.url.startsWith("/api/trafego")) return json(200, history);
     if (c.url.startsWith("/api/requisicoes")) return json(200, []);
+    if (c.url.startsWith("/api/conexoes")) return json(200, []);
     if (c.url.startsWith("/api/consultas")) return json(200, []);
     return json(500, { erro: "inesperado" });
   });
@@ -125,4 +126,26 @@ test("METRICAS_BANCO feeds the queries chart", async () => {
   const ws = await socket();
   act(() => ws.message({ tipo: "METRICAS_BANCO", dados: { inicio: "2026-11-21T12:00:00Z", consultas: 9, erros: 0, tipos: { SELECT: 9 }, p50_ms: 1, p95_ms: 2, top: [] } }));
   expect(screen.getByRole("img", { name: "Consultas a cada 10 s, 1 pontos" })).toBeInTheDocument();
+});
+
+test("shows requests and queries per second from the newest windows", async () => {
+  renderPage();
+  await socket();
+  const inicio = new Date(Date.now() - 12_000).toISOString();
+  act(() => {
+    useAppStore.getState().addHTTP([{ inicio, requisicoes: 30, status: { "2xx": 30 }, p50_ms: 1, p95_ms: 2 }]);
+    useAppStore.getState().addDB([{ inicio, consultas: 90, erros: 0, tipos: { SELECT: 90 }, p50_ms: 1, p95_ms: 2 }]);
+  });
+  expect(screen.getByText("Requisições por segundo").nextElementSibling).toHaveTextContent("3");
+  expect(screen.getByText("Consultas por segundo").nextElementSibling).toHaveTextContent("9");
+});
+
+test("METRICAS_CONEXOES feeds the active connections stat", async () => {
+  renderPage();
+  const ws = await socket();
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("—");
+  act(() =>
+    ws.message({ tipo: "METRICAS_CONEXOES", dados: { hora: new Date().toISOString(), portas: [{ porta: 3000, tipo: "app", estabelecidas: 12, estados: {}, clientes: [] }] } }),
+  );
+  expect(screen.getByText("Conexões ativas").nextElementSibling).toHaveTextContent("12");
 });
