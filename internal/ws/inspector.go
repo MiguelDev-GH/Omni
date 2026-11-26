@@ -156,16 +156,24 @@ func parseInspectorCommand(msg []byte) (cmd inspectorCommand, ok bool) {
 	if json.Unmarshal(env.Data, &cmd) != nil {
 		return cmd, false
 	}
-	f := &cmd.Filter
+	f, ok := NormalizeFilter(cmd.Filter)
+	cmd.Filter = f
+	return cmd, ok
+}
+
+// NormalizeFilter confere o filtro do Inspetor e devolve o IP na forma
+// canônica. ok é false com IP que não é endereço, porta fora de 0 a 65535 ou
+// protocolo longo demais.
+func NormalizeFilter(f InspectorFilter) (InspectorFilter, bool) {
 	if f.IP != "" {
 		addr, err := netip.ParseAddr(f.IP)
 		if err != nil {
-			return cmd, false
+			return f, false
 		}
 		f.IP = addr.Unmap().String()
 	}
 	if f.Port < 0 || f.Port > 65535 || len(f.Protocol) > maxProtocolLen {
-		return cmd, false
+		return f, false
 	}
-	return cmd, true
+	return f, true
 }

@@ -12,6 +12,7 @@ import (
 
 	"github.com/MiguelDev-GH/omni/internal/alerts"
 	"github.com/MiguelDev-GH/omni/internal/api"
+	"github.com/MiguelDev-GH/omni/internal/capture"
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/connstats"
 	"github.com/MiguelDev-GH/omni/internal/dbsize"
@@ -118,10 +119,14 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	bgCtx, stopBg := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	orch := orchestrator.New(bgCtx, runner, st, hub)
+	open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
+	snif := sniffer.NewEngine(open, st, pub).WithRetention(cfg.CheckRetention)
+	recorder := capture.New(bgCtx, cfg.CaptureDir, st, snif, hub, st.ListTargets, cfg.CaptureRetention)
 	defer func() {
 		stopBg()
 		wg.Wait()
 		orch.Wait()
+		recorder.Wait()
 	}()
 	defer hub.Close()
 
@@ -132,6 +137,11 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/varreduras/{id}/achados", api.ScanFindingsHandler(st))
 	srv.Handle("GET /api/varreduras/{id}/comparacao", api.CompareScanHandler(st, st))
 	srv.Handle("GET /api/varreduras/{id}/relatorio/{ferramenta}", api.ScanReportHandler(st))
+	srv.Handle("POST /api/capturas", api.StartCaptureHandler(recorder))
+	srv.Handle("GET /api/capturas", api.ListCapturesHandler(recorder))
+	srv.Handle("GET /api/capturas/{id}/arquivo", api.CaptureFileHandler(recorder))
+	srv.Handle("GET /api/capturas/{id}/pacotes", api.CapturePacketsHandler(recorder))
+	srv.Handle("DELETE /api/capturas/{id}", api.DeleteCaptureHandler(recorder))
 	srv.HandlePublic("GET /ws", ws.Handler(hub, tickets, cfg.AllowedOrigins))
 	srv.HandleFrontend(web.Handler(web.Assets()))
 
@@ -158,14 +168,17 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		defer wg.Done()
 		pruneAlerts(bgCtx, st, cfg.CheckRetention)
 	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		recorder.Run(bgCtx)
+	}()
 	go func() {
 		defer wg.Done()
 		poller.NewScheduler(st, pub, cfg.PollInterval).WithRetention(cfg.CheckRetention).Run(bgCtx)
 	}()
 	go func() {
 		defer wg.Done()
-		open := func(bpf string) (sniffer.Source, error) { return openCapture(cfg.Interface, bpf) }
-		snif := sniffer.NewEngine(open, st, pub).WithRetention(cfg.CheckRetention)
 		snif.OnHTTP(sec.observeHTTP)
 		// O tap do Inspetor só fica ligado enquanto algum cliente o assina.
 		inspector.OnActive(func(on bool) {

@@ -335,7 +335,7 @@ Entrega: `/capturas` grava capturas de curta duração em `.pcap`, lista, baixa,
 
 ### Tarefa 15.1: Gravador de capturas
 
-**Files:** Create `internal/capture/recorder.go`, `internal/store/migrations/011_captures.sql`, `internal/store/captures.go`; Modify `internal/sniffer/engine.go`, `internal/config/config.go`, `cmd/omni/run.go`; Tests
+**Files:** Create `internal/capture/recorder.go`, `internal/store/migrations/019_captures.sql`, `internal/store/captures.go`; Modify `internal/sniffer/engine.go`, `internal/config/config.go`, `cmd/omni/run.go`; Tests
 
 **Interfaces:**
 - Produces:

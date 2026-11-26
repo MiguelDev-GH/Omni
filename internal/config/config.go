@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -22,6 +23,8 @@ const (
 	defaultInterface    = "any"
 	defaultRetention    = "168h"
 	minRetention        = time.Hour
+	// defaultCaptureRetention é curta porque as capturas guardam o tráfego inteiro.
+	defaultCaptureRetention = "24h"
 )
 
 // interfaceRe aceita nomes de interface do Linux (até 15 caracteres), sem hífen no início.
@@ -37,6 +40,8 @@ var (
 	ErrRetencaoInvalida  = errors.New("OMNI_RETENCAO_VERIFICACOES inválida; use uma duração de no mínimo 1h, como 168h")
 	ErrInterfaceInvalida = errors.New("OMNI_INTERFACE inválida; use o nome de uma interface, como eth0, ou any")
 	ErrPGDSNDuplo        = errors.New("use OMNI_PG_DSN ou OMNI_PG_DSN_ARQUIVO, não os dois")
+
+	ErrRetencaoCapturasInvalida = errors.New("OMNI_RETENCAO_CAPTURAS inválida; use uma duração de no mínimo 1h, como 24h")
 )
 
 type Config struct {
@@ -68,6 +73,13 @@ type Config struct {
 	// SMTPQueueDirs são os diretórios da fila de saída do servidor de e-mail
 	// (OMNI_SMTP_FILA_DIRS, separados por vírgula); vazio desliga a contagem.
 	SMTPQueueDirs []string
+
+	// CaptureDir é onde ficam as capturas .pcap (OMNI_CAPTURAS); o padrão é
+	// "capturas" ao lado do banco.
+	CaptureDir string
+	// CaptureRetention é por quanto tempo as capturas ficam guardadas
+	// (OMNI_RETENCAO_CAPTURAS).
+	CaptureRetention time.Duration
 
 	// extraOrigins guarda as origens de OMNI_ORIGENS já validadas, para Bind
 	// refazer AllowedOrigins com a porta real.
@@ -133,6 +145,11 @@ func Load(getenv func(string) string) (Config, error) {
 		if dir = strings.TrimSpace(dir); dir != "" {
 			c.SMTPQueueDirs = append(c.SMTPQueueDirs, dir)
 		}
+	}
+	c.CaptureDir = withDefault(getenv("OMNI_CAPTURAS"), filepath.Join(filepath.Dir(c.DBPath), "capturas"))
+	c.CaptureRetention, err = parseRetention(withDefault(getenv("OMNI_RETENCAO_CAPTURAS"), defaultCaptureRetention))
+	if err != nil {
+		return Config{}, fmt.Errorf("%w: %s", ErrRetencaoCapturasInvalida, getenv("OMNI_RETENCAO_CAPTURAS"))
 	}
 	return c, nil
 }

@@ -25,6 +25,7 @@ test("shows sections and disables future items", () => {
   expect(screen.getByRole("link", { name: "Amass" })).toHaveAttribute("href", "/arsenal/amass");
   expect(screen.getByRole("link", { name: "Sistema" })).toHaveAttribute("href", "/sistema");
   expect(screen.getByRole("link", { name: "Inspetor de pacotes" })).toHaveAttribute("href", "/inspetor");
+  expect(screen.queryByText("Capturas")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Vazamentos" })).toHaveAttribute("href", "/arsenal/vazamentos");
   expect(screen.getAllByText("em breve").length).toBeGreaterThan(0);
 });

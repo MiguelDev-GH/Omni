@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 
 	"github.com/MiguelDev-GH/omni/internal/target"
 )
@@ -81,6 +82,7 @@ func TargetPorts(ts []target.Target) []int {
 // packetSource adapta um gopacket.PacketSource à interface Source.
 type packetSource struct {
 	src   *gopacket.PacketSource
+	link  layers.LinkType
 	stats func() CaptureStats
 	close func() error
 }
@@ -88,5 +90,6 @@ type packetSource struct {
 func (s *packetSource) Packets(ctx context.Context) <-chan gopacket.Packet {
 	return s.src.PacketsCtx(ctx)
 }
-func (s *packetSource) Stats() CaptureStats { return s.stats() }
-func (s *packetSource) Close() error        { return s.close() }
+func (s *packetSource) Stats() CaptureStats       { return s.stats() }
+func (s *packetSource) Close() error              { return s.close() }
+func (s *packetSource) LinkType() layers.LinkType { return s.link }

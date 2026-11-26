@@ -30,6 +30,8 @@ export const router = createBrowserRouter([
       { path: "/smtp", element: <ProbeServicePage kind="smtp" /> },
       { path: "/sistema", element: <SystemPage /> },
       { path: "/inspetor", element: <InspectorPage /> },
+      // As gravações .pcap ficam no Inspetor; o endereço antigo leva até ele.
+      { path: "/capturas", element: <Navigate to="/inspetor" replace /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

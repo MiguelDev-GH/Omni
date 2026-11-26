@@ -21,7 +21,7 @@ func TestLoadDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, Config{Addr: "127.0.0.1:0", DBPath: "omni.db", Token: tok, PollInterval: 30 * time.Second, CheckRetention: 168 * time.Hour,
 		AllowedOrigins: []string{"http://127.0.0.1:0", "http://localhost:0", "http://[::1]:0"},
-		Interface:      "any"}, c)
+		Interface:      "any", CaptureDir: "capturas", CaptureRetention: 24 * time.Hour}, c)
 }
 
 func TestBindUsesRealPort(t *testing.T) {
@@ -163,6 +163,23 @@ func TestLoadCheckRetention(t *testing.T) {
 	for _, v := range []string{"59m", "7d", "abc"} {
 		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_RETENCAO_VERIFICACOES": v}))
 		assert.ErrorIs(t, err, ErrRetencaoInvalida, v)
+	}
+}
+
+func TestLoadCaptures(t *testing.T) {
+	c, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_DB": "/var/lib/omni/omni.db"}))
+	require.NoError(t, err)
+	assert.Equal(t, "/var/lib/omni/capturas", c.CaptureDir, "o padrão fica ao lado do banco")
+	assert.Equal(t, 24*time.Hour, c.CaptureRetention)
+
+	c, err = Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_CAPTURAS": "/srv/pcap", "OMNI_RETENCAO_CAPTURAS": "1h"}))
+	require.NoError(t, err)
+	assert.Equal(t, "/srv/pcap", c.CaptureDir)
+	assert.Equal(t, time.Hour, c.CaptureRetention)
+
+	for _, v := range []string{"30m", "1d", "abc"} {
+		_, err := Load(env(map[string]string{"OMNI_TOKEN": tok, "OMNI_RETENCAO_CAPTURAS": v}))
+		assert.ErrorIs(t, err, ErrRetencaoCapturasInvalida, v)
 	}
 }
 

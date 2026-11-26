@@ -55,6 +55,8 @@ Toda a configuração é feita por variáveis de ambiente.
 | `OMNI_INTERFACE` | `any` | interface de captura do sniffer |
 | `OMNI_INTERVALO_POLLER` | `30s` | intervalo das verificações ativas |
 | `OMNI_RETENCAO_VERIFICACOES` | `168h` | por quanto tempo guardar as verificações, as métricas de tráfego, HTTP, banco e sistema e o histórico de alertas. Abaixo de `168h`, o relatório em PDF não tem dados para a semana inteira |
+| `OMNI_CAPTURAS` | `capturas`, ao lado do banco | diretório das capturas `.pcap`, criado com permissão `0700` |
+| `OMNI_RETENCAO_CAPTURAS` | `24h` | por quanto tempo guardar as capturas `.pcap`, no mínimo `1h`. Elas têm o tráfego inteiro e podem conter dados pessoais |
 | `OMNI_SMTP_HOST`, `OMNI_SMTP_PORTA`, `OMNI_SMTP_USUARIO`, `OMNI_SMTP_SENHA` ou `OMNI_SMTP_SENHA_ARQUIVO`, `OMNI_SMTP_REMETENTE` | e-mail desligado | servidor que envia os alertas. Veja [Alertas e notificação por e-mail](../README.md#alertas-e-notificação-por-e-mail) |
 | `OMNI_ALERTA_EMAILS` | — | destinatários dos alertas, separados por vírgula |
 | `OMNI_ARQUIVOS_MONITORADOS` | integridade desligada | arquivos de configuração cuja integridade é vigiada, separados por vírgula |

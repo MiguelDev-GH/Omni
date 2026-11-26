@@ -8,6 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 	"github.com/MiguelDev-GH/omni/internal/target"
 	"github.com/MiguelDev-GH/omni/internal/ws"
@@ -72,6 +75,26 @@ type Engine struct {
 	onHTTP    func(l7.HTTPExchange)
 
 	tap atomic.Pointer[func(PacketSummary)]
+
+	// rawTaps é trocado inteiro a cada mudança (cópia na escrita), para a
+	// goroutine da captura ler sem trava.
+	rawMu   sync.Mutex
+	rawNext int
+	rawTaps atomic.Pointer[[]rawTap]
+}
+
+// RawTap recebe cada pacote capturado, como veio da fonte, e o tipo de
+// enlace da fonte. Roda na goroutine da captura e não pode bloquear.
+type RawTap func(p gopacket.Packet, link layers.LinkType)
+
+type rawTap struct {
+	id int
+	fn RawTap
+}
+
+// linkTyper é a fonte que sabe o próprio tipo de enlace; sem ele, vale Ethernet.
+type linkTyper interface {
+	LinkType() layers.LinkType
 }
 
 // OnHTTP registra uma função chamada a cada requisição HTTP decodificada,
@@ -102,6 +125,46 @@ func (e *Engine) SetTap(tap func(PacketSummary)) {
 	e.tap.Store(&tap)
 }
 
+// AddRawTap passa a chamar fn com cada pacote capturado, até a função
+// devolvida ser chamada. Vários taps podem ficar ligados ao mesmo tempo.
+func (e *Engine) AddRawTap(fn RawTap) (remove func()) {
+	e.rawMu.Lock()
+	defer e.rawMu.Unlock()
+	e.rawNext++
+	id := e.rawNext
+	e.storeRawTaps(append(e.loadRawTaps(), rawTap{id: id, fn: fn}))
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			e.rawMu.Lock()
+			defer e.rawMu.Unlock()
+			var kept []rawTap
+			for _, t := range e.loadRawTaps() {
+				if t.id != id {
+					kept = append(kept, t)
+				}
+			}
+			e.storeRawTaps(kept)
+		})
+	}
+}
+
+// loadRawTaps devolve uma cópia da lista, que pode ser alterada à vontade.
+func (e *Engine) loadRawTaps() []rawTap {
+	if p := e.rawTaps.Load(); p != nil {
+		return append([]rawTap(nil), *p...)
+	}
+	return nil
+}
+
+func (e *Engine) storeRawTaps(ts []rawTap) {
+	if len(ts) == 0 {
+		e.rawTaps.Store(nil)
+		return
+	}
+	e.rawTaps.Store(&ts)
+}
+
 // State devolve "ativo", "sem-permissao" ou "inativo".
 func (e *Engine) State() string {
 	e.mu.Lock()
@@ -119,7 +182,7 @@ func (e *Engine) Run(ctx context.Context) error {
 			slog.Error("sniffer: listar alvos", "erro", err)
 		}
 		if bpf := BPFForTargets(ts); bpf != "" {
-			e.captureFrom(ctx, bpf, RolesFor(ts), dbPorts(ts))
+			e.captureFrom(ctx, bpf, RolesFor(ts), DBPorts(ts))
 		} else {
 			e.setState(StateInactive, nil)
 		}
@@ -145,6 +208,10 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, roles PortRoles, d
 	}
 	defer func() { _ = src.Close() }()
 	e.setState(StateActive, nil)
+	link := layers.LinkTypeEthernet
+	if lt, ok := src.(linkTyper); ok {
+		link = lt.LinkType()
+	}
 
 	capCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -211,6 +278,11 @@ func (e *Engine) captureFrom(ctx context.Context, bpf string, roles PortRoles, d
 			smtpAsm.Add(p)
 			if tap := e.tap.Load(); tap != nil {
 				(*tap)(Summarize(p, roles, db))
+			}
+			if raw := e.rawTaps.Load(); raw != nil {
+				for _, t := range *raw {
+					t.fn(p, link)
+				}
 			}
 		case now := <-winT.C:
 			flush(now)
@@ -313,9 +385,9 @@ func (e *Engine) prune(ctx context.Context) {
 	}
 }
 
-// dbPorts devolve as portas de banco decodificadas como PostgreSQL; a porta
+// DBPorts devolve as portas de banco decodificadas como PostgreSQL; a porta
 // padrão do MySQL fica de fora.
-func dbPorts(ts []target.Target) []int {
+func DBPorts(ts []target.Target) []int {
 	var ports []int
 	for _, t := range ts {
 		if t.DBPort > 0 && t.DBPort != 3306 {
