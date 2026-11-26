@@ -364,7 +364,7 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 3. **Testes ativos:** o Poller verifica periodicamente se a aplicação está no ar e respondendo bem, e coleta métricas do sistema.
 4. **Agregação:** a cada segundo (tráfego) e a cada 10 s (HTTP, banco, DNS e SMTP), o Agregador salva os agregados no SQLite e os envia pelo WebSocket, e os gráficos se atualizam.
 5. **Varredura de segurança:** sob demanda (o agendamento ainda não existe), o Orquestrador roda as ferramentas selecionadas, consolida as vulnerabilidades, compara com o scan anterior e avisa o fim pelo WebSocket.
-6. **Relatórios:** o usuário escolhe o alvo e o período (último dia, última semana ou de/até, no máximo 168 h) e baixa um PDF com alertas, disponibilidade, varreduras do Arsenal com os achados e os gráficos do período. Alertas, tráfego, HTTP, banco e sistema são do servidor inteiro.
+6. **Relatórios:** o usuário escolhe o alvo e o período (último dia, última semana ou de/até, no máximo 168 h) e baixa um PDF com alertas, disponibilidade, varreduras do Arsenal com os achados e os gráficos do período: tráfego, HTTP (com os códigos de erro), banco (com as transações com falha e o tamanho), sistema e I/O de disco, conexões por porta, DNS, SMTP e fila do SMTP. Só a disponibilidade e o Arsenal são do alvo; o resto é do servidor inteiro.
 
 ## Comunicação em tempo real (WebSocket)
 
@@ -442,9 +442,9 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 - **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, DNS, SMTP, Status HTTP, Sistema
 - **Tráfego:** Inspetor de pacotes, com as gravações `.pcap`
 - **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl e Vazamentos (Sprint 13)
-- **Relatórios:** histórico, comparação entre scans e exportação em PDF (o PDF é gerado na própria página Relatórios; o item "Exportação em PDF" do menu ainda aparece como "em breve")
+- **Relatórios:** histórico e comparação entre scans em `/relatorios`, e exportação em PDF em `/relatorios/pdf`
 
-Os itens com sprint ainda aparecem no menu como "em breve". O que cada sprint entrega está em [docs/SPRINTS.md](docs/SPRINTS.md).
+O que cada sprint entrega está em [docs/SPRINTS.md](docs/SPRINTS.md).
 
 **Tela Geral:**
 
