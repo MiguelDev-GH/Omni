@@ -16,14 +16,14 @@ Para os detalhes técnicos (arquivos, interfaces e testes de cada tarefa), veja 
 | [6](#sprint-6-decodificação-postgresql) | Observação passiva | Consultas ao banco | ✅ Concluída |
 | [7](#sprint-7-orquestrador-docker-e-nmap) | Arsenal | Orquestrador Docker e varredura Nmap | ✅ Concluída |
 | [8](#sprint-8-nuclei-testssl-e-comparação-entre-scans) | Arsenal | Nuclei, testssl e comparação entre scans | ✅ Concluída |
-| [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | 🚧 Em andamento |
-| [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | 🚧 Em andamento |
-| [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | 🚧 Em andamento |
-| [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | 🚧 Em andamento |
-| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento |
+| [9](#sprint-9-base-de-relatórios-e-páginas-de-nmap-nuclei-e-testssl) | Expansão | Página própria para cada ferramenta do Arsenal (Nmap, Nuclei, testssl) | ✅ Concluída |
+| [10](#sprint-10-página-sistema) | Expansão | Página Sistema com histórico de CPU, memória e disco | ✅ Concluída |
+| [11](#sprint-11-ffuf-e-nikto) | Expansão | ffuf e Nikto | ✅ Concluída |
+| [12](#sprint-12-sqlmap-guiado-pelo-tráfego) | Expansão | SQLMap guiado pelas rotas vistas no tráfego | ✅ Concluída |
+| [13](#sprint-13-amass-e-gitleaks) | Expansão | Amass e Gitleaks (Vazamentos) | 🚧 Em andamento (Amass pronto, Gitleaks a fazer) |
 | [14](#sprint-14-inspetor-de-pacotes) | Expansão | Inspetor de pacotes ao vivo | ⏳ A fazer |
 | [15](#sprint-15-capturas-pcap) | Expansão | Capturas `.pcap` sob demanda | ⏳ A fazer |
-| [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ⏳ A fazer |
+| [16](#sprint-16-exportação-em-pdf) | Expansão | Exportação de relatório em PDF | ✅ Concluída |
 | [Backlog](#backlog) | Expansão | Restante das pendências do README | 📋 Backlog |
 
 Legenda: ⏳ A fazer · 🚧 Em andamento · ✅ Concluída · 📋 Backlog
@@ -277,13 +277,15 @@ As Sprints 9 a 16 tiram do "em breve" todas as seções do menu. A **Sprint 9 ve
 
 **Branch:** `feat/relatorio-pdf` · **Labels:** `funcionalidade`, `visual`
 
+**Decisões da Sprint 16:** o PDF é montado no navegador com jsPDF (gráficos em vetor, texto selecionável), em vez da janela de impressão, e cobre no máximo 168 h. Os detalhes estão em [docs/superpowers/plans/2026-11-24-relatorios-pdf.md](superpowers/plans/2026-11-24-relatorios-pdf.md).
+
 ### Backlog
 
 Itens ainda sem sprint, planejados quando entrarem na fila:
 
 - **Aplicação:** HTTP/2, MySQL, `pg_stat_statements`, agendamento de varreduras e alertas externos além do e-mail (Telegram, Discord).
 - **TLS:** metadados do handshake (SNI, versão, cifra).
-- **Transporte:** RTT, retransmissões, RST, janela zero, conexões por estado e amplificação UDP.
+- **Transporte:** RTT, retransmissões, RST, janela zero e amplificação UDP. (As conexões por estado entraram junto com as lacunas do enunciado; veja [docs/superpowers/plans/2026-11-25-lacunas-do-trabalho.md](superpowers/plans/2026-11-25-lacunas-do-trabalho.md).)
 - **Rede:** top IPs por número de conexões, ICMP, fragmentação e GeoIP.
 - **Enlace:** detecção de ARP spoofing e interfaces virtuais do Docker.
 - **Sistema:** contadores da placa e captura de alto desempenho.
