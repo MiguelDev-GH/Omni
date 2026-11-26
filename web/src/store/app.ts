@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { statusKey, type Alert, type AlertStatus } from "../api/alerts";
 import type { ConnSnapshot } from "../api/connections";
+import type { DNSWindow, QueueSnapshot, SMTPWindow } from "../api/dnsSmtp";
 import type { Target } from "../api/targets";
 import type { DBWindow } from "../api/queries";
 import type { HTTPWindow } from "../api/requests";
@@ -79,6 +80,12 @@ export type AppState = {
   db: DBWindow[]; // cronológico, no máximo L7_POINTS
   addDB: (list: DBWindow[]) => void;
   connections: ConnSnapshot[]; // cronológico, no máximo MAX_CONN_POINTS
+  dns: DNSWindow[]; // cronológico, no máximo L7_POINTS
+  addDNS: (list: DNSWindow[]) => void;
+  smtp: SMTPWindow[]; // cronológico, no máximo L7_POINTS
+  addSMTP: (list: SMTPWindow[]) => void;
+  queue: QueueSnapshot | null; // última contagem da fila do SMTP
+  setQueue: (q: QueueSnapshot) => void;
   addConnections: (list: ConnSnapshot[]) => void;
   scanLogs: Record<number, string[]>; // por id de varredura
   appendScanLog: (scanId: number, lines: string[]) => void;
@@ -143,6 +150,12 @@ export const useAppStore = create<AppState>()((set) => ({
   db: [],
   addDB: (list) => set((st) => ({ db: mergeL7(st.db, list) })),
   connections: [],
+  dns: [],
+  addDNS: (list) => set((st) => ({ dns: mergeL7(st.dns, list) })),
+  smtp: [],
+  addSMTP: (list) => set((st) => ({ smtp: mergeL7(st.smtp, list) })),
+  queue: null,
+  setQueue: (q) => set({ queue: q }),
   addConnections: (list) => set((st) => ({ connections: mergeConnections(st.connections, list) })),
   scanLogs: {},
   appendScanLog: (scanId, lines) =>

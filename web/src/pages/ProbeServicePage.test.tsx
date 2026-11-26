@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
 import type { Target } from "../api/targets";
@@ -21,8 +21,16 @@ const history: PortStatus[] = [
 // statValue lê o número mostrado logo abaixo do rótulo de um Stat.
 const statValue = (label: string) => screen.getByText(label, { selector: "p" }).nextElementSibling?.textContent;
 
-function renderPage(kind: "dns" | "smtp", t: Target = target) {
-  const calls = mockFetch((c) => (c.url.startsWith(`/api/alvos/${t.id}/historico`) ? json(200, history) : json(500, { erro: "inesperado" })));
+type Traffic = { dns?: unknown[]; smtp?: unknown[]; fila?: unknown };
+
+function renderPage(kind: "dns" | "smtp", t: Target = target, traffic: Traffic = {}) {
+  const calls = mockFetch((c) => {
+    if (c.url.startsWith(`/api/alvos/${t.id}/historico`)) return json(200, history);
+    if (c.url.startsWith("/api/dns")) return json(200, traffic.dns ?? []);
+    if (c.url.startsWith("/api/smtp/fila")) return json(200, traffic.fila ?? { configurado: false, contagens: [] });
+    if (c.url.startsWith("/api/smtp")) return json(200, traffic.smtp ?? []);
+    return json(500, { erro: "inesperado" });
+  });
   useAppStore.setState({ token: "t", targets: [t], targetsLoaded: true, selectedTargetId: t.id, targetStatus: {} });
   const router = createMemoryRouter([
     { path: "/", element: <ProbeServicePage kind={kind} /> },
@@ -52,4 +60,48 @@ test("without a DNS port on the target, shows an empty state linking to /alvos",
   renderPage("dns", { ...target, porta_dns: undefined });
   expect(await screen.findByText(/não tem porta DNS/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /Cadastre/ })).toHaveAttribute("href", "/alvos");
+});
+
+const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
+
+// trafficValue lê o número de um Stat dentro da seção "Tráfego real".
+const trafficValue = async (label: string) => {
+  const section = await screen.findByRole("region", { name: "Tráfego real" });
+  return within(section).getByText(label, { selector: "p" }).nextElementSibling?.textContent;
+};
+
+test("shows queries per second, failure rate and rcodes from traffic", async () => {
+  renderPage("dns", target, {
+    dns: [
+      { inicio: ago(25), consultas: 40, falhas: 2, rcodes: { NOERROR: 38, NXDOMAIN: 2 }, p50_ms: 1, p95_ms: 4 },
+      { inicio: ago(15), consultas: 60, falhas: 3, rcodes: { NOERROR: 57, SERVFAIL: 1, TIMEOUT: 2 }, p50_ms: 1, p95_ms: 12.5 },
+    ],
+  });
+  expect(await trafficValue("Consultas por segundo")).toBe("6");
+  expect(await trafficValue("Falhas em 15 minutos")).toBe("5%");
+  expect(await trafficValue("Resolução p95 (10 s)")).toBe("13 ms");
+  const rows = within(screen.getByRole("table", { name: "Respostas DNS" })).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["NOERROR95", "NXDOMAIN2", "TIMEOUT2", "SERVFAIL1"]);
+});
+
+test("shows delivery rate, send latency, volume per minute and per hour, and queue length", async () => {
+  const smtp = [
+    { inicio: ago(3000), tentativas: 100, entregues: 100, rejeitados: 0, abortados: 0, codigos: {}, p50_ms: 30, p95_ms: 50 },
+    { inicio: ago(55), tentativas: 4, entregues: 3, rejeitados: 1, abortados: 0, codigos: { "550": 1 }, p50_ms: 30, p95_ms: 50 },
+    { inicio: ago(15), tentativas: 6, entregues: 5, rejeitados: 0, abortados: 1, codigos: {}, p50_ms: 35, p95_ms: 80 },
+  ];
+  renderPage("smtp", target, { smtp, fila: { configurado: true, contagens: [{ hora: ago(20), mensagens: 7 }] } });
+  expect(await trafficValue("Taxa de entrega")).toBe("98%"); // 108 de 110 na última hora
+  expect(await trafficValue("Latência de envio p95 (10 s)")).toBe("80 ms");
+  expect(await trafficValue("E-mails no último minuto")).toBe("10");
+  expect(await trafficValue("E-mails na última hora")).toBe("110");
+  expect(await trafficValue("Fila de saída")).toBe("7");
+  const rows = within(screen.getByRole("table", { name: "Códigos de recusa" })).getAllByRole("row").slice(1);
+  expect(rows.map((r) => r.textContent)).toEqual(["5501"]);
+});
+
+test("SMTP queue shows when it is not configured", async () => {
+  renderPage("smtp");
+  expect(await trafficValue("Fila de saída")).toBe("não configurada");
+  expect(await trafficValue("Taxa de entrega")).toBe("—");
 });
