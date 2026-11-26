@@ -9,14 +9,14 @@
 
 Plataforma de **monitoramento e segurança** que roda **na mesma máquina do servidor** que observa. Ela une três visões em um único painel:
 
-- **Monitoramento passivo:** captura de tráfego com gopacket, um "mini-Wireshark" embutido.
-- **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema.
+- **Monitoramento passivo:** captura de tráfego com gopacket, um "mini-Wireshark" embutido, que decodifica HTTP, PostgreSQL, DNS e SMTP.
+- **Monitoramento ativo:** testes periódicos de HTTP, DNS e SMTP, mais métricas do sistema (CPU, memória, disco e I/O), conexões por porta e tamanho do banco.
 - **Arsenal de segurança:** ferramentas como Nmap e Nuclei executadas em containers Docker efêmeros.
 - **Detecção de ataques:** brute-force e password spraying, picos de tráfego (DDoS) e alteração de arquivos de configuração.
 
 **Documentação:** [guia de instalação](docs/INSTALACAO.md) · [runbooks de operação](docs/RUNBOOKS.md) · [playbooks de incidente](docs/PLAYBOOKS.md) · [testes de navegação](docs/TESTES-NAVEGACAO.md)
 
-> **Status:** versão básica implementada. As Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas, junto com alertas por e-mail e monitoramento de DNS e SMTP. As Sprints 9 a 16 (página própria por ferramenta do Arsenal, Sistema, ffuf, Nikto, SQLMap, Amass, Gitleaks, Inspetor de pacotes, capturas `.pcap` e PDF) estão planejadas. Veja [docs/SPRINTS.md](docs/SPRINTS.md).
+> **Status:** as Sprints 1 a 8 (núcleo, Poller, interface, sniffer das camadas 3 e 4, HTTP, PostgreSQL e Arsenal com Nmap, Nuclei e testssl) estão prontas. Da Fase 4 já estão na `main` a página própria de cada ferramenta do Arsenal (Nmap, Nuclei, testssl, ffuf, Nikto, SQLMap e Amass), a tela Sistema e o relatório em PDF. Também estão prontos os alertas por e-mail, as telas de DNS e SMTP (sonda ativa e tráfego real), as conexões por porta, o I/O de disco e o tamanho do PostgreSQL. Faltam Gitleaks (Vazamentos), o Inspetor de pacotes e as capturas `.pcap`. Veja [docs/SPRINTS.md](docs/SPRINTS.md) e a [cobertura do enunciado](#cobertura-do-enunciado).
 
 ---
 
@@ -31,6 +31,8 @@ Plataforma de **monitoramento e segurança** que roda **na mesma máquina do ser
 - [Aplicação cobaia](#aplicação-cobaia)
 - [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail)
 - [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp)
+- [Conexões, disco e tamanho do banco](#conexões-disco-e-tamanho-do-banco)
+- [Cobertura do enunciado](#cobertura-do-enunciado)
 - [Segurança: brute-force, DDoS e integridade de arquivos](#segurança-brute-force-ddos-e-integridade-de-arquivos)
 - [Requisitos de implantação](#requisitos-de-implantação)
 - [O que falta implementar, por camada](#o-que-falta-implementar-por-camada)
@@ -100,8 +102,9 @@ graph TD
 
 | Componente | Responsabilidade |
 |---|---|
-| **Sniffer** | Captura nas interfaces `lo`/`any` com filtro BPF nas portas do alvo. Remonta fluxos TCP e decodifica HTTP, PostgreSQL, MySQL, DNS e SMTP. |
-| **Poller** | Testes ativos periódicos: disponibilidade e latência HTTP, resolução DNS, handshake SMTP e STARTTLS, validade do certificado. Coleta CPU, RAM, disco e conexões via `gopsutil` e `/proc`. |
+| **Sniffer** | Captura nas interfaces `lo`/`any` com filtro BPF nas portas do alvo (TCP da aplicação, do banco e do SMTP; UDP do DNS). Remonta fluxos TCP e decodifica HTTP/1.1, PostgreSQL e SMTP; pareia consultas e respostas DNS por UDP. |
+| **Poller** | Testes ativos periódicos: disponibilidade e latência HTTP, resolução DNS, conversa SMTP e STARTTLS. |
+| **Coletores do sistema** | CPU, memória, disco e I/O do disco (`gopsutil`), conexões TCP abertas por porta e por processo cliente (`/proc`), tamanho do PostgreSQL (conexão opcional) e fila de saída do servidor de e-mail (diretórios opcionais). |
 | **Orquestrador Docker** | Sobe containers efêmeros do arsenal com limites de CPU e RAM, coleta a saída, normaliza os achados num esquema único e destrói o container. |
 | **Agregador** | Consolida eventos em janelas de 1s (requisições por rota, status HTTP, latência, consultas, banda, protocolos) e grava em lote. |
 | **API REST** | CRUD de alvos, disparo de scans, consultas ao histórico e aos relatórios de cada ferramenta. `GET /api/alvos/{id}/relatorio` junta o que o PDF precisa; o navegador monta o arquivo com jsPDF. |
@@ -114,14 +117,14 @@ Cada ferramenta tem uma página própria em `/arsenal/<ferramenta>`, desenhada a
 
 | Ferramenta | Função | Página na interface | Situação |
 |---|---|---|---|
-| **Nmap** | Portas abertas e serviços | Mapa de portas: todas as portas com estado, serviço e versão, e o que abriu ou fechou desde a varredura anterior | Ferramenta pronta; página na Sprint 9 |
-| **Nuclei** | Vulnerabilidades conhecidas (CVEs) e más configurações, via templates | Resultados por template, com filtros por severidade e tag, descrição e referências | Ferramenta pronta; página na Sprint 9 |
-| **testssl.sh** | Validade do certificado e força da criptografia TLS | Boletim TLS: nota, protocolos oferecidos, dias até o certificado vencer e vulnerabilidades testadas | Ferramenta pronta; página na Sprint 9 |
-| **ffuf** | Descoberta de diretórios e rotas ocultas | Árvore de rotas, marcando as que nunca apareceram no tráfego real | Sprint 11 |
-| **Nikto** | Falhas em servidores web | Checagens do servidor agrupadas em cabeçalhos, arquivos expostos, versão e outros | Sprint 11 |
-| **SQLMap** | Injeção de SQL | Escolha de uma rota vista pelo sniffer e do parâmetro; veredito, técnicas e banco identificado | Sprint 12 |
-| **Amass** | Descoberta de subdomínios do domínio da aplicação (modo passivo) | Subdomínios com endereços, destacando os que apontam para este servidor | Sprint 13 |
-| **Gitleaks** (Vazamentos) | Vazamento de segredos no código | Vazamentos por arquivo, com regra, linha e commit, sem nunca mostrar o segredo | Sprint 13 |
+| **Nmap** | Portas abertas e serviços | Mapa de portas: todas as portas com estado, serviço e versão, e o que abriu ou fechou desde a varredura anterior | Pronta |
+| **Nuclei** | Vulnerabilidades conhecidas (CVEs) e más configurações, via templates | Resultados por template, com filtros por severidade e tag, descrição e referências | Pronta |
+| **testssl.sh** | Validade do certificado e força da criptografia TLS | Boletim TLS: nota, protocolos oferecidos, dias até o certificado vencer e vulnerabilidades testadas | Pronta |
+| **ffuf** | Descoberta de diretórios e rotas ocultas | Árvore de rotas, marcando as que nunca apareceram no tráfego real | Pronta |
+| **Nikto** | Falhas em servidores web | Checagens do servidor agrupadas em cabeçalhos, arquivos expostos, versão e outros | Pronta |
+| **SQLMap** | Injeção de SQL | Escolha de uma rota vista pelo sniffer e do parâmetro; veredito, técnicas e banco identificado | Pronta |
+| **Amass** | Descoberta de subdomínios do domínio da aplicação (modo passivo) | Subdomínios com endereços, destacando os que apontam para este servidor | Pronta |
+| **Gitleaks** (Vazamentos) | Vazamento de segredos no código | Vazamentos por arquivo, com regra, linha e commit, sem nunca mostrar o segredo | A fazer (Sprint 13) |
 
 ## Fluxo de funcionamento
 
@@ -152,11 +155,15 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 { "tipo": "STATUS_ALVOS", "dados": { "resultados": [ { "alvo_id": 1, "porta": 3000, "tipo": "http", "no_ar": true, "status_http": 200, "latencia_ms": 1.2, "hora": "2026-11-20T17:31:46Z" } ] } }
 { "tipo": "ALERTA_QUEDA", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "erro": "dial tcp 127.0.0.1:3000: connect: connection refused", "hora": "2026-11-20T17:31:52Z" } }
 { "tipo": "SERVICO_RESTAURADO", "dados": { "alvo_id": 1, "alvo": "api", "porta": 3000, "hora": "2026-11-20T17:31:56Z" } }
-{ "tipo": "METRICAS_SISTEMA", "dados": { "cpu": 10.9, "memoria": 50.2, "disco": 4.7, "hora": "2026-11-20T17:31:49Z" } }
+{ "tipo": "METRICAS_SISTEMA", "dados": { "cpu": 10.9, "memoria": 50.2, "disco": 4.7, "io": true, "leitura_bps": 204800, "escrita_bps": 51200, "iops": 42, "latencia_disco_ms": 0.8, "disco_ocupado": 3.5, "hora": "2026-11-20T17:31:49Z" } }
 { "tipo": "METRICAS_TRAFEGO", "dados": { "inicio": "2026-11-21T12:00:00Z", "bytes": 48210, "pacotes": 61, "descartados": 0, "protocolos": { "HTTP": 40100, "PostgreSQL": 8110 }, "top_origens": [ { "ip": "127.0.0.1", "bytes": 30020, "pacotes": 33 } ] } }
 { "tipo": "ESTADO_MOTORES", "dados": { "sniffer": "ativo" } }
-{ "tipo": "METRICAS_HTTP", "dados": { "inicio": "2026-11-21T12:00:00Z", "requisicoes": 42, "status": { "2xx": 40, "5xx": 2 }, "p50_ms": 1.4, "p95_ms": 12.8, "rotas": [ { "metodo": "GET", "rota": "/users/:id", "requisicoes": 30, "erros": 0, "p50_ms": 1.2, "p95_ms": 3.1 } ] } }
-{ "tipo": "METRICAS_BANCO", "dados": { "inicio": "2026-11-21T12:00:00Z", "consultas": 18, "erros": 1, "tipos": { "SELECT": 15, "UPDATE": 3 }, "p50_ms": 0.6, "p95_ms": 4.2, "top": [ { "consulta": "SELECT * FROM u WHERE id = ?", "tipo": "SELECT", "execucoes": 15, "erros": 0, "p50_ms": 0.5, "p95_ms": 1.1 } ] } }
+{ "tipo": "METRICAS_HTTP", "dados": { "inicio": "2026-11-21T12:00:00Z", "requisicoes": 42, "status": { "2xx": 39, "4xx": 1, "5xx": 2 }, "codigos": { "404": 1, "503": 2 }, "p50_ms": 1.4, "p95_ms": 12.8, "rotas": [ { "metodo": "GET", "rota": "/users/:id", "requisicoes": 30, "erros": 0, "p50_ms": 1.2, "p95_ms": 3.1 } ] } }
+{ "tipo": "METRICAS_BANCO", "dados": { "inicio": "2026-11-21T12:00:00Z", "consultas": 18, "erros": 1, "tipos": { "SELECT": 15, "UPDATE": 2, "ROLLBACK": 1 }, "transacoes_falhas": 1, "p50_ms": 0.6, "p95_ms": 4.2, "top": [ { "consulta": "SELECT * FROM u WHERE id = ?", "tipo": "SELECT", "execucoes": 15, "erros": 0, "p50_ms": 0.5, "p95_ms": 1.1 } ] } }
+{ "tipo": "METRICAS_DNS", "dados": { "inicio": "2026-11-21T12:00:00Z", "consultas": 50, "falhas": 2, "rcodes": { "NOERROR": 48, "NXDOMAIN": 1, "TIMEOUT": 1 }, "p50_ms": 0.4, "p95_ms": 1.9 } }
+{ "tipo": "METRICAS_SMTP", "dados": { "inicio": "2026-11-21T12:00:00Z", "tentativas": 5, "entregues": 4, "rejeitados": 1, "abortados": 0, "codigos": { "550": 1 }, "p50_ms": 12, "p95_ms": 40 } }
+{ "tipo": "FILA_SMTP", "dados": { "hora": "2026-11-21T12:00:00Z", "mensagens": 3 } }
+{ "tipo": "METRICAS_CONEXOES", "dados": { "hora": "2026-11-21T12:00:00Z", "portas": [ { "porta": 5432, "tipo": "banco", "estabelecidas": 6, "estados": { "ESTABLISHED": 6 }, "clientes": [ { "processo": "loja", "conexoes": 5 }, { "processo": "psql", "conexoes": 1 } ] } ] } }
 { "tipo": "ESTADO_MOTORES", "dados": { "docker": "ativo" } }
 { "tipo": "SCAN_INICIADO", "dados": { "scan_id": 3, "alvo_id": 1, "ferramentas": ["nmap"] } }
 { "tipo": "SCAN_LOG", "dados": { "scan_id": 3, "ferramenta": "nmap", "linhas": ["Starting Nmap 7.95"] } }
@@ -166,13 +173,18 @@ Toda mensagem vem no envelope `{ "tipo": ..., "dados": ... }`. Os eventos desta 
 
 - `STATUS_ALVOS` sai a cada rodada do poller (`OMNI_INTERVALO_POLLER`, padrão 30 s, mínimo 1 s), com uma verificação por porta: HTTP nas portas da aplicação e TCP na porta do banco. Os resultados ficam no banco por `OMNI_RETENCAO_VERIFICACOES` (padrão `168h`, ou 7 dias; mínimo `1h`, no formato de duração do Go, como `48h`); a mesma retenção vale para as métricas de tráfego, HTTP, banco, sistema e para o histórico de alertas, e o histórico de cada alvo traz até 2880 resultados por porta.
 - `ALERTA_QUEDA` e `SERVICO_RESTAURADO` saem só na mudança de estado de uma porta.
-- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem. As leituras ficam no banco por `OMNI_RETENCAO_VERIFICACOES` e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
+- `METRICAS_SISTEMA` sai a cada 5 s, com CPU, memória e disco (do volume do banco) em porcentagem e o I/O desse disco no intervalo: bytes lidos e escritos por segundo, IOPS, tempo médio por operação (`latencia_disco_ms`) e percentual de tempo ocupado. `io` é `false` na primeira leitura e quando o dispositivo não é encontrado (como no Windows nativo). As leituras ficam no banco por `OMNI_RETENCAO_VERIFICACOES` e saem em `GET /api/sistema` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 24 h, com uma média por minuto acima de 1 h), que alimenta a tela Sistema.
 - O histórico das verificações das últimas 24 h fica em `GET /api/alvos/{id}/historico` (aceita `?desde=<RFC3339>`).
 - `METRICAS_TRAFEGO` sai a cada segundo enquanto o sniffer captura: bytes, pacotes, bytes por protocolo, os dez IPs de origem com mais tráfego e os pacotes que o pcap descartou (`descartados` maior que zero indica métricas incompletas). O protocolo é deduzido pela porta; as portas da aplicação contam como HTTP.
 - `ESTADO_MOTORES` sai a cada 5 s e a cada mudança, com o estado do sniffer: `ativo`, `inativo` (sem alvos cadastrados) ou `sem-permissao` (falta `CAP_NET_RAW`; o resto do Omni segue no ar).
 - As janelas com tráfego ficam 24 h no banco e saem em `GET /api/trafego` (últimos 15 minutos; aceita `?desde=<RFC3339>`, até 3600 janelas).
 - `METRICAS_HTTP` sai a cada 10 s: o sniffer remonta os fluxos TCP das portas da aplicação (`gopacket/reassembly`, até 4 MiB em buffer por conexão, fluxos ociosos fechados em 2 min), pareia requisição e resposta (inclusive em pipeline e fora de ordem) e agrega contagem, classes de status e latência p50/p95 por rota normalizada (`/users/123` vira `/users/:id`). Cabeçalhos, query strings e corpos nunca são guardados, e o tráfego com User-Agent `Omni-` (Poller e Arsenal) fica fora. Rotas: `GET /api/requisicoes` (janelas, últimos 15 minutos) e `GET /api/requisicoes/rotas` (as 100 rotas de mais volume das últimas 24 h).
 - `METRICAS_BANCO` sai a cada 10 s com as consultas ao PostgreSQL na porta do banco dos alvos (consultas simples e Parse/Bind/Execute, com erros). O SQL é normalizado: literais viram `?`, comentários somem e listas viram `(?)`. Mensagens de senha nunca são lidas, e conexões com TLS são ignoradas. Rotas: `GET /api/consultas` e `GET /api/consultas/lentas?limite=` (padrão 20, as de maior p95 em 24 h). As métricas HTTP e de banco ficam 24 h no banco, como as de tráfego.
+- `METRICAS_HTTP` traz também `codigos`, a contagem das respostas de erro (status 400 ou maior) pelo código exato.
+- `METRICAS_BANCO` traz os rollbacks pedidos pela aplicação em `tipos.ROLLBACK` e as transações abortadas por erro em `transacoes_falhas` (o `ReadyForQuery` do PostgreSQL passa a informar o estado `E`; cada transação conta uma vez).
+- `METRICAS_DNS` e `METRICAS_SMTP` saem a cada 10 s com o que o sniffer viu nas portas DNS e SMTP dos alvos; veja [Tráfego real](#tráfego-real). Rotas: `GET /api/dns`, `GET /api/smtp` e `GET /api/smtp/fila`.
+- `METRICAS_CONEXOES` sai a cada 5 s com as conexões TCP de cada porta dos alvos (aplicação, banco e SMTP): as abertas, os estados e, do lado cliente, os processos e quantas conexões cada um mantém (o pool). Rota: `GET /api/conexoes`.
+- `FILA_SMTP` sai a cada 30 s quando `OMNI_SMTP_FILA_DIRS` está definido.
 - O Docker informa o estado no `ESTADO_MOTORES` a cada 5 s: `ativo` ou `indisponivel`.
 - `ALERTA` sai quando uma métrica muda de nível (verde, amarelo ou vermelho); veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
 - `SCAN_LOG` leva a saída da ferramenta em lotes a cada 500 ms (no máximo 20 000 linhas por ferramenta); `SCAN_CONCLUIDO` traz quantos achados são novos em relação à varredura anterior.
@@ -195,15 +207,16 @@ Para subir só o backend com um token aleatório novo, `make backend` compila o 
 
 **Barra lateral:**
 
-- **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, Status HTTP, Sistema
+- **Monitoramento:** Geral, Alertas, Requisições na API, Consultas no banco, DNS, SMTP, Status HTTP, Sistema
 - **Tráfego:** Inspetor de pacotes (Sprint 14), Capturas `.pcap` (Sprint 15)
-- **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, testssl (Sprint 9), ffuf, Nikto (Sprint 11), SQLMap (Sprint 12), Amass, Vazamentos (Sprint 13)
-- **Relatórios:** histórico, comparação entre scans, exportação em PDF (Sprint 16)
+- **Arsenal:** visão geral em `/arsenal` e uma página por ferramenta: Nmap, Nuclei, Nikto, SQLMap, ffuf, Amass, testssl e Vazamentos (Sprint 13)
+- **Relatórios:** histórico, comparação entre scans e exportação em PDF (o PDF é gerado na própria página Relatórios; o item "Exportação em PDF" do menu ainda aparece como "em breve")
 
 Os itens com sprint ainda aparecem no menu como "em breve". O que cada sprint entrega está em [docs/SPRINTS.md](docs/SPRINTS.md).
 
 **Tela Geral:**
 
+- Requisições e consultas por segundo, conexões ativas, banda e pacotes por segundo
 - Gráfico de requisições na API
 - Gráfico de consultas no banco
 - Barras empilhadas de status HTTP (2xx, 3xx, 4xx, 5xx)
@@ -244,6 +257,10 @@ Um nível só muda depois que a condição se mantém pelo tempo da regra (colun
 | Taxa de falhas da sonda (últimas 10, mínimo 5) | DNS / SMTP | 20% | 50% | imediato |
 | SMTP sem STARTTLS | SMTP | servidor não oferece STARTTLS | — | imediato |
 | Uso de CPU / memória / disco | Sistema | 80% / 85% / 85% | 95% | 1 min |
+| Latência do disco (por operação) | Sistema | 20 ms | 100 ms | 1 min |
+| Falhas de resolução no tráfego (mínimo 20 consultas) | DNS | 5% | 20% | 30 s |
+| Envios recusados ou interrompidos (mínimo 10 tentativas) | SMTP | 10% | 30% | 30 s |
+| Tamanho da fila de e-mails | SMTP | 50 mensagens | 200 mensagens | 5 min |
 | Logins falhos por IP / por conta | Segurança | 10 por minuto | 30 por minuto | imediato |
 | Contas diferentes testadas por IP (password spraying) | Segurança | 5 por minuto | 10 por minuto | imediato |
 | Requisições por IP | Segurança | 3000 por minuto | 6000 por minuto | imediato |
@@ -318,7 +335,38 @@ Cadastre (ou edite) o alvo com domínio `loja.local`, porta DNS `1053` e porta S
 - **Vermelho no DNS ou SMTP:** `docker compose stop coredns` ou `docker compose stop mailpit`.
 - **Amarelo "SMTP sem STARTTLS":** já aparece com o Mailpit padrão, que não tem TLS.
 
-**Ainda não coberto:** consultas por segundo do DNS, volume e fila do SMTP. Essas métricas dependem do tráfego real e entram com a captura passiva no sniffer (UDP 53 e SMTP).
+### Tráfego real
+
+Além da sonda, o sniffer captura a porta DNS (UDP) e a porta SMTP de cada alvo. As telas **DNS** (`/dns`) e **SMTP** (`/smtp`) mostram as duas visões: a sonda ativa e o tráfego real.
+
+**DNS** (`internal/sniffer/l7/dns.go`): cada consulta é pareada com a resposta pelo cliente (IP e porta) e pelo ID. Daí saem as consultas por segundo, o tempo de resolução (p50/p95), as falhas (RCODE diferente de `NOERROR`) e os códigos de resposta. Consulta sem resposta em 5 s conta como `TIMEOUT`. O nome consultado nunca é guardado, e no máximo 10.000 consultas ficam esperando resposta, para um ataque não esgotar a memória.
+
+**SMTP** (`internal/sniffer/l7/smtp.go`): cada transação, do `MAIL FROM` ao fim, termina **entregue** (`250` depois do `DATA`), **rejeitada** (`MAIL FROM`, todos os `RCPT TO` ou o fim do `DATA` recusados com 4xx/5xx) ou **abortada** (`RSET`, `QUIT` ou conexão encerrada ou ociosa no meio, que são os timeouts). A tela mostra a taxa de entrega, a latência de envio (do fim do `DATA` até a resposta), o volume no último minuto e na última hora e os códigos de recusa. Endereços, cabeçalhos e corpo nunca são guardados, as linhas depois de `AUTH` não são lidas, e a conexão é ignorada depois que o servidor aceita o `STARTTLS` ou depois de um buraco na captura (a transação aberta conta como abortada). A conversa da sonda do próprio Omni (`EHLO omni-sonda.localhost`) fica de fora, como o tráfego `Omni-` no HTTP.
+
+**Fila de saída:** com `OMNI_SMTP_FILA_DIRS` (diretórios separados por vírgula; no Postfix, `/var/spool/postfix/active,/var/spool/postfix/deferred`), o Omni conta a cada 30 s os arquivos da fila, sem abrir nenhum e sem seguir links. O usuário do Omni precisa de leitura nesses diretórios (por exemplo, com uma ACL: `sudo setfacl -R -m u:omni:rx /var/spool/postfix/active /var/spool/postfix/deferred`). Sem a variável, a tela mostra "não configurada".
+
+**Carga de teste:** `make carga ARGS="-dns 127.0.0.1:1053 -smtp 127.0.0.1:1025"`, em `subjects/loja` e com `exemplos/dns-smtp` no ar, envia consultas e e-mails de pedido junto com a carga HTTP (`-dns-taxa` e `-emails-por-minuto` mudam o ritmo).
+
+**Limites:** DNS sobre TCP e o SMTP depois do `STARTTLS` não são decodificados (o segundo é criptografado).
+
+## Conexões, disco e tamanho do banco
+
+**Conexões por porta** (`internal/connstats`): a cada 5 s, o Omni lê as conexões TCP do sistema e conta, em cada porta dos alvos, as abertas (`ESTABLISHED`) e as demais por estado. Do lado cliente, agrupa as conexões pelo processo que as abriu: é o pool de conexões de cada aplicação com o banco. As telas Requisições e Geral mostram as conexões ativas da aplicação; a tela Consultas mostra as abertas no banco e os pools. Sem root, processos de outros usuários aparecem como "(sem permissão para ver)".
+
+**I/O do disco** (`internal/sysmetrics`): o dispositivo é o que guarda o banco do Omni (o mesmo do percentual de disco); no LVM, o link `/dev/mapper/...` é resolvido para o `dm-N` dos contadores. A tela Sistema mostra leitura e escrita por segundo, IOPS e a latência média por operação, com os limites do alerta.
+
+**Tamanho do PostgreSQL** (`internal/dbsize`): o tamanho só existe dentro do banco (a pasta de dados pertence ao usuário `postgres`, com permissão 700). Com `OMNI_PG_DSN_ARQUIVO` (ou `OMNI_PG_DSN`), o Omni abre a cada 5 minutos uma conexão só de leitura, mede cada banco com `pg_database_size` e estima o crescimento em GB/dia pela regressão linear das últimas 24 h (precisa de pelo menos 1 h de medições). Crie um papel só para isso:
+
+```sql
+CREATE ROLE omni LOGIN PASSWORD '...' IN ROLE pg_monitor;
+```
+
+```bash
+echo 'postgres://omni:...@127.0.0.1:5432/postgres' > ~/omni-pg.dsn && chmod 600 ~/omni-pg.dsn
+OMNI_PG_DSN_ARQUIVO=~/omni-pg.dsn ./omni
+```
+
+O arquivo é preferível à variável, que fica visível em `/proc/<pid>/environ`. A senha nunca aparece no log: uma falha de conexão troca a senha por `xxxxx`, e um DSN malformado vira só "OMNI_PG_DSN inválido". Sem a conexão, a tela Consultas explica como ligar. Rota: `GET /api/banco/tamanho`.
 
 ## Segurança: brute-force, DDoS e integridade de arquivos
 
@@ -412,21 +460,24 @@ Cuidados no WSL2:
 - [x] **Normalização de rotas:** agrupar `/users/123` e `/users/456` como `/users/:id`.
 - [x] **Decodificador PostgreSQL:** mensagens `Query` e `Parse`, com pareamento entre consulta e resposta para medir o tempo.
 - [ ] **Decodificador MySQL:** `COM_QUERY`, com o mesmo pareamento.
+- [x] **Tamanho e crescimento do PostgreSQL** por uma conexão opcional com `pg_monitor`. Veja [Conexões, disco e tamanho do banco](#conexões-disco-e-tamanho-do-banco).
 - [ ] **Complemento opcional para PostgreSQL:** coletar estatísticas de `pg_stat_statements`.
 - [x] **DNS (sonda ativa):** latência e respostas com erro (NXDOMAIN, SERVFAIL, REFUSED). Veja [Monitoramento de DNS e SMTP](#monitoramento-de-dns-e-smtp).
-- [ ] **DNS:** registros MX e TXT (SPF/DKIM) e consultas por segundo vindas do tráfego real.
+- [x] **DNS (tráfego real):** consultas por segundo, tempo de resolução, falhas e timeouts. Veja [Tráfego real](#tráfego-real).
+- [ ] **DNS:** registros MX e TXT (SPF/DKIM) e DNS sobre TCP.
 - [x] **SMTP (sonda ativa):** tempo do handshake (`220`) e suporte a STARTTLS.
-- [ ] **SMTP:** volume de envios e fila, vindos do tráfego real.
+- [x] **SMTP (tráfego real):** taxa de entrega, rejeições, latência de envio, volume e fila de saída.
 - [x] **Mascaramento de dados sensíveis** (`Authorization`, `Cookie`, senhas) antes de qualquer gravação.
 - [x] **Parsers do Arsenal** com um esquema único de achado (alvo, ferramenta, severidade, evidência) e severidade normalizada.
-- [ ] **Relatório estruturado por ferramenta,** para a página própria de cada uma (Sprint 9).
+- [x] **Relatório estruturado por ferramenta,** para a página própria de cada uma.
 - [ ] **Severidade por CVSS** e deduplicação entre ferramentas.
 - [x] **Comparação entre scans:** indicar o que mudou desde o anterior, por exemplo "porta 22 abriu desde ontem".
 - [x] **Alertas por e-mail.** Veja [Alertas e notificação por e-mail](#alertas-e-notificação-por-e-mail).
 - [x] **Detecção de brute-force e password spraying** pelas respostas 401, com IP de origem atrás do proxy e usuário da autenticação Basic.
 - [x] **Integridade de arquivos de configuração** (SHA-256, permissões e dono).
 - [ ] **Agendamento de scans** e alertas externos (Telegram, Discord).
-- [ ] **Novas ferramentas do Arsenal:** ffuf e Nikto (Sprint 11), SQLMap (Sprint 12), Amass e Gitleaks (Sprint 13).
+- [x] **Novas ferramentas do Arsenal:** ffuf, Nikto, SQLMap e Amass.
+- [ ] **Gitleaks** (Vazamentos, Sprint 13).
 - [x] **Exportação de relatório em PDF** por alvo e intervalo (até 168 h).
 
 ### Camada 6: Apresentação (TLS)
@@ -442,7 +493,7 @@ Cuidados no WSL2:
 - [ ] **Retransmissões e pacotes fora de ordem,** que indicam rede degradada.
 - [ ] **RST em excesso** (serviço recusando conexões) e **SYN sem resposta** (possível SYN flood ou varredura).
 - [ ] **Janela TCP zero,** sinal de que a aplicação não está dando conta.
-- [ ] **Conexões por estado** (ESTABLISHED, TIME_WAIT) via `/proc/net/tcp`, cruzadas com o processo dono da porta.
+- [x] **Conexões por estado** (ESTABLISHED, TIME_WAIT) via `/proc/net/tcp`, cruzadas com o processo dono da porta. Veja [Conexões, disco e tamanho do banco](#conexões-disco-e-tamanho-do-banco).
 - [ ] **UDP:** volume por porta e detecção de amplificação (resposta muito maior que a requisição).
 
 ### Camada 3: Rede
@@ -465,7 +516,7 @@ Cuidados no WSL2:
 - [ ] **Captura de alto desempenho:** AF_PACKET com ring buffer e `DecodingLayerParser`, para não sobrecarregar o garbage collector.
 - [x] **Limites de CPU e RAM nos containers do Arsenal** (1 CPU e 512 MiB; 1,5 GiB para o Nuclei).
 - [ ] **Limites de CPU e RAM para o próprio Omni,** para não derrubar a produção.
-- [ ] **Histórico de CPU, memória e disco** numa página própria (Sprint 10).
+- [x] **Histórico de CPU, memória, disco e I/O** numa página própria.
 - [ ] **Inspetor de pacotes** ao vivo (Sprint 14) e **capturas `.pcap`** sob demanda, com retenção configurável (Sprint 15).
 
 ## Segurança da própria plataforma
@@ -481,7 +532,8 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **Descoberta de serviços sem segredos:** `GET /api/descoberta` exige o token e devolve só nome do processo, PID, host e portas, nunca a linha de comando, que costuma conter senhas. Sem root, processos de outros usuários aparecem sem nome.
 - **Validação estrita do alvo** (IP, domínio ou porta), com argumentos passados aos containers **como array, nunca como string concatenada**, para evitar injeção de comando.
 - **Escopo travado:** o Arsenal só roda contra `localhost` e os domínios cadastrados da aplicação.
-- **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto: `instrumentisto/nmap:7.95`, `projectdiscovery/nuclei:v3.4.10` e `drwetter/testssl.sh:3.2`.
+- **Imagens Docker com versão fixa,** de preferência oficiais ou construídas pelo próprio projeto: `instrumentisto/nmap:7.95`, `projectdiscovery/nuclei:v3.4.10`, `drwetter/testssl.sh:3.2`, `ghcr.io/sullo/nikto:2.6.1`, `secsi/ffuf:2.3.0`, `caffix/amass:v3.23.3` e o SQLMap fixado num commit (`googlesky/sqlmap:upstream-5db2e62…`).
+- **Conexão com o PostgreSQL só de leitura e opcional:** papel com `pg_monitor`, DSN num arquivo com permissão 600 e senha fora dos logs.
 - **Retenção de dados configurável,** já que capturas podem conter dados pessoais (LGPD). As capturas `.pcap` (Sprint 15) ficam com permissão `0600`, têm tamanho máximo e são apagadas depois do prazo de `OMNI_RETENCAO_CAPTURAS`.
 - **Regras das ferramentas novas (Sprints 11 a 13):** toda opção vinda da interface (rota e parâmetro do SQLMap, lista de palavras do ffuf, caminho do código-fonte do Gitleaks) é validada no backend contra uma lista fechada ou um padrão estrito; o SQLMap roda só com nível 1 e risco 1 e nunca com opções de extração (`--dump`, `--os-shell`, `--file-*`); o código-fonte é montado **somente leitura** no container do Gitleaks, e o valor dos segredos encontrados nunca é gravado nem mostrado.
 
@@ -493,6 +545,38 @@ O Omni roda no servidor de produção, com acesso ao Docker e privilégio de cap
 - **Traceroute** só faz sentido para destinos externos ao servidor.
 - **O Amass precisa de acesso à internet:** em modo passivo, ele consulta fontes públicas (certificados, DNS passivo) sobre o domínio do alvo, sem mandar tráfego ao alvo. Sem internet, a varredura termina sem subdomínios.
 - **Windows nativo** roda só com o Poller: o Sniffer e o Arsenal ficam desligados. Use o WSL2 (veja [Windows](#windows)).
+- **DNS sobre TCP e SMTP depois do STARTTLS** não são decodificados; essas conversas ficam fora das métricas do tráfego real.
+- **A fila do SMTP e o tamanho do banco** dependem de permissões que o administrador concede (leitura dos diretórios da fila e um papel `pg_monitor`).
+
+## Cobertura do enunciado
+
+Onde cada métrica pedida no trabalho (seção 3 do enunciado) aparece na interface e de onde vem o dado.
+
+| Serviço | Métrica | Onde aparece | Fonte |
+|---|---|---|---|
+| Web | Disponibilidade (status HTTP) | Alvos, Alertas | Sonda ativa (Poller) |
+| Web | Requisições por segundo | Geral, Requisições na API | Sniffer (HTTP) |
+| Web | Latência | Requisições na API (p50/p95 por rota) | Sniffer (HTTP) e sonda |
+| Web | Taxa de erro 4xx/5xx e contagem por código | Status HTTP, Requisições na API (Códigos de erro) | Sniffer (HTTP) |
+| Web | Conexões ativas | Geral, Requisições na API | `/proc` (connstats) |
+| Banco | Disponibilidade | Alvos, Alertas | Sonda ativa (TCP) |
+| Banco | Consultas por segundo | Geral, Consultas no banco | Sniffer (PostgreSQL) |
+| Banco | Erros, rollbacks e transações que falharam | Consultas no banco | Sniffer (PostgreSQL) |
+| Banco | Conexões abertas e pools | Consultas no banco | `/proc` (connstats) |
+| Banco | CPU, memória, I/O e latência de disco | Sistema | `gopsutil` |
+| Banco | Tamanho e crescimento (GB/dia) | Consultas no banco | PostgreSQL (`pg_database_size`, opcional) |
+| Banco | Consultas lentas | Consultas no banco | Sniffer (PostgreSQL) |
+| DNS | Tempo de resolução | DNS (sonda e tráfego) | Sonda ativa e sniffer |
+| DNS | Falhas de resolução | DNS, Alertas | Sonda ativa e sniffer |
+| DNS | Consultas por segundo | DNS (tráfego real) | Sniffer (DNS por UDP) |
+| DNS | Disponibilidade | DNS, Alertas | Sonda ativa |
+| SMTP | Taxa de entrega | SMTP (tráfego real) | Sniffer (SMTP) |
+| SMTP | Tamanho da fila | SMTP, Alertas | Diretórios da fila (opcional) |
+| SMTP | Latência de envio | SMTP (tráfego real e sonda) | Sniffer e sonda ativa |
+| SMTP | Taxa de erros (rejeições, timeouts) | SMTP, Alertas | Sniffer (SMTP) |
+| SMTP | Volume por minuto e por hora | SMTP (tráfego real) | Sniffer (SMTP) |
+
+Os alertas seguem os três níveis do enunciado (verde, amarelo e vermelho, com e-mail no amarelo e no vermelho), e a seção 5 está em [Segurança](#segurança-brute-force-ddos-e-integridade-de-arquivos) (DDoS, brute-force e integridade de arquivos) e no [Arsenal](#arsenal-containers) (vulnerabilidades conhecidas por serviço, com Nuclei, Nmap e testssl).
 
 ## Roadmap
 
