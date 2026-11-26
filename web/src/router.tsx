@@ -6,6 +6,7 @@ import ArsenalPage from "./pages/ArsenalPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import OverviewPage from "./pages/OverviewPage";
 import QueriesPage from "./pages/QueriesPage";
+import ReportPdfPage from "./pages/ReportPdfPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProbeServicePage from "./pages/ProbeServicePage";
 import SystemPage from "./pages/SystemPage";
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { path: "/arsenal", element: <ArsenalPage /> },
       { path: "/arsenal/:ferramenta", element: <ToolPage /> },
       { path: "/relatorios", element: <ReportsPage /> },
+      { path: "/relatorios/pdf", element: <ReportPdfPage /> },
       { path: "/dns", element: <ProbeServicePage kind="dns" /> },
       { path: "/smtp", element: <ProbeServicePage kind="smtp" /> },
       { path: "/sistema", element: <SystemPage /> },

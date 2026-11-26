@@ -1,6 +1,8 @@
 import type { SystemMetrics } from "../store/app";
 import type { Alert, Level } from "./alerts";
 import { apiFetch } from "./client";
+import type { ConnSnapshot } from "./connections";
+import type { DNSWindow, QueueSnapshot, SMTPWindow } from "./dnsSmtp";
 import type { DBWindow } from "./queries";
 import type { HTTPWindow } from "./requests";
 import type { Finding, Scan } from "./scans";
@@ -43,8 +45,12 @@ export type AlertRuleSummary = {
 
 export type ReportScan = Scan & { lista_achados: Finding[] };
 
+// DBSizeSample é o maior tamanho de um banco numa faixa do relatório.
+export type DBSizeSample = { banco: string; bytes: number; hora: string };
+
 // TargetReport é a resposta de GET /api/alvos/{id}/relatorio. Tráfego, HTTP,
-// banco e sistema são do servidor inteiro, não só do alvo.
+// banco, DNS, SMTP, conexões e sistema são do servidor inteiro, não só do
+// alvo.
 export type TargetReport = {
   alvo: Target;
   desde: string;
@@ -60,6 +66,12 @@ export type TargetReport = {
   http: HTTPWindow[];
   banco: DBWindow[];
   sistema: SystemMetrics[];
+  dns?: DNSWindow[];
+  smtp?: SMTPWindow[];
+  // fila_smtp e conexoes trazem o pico de cada faixa.
+  fila_smtp?: QueueSnapshot[];
+  conexoes?: ConnSnapshot[];
+  tamanho_banco?: DBSizeSample[];
   varreduras: ReportScan[];
 };
 
