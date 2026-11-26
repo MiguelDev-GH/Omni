@@ -26,3 +26,13 @@ func TestDBStatsWindow(t *testing.T) {
 	assert.Equal(t, uint64(1), w.Top[1].Errors)
 	assert.Empty(t, s.Flush(t0.Add(20*time.Second)).Top)
 }
+
+func TestDBStatsCountsTxFailures(t *testing.T) {
+	s := NewDBStats()
+	s.Flush(t0)
+	s.AddTxFailure()
+	s.AddTxFailure()
+	w := s.Flush(t0.Add(10 * time.Second))
+	assert.Equal(t, uint64(2), w.TxFailed)
+	assert.Equal(t, uint64(0), s.Flush(t0.Add(20*time.Second)).TxFailed)
+}

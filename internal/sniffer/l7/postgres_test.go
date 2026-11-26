@@ -173,3 +173,33 @@ func TestPGGarbageIsIgnored(t *testing.T) {
 	frames = append(frames, timed{c.FromClient([]byte("GET / HTTP/1.1\r\n\r\n")), 0}, timed{c.FromServer([]byte("HTTP/1.1 200 OK\r\n\r\n")), 0})
 	assert.Empty(t, runPG(t, frames...))
 }
+
+func TestPostgresTxFailedOncePerAbortedBlock(t *testing.T) {
+	c := pgConnFrames()
+	inTx := msg('Z', []byte("T"))
+	failedTx := msg('Z', []byte("E"))
+	frames := append(login(c),
+		timed{c.FromClient(msg('Q', cstr("BEGIN"))), time.Millisecond},
+		timed{c.FromServer(append(msg('C', cstr("BEGIN")), inTx...)), 2 * time.Millisecond},
+		timed{c.FromClient(msg('Q', cstr("INSERT INTO t VALUES (1)"))), 3 * time.Millisecond},
+		timed{c.FromServer(append(msg('E', cstr("SERROR")), failedTx...)), 4 * time.Millisecond},
+		timed{c.FromClient(msg('Q', cstr("SELECT 1"))), 5 * time.Millisecond},
+		timed{c.FromServer(append(msg('E', cstr("SERROR")), failedTx...)), 6 * time.Millisecond},
+		timed{c.FromClient(msg('Q', cstr("ROLLBACK"))), 7 * time.Millisecond},
+		timed{c.FromServer(append(msg('C', cstr("ROLLBACK")), ready...)), 8 * time.Millisecond},
+		// Uma segunda transação que falha conta de novo.
+		timed{c.FromClient(msg('Q', cstr("BEGIN"))), 9 * time.Millisecond},
+		timed{c.FromServer(append(msg('C', cstr("BEGIN")), inTx...)), 10 * time.Millisecond},
+		timed{c.FromClient(msg('Q', cstr("UPDATE t SET a = 1"))), 11 * time.Millisecond},
+		timed{c.FromServer(append(msg('E', cstr("SERROR")), failedTx...)), 12 * time.Millisecond},
+	)
+	var failures []time.Time
+	a := NewPostgresAssembler([]int{5432}, func(DBQuery) {})
+	a.OnTxFailed(func(at time.Time) { failures = append(failures, at) })
+	for _, f := range frames {
+		a.Add(testutil.Packet(f.frame, t0.Add(f.at)))
+	}
+	require.Len(t, failures, 2)
+	assert.Equal(t, t0.Add(4*time.Millisecond), failures[0])
+	assert.Equal(t, t0.Add(12*time.Millisecond), failures[1])
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/api"
 	"github.com/MiguelDev-GH/omni/internal/config"
 	"github.com/MiguelDev-GH/omni/internal/connstats"
+	"github.com/MiguelDev-GH/omni/internal/dbsize"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
 	"github.com/MiguelDev-GH/omni/internal/orchestrator"
 	"github.com/MiguelDev-GH/omni/internal/poller"
@@ -95,6 +96,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/trafego", api.TrafficHandler(st))
 	srv.Handle("GET /api/sistema", api.SystemHandler(st))
 	srv.Handle("GET /api/conexoes", api.ConnectionsHandler(st))
+	srv.Handle("GET /api/banco/tamanho", api.DBSizeHandler(st, cfg.PGDSN != ""))
 	srv.Handle("GET /api/requisicoes", api.RequestsHandler(st))
 	srv.Handle("GET /api/requisicoes/rotas", api.RoutesHandler(st))
 	srv.Handle("GET /api/consultas", api.QueriesHandler(st))
@@ -161,6 +163,14 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		defer wg.Done()
 		orch.MonitorDocker(bgCtx, dockerEvery)
 	}()
+	if cfg.PGDSN != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			dbsize.Run(bgCtx, dbsize.PGQuerier(cfg.PGDSN), st, dbsize.DefaultInterval, cfg.CheckRetention)
+		}()
+		slog.Info("tamanho do PostgreSQL ativo")
+	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
