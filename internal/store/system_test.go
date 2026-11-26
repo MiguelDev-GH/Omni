@@ -77,3 +77,33 @@ func TestPruneSystem(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.Equal(t, 2.0, got[0].CPUPercent)
 }
+
+func TestSystemSinceRoundTripsIO(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	io := sysmetrics.Snapshot{CPUPercent: 1, MemPercent: 2, DiskPercent: 3, IO: true,
+		ReadBps: 1000, WriteBps: 2000, IOPS: 30, DiskLatencyMS: 4, DiskBusy: 50, At: at}
+	noIO := sysSample(at.Add(5*time.Second), 1)
+	require.NoError(t, s.AddSystemSample(ctx, io))
+	require.NoError(t, s.AddSystemSample(ctx, noIO))
+
+	got, err := s.SystemSince(ctx, at, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, io, got[0])
+	assert.Equal(t, noIO, got[1])
+
+	// Na média por minuto, io vale se alguma leitura do minuto tinha I/O, e
+	// as taxas são a média só dessas leituras.
+	avg, err := s.SystemSince(ctx, at, time.Minute, 10)
+	require.NoError(t, err)
+	require.Len(t, avg, 1)
+	assert.True(t, avg[0].IO)
+	assert.InDelta(t, 30.0, avg[0].IOPS, 1e-9)
+
+	between, err := s.SystemBetween(ctx, at, at.Add(time.Minute), time.Minute)
+	require.NoError(t, err)
+	require.Len(t, between, 1)
+	assert.InDelta(t, 4.0, between[0].DiskLatencyMS, 1e-9)
+}

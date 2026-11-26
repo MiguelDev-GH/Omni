@@ -327,3 +327,37 @@ func TestWatcherKeepsDNSAndSMTPPortsOnRefresh(t *testing.T) {
 		t.Fatalf("estado da porta DNS esquecido: %+v, janela %v", statuses, w.probes)
 	}
 }
+
+func TestWatcherDiskLatency(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 60; i++ {
+		at := t0.Add(time.Duration(i) * time.Second)
+		w.handle(context.Background(), mkEvent(eventSystem, map[string]any{
+			"cpu": 1, "memoria": 1, "disco": 1, "io": true, "latencia_disco_ms": 150, "hora": at,
+		}), at)
+	}
+	var red bool
+	for _, a := range *got {
+		if a.Rule == RuleDiskLatency && a.Level == Red {
+			red = true
+		}
+	}
+	if !red {
+		t.Fatalf("latência de disco em 150 ms por 1 min deveria ficar vermelha: %+v", *got)
+	}
+}
+
+func TestWatcherDiskLatencyIgnoredWithoutIO(t *testing.T) {
+	w, got := newTestWatcher(DefaultRules(), nil)
+	for i := 0; i <= 60; i++ {
+		at := t0.Add(time.Duration(i) * time.Second)
+		w.handle(context.Background(), mkEvent(eventSystem, map[string]any{
+			"cpu": 1, "memoria": 1, "disco": 1, "io": false, "latencia_disco_ms": 999, "hora": at,
+		}), at)
+	}
+	for _, a := range *got {
+		if a.Rule == RuleDiskLatency {
+			t.Fatalf("sem io não deveria haver amostra de latência: %+v", a)
+		}
+	}
+}

@@ -59,6 +59,7 @@ const (
 	RuleCPU          = "sistema_cpu"
 	RuleMemory       = "sistema_memoria"
 	RuleDisk         = "sistema_disco"
+	RuleDiskLatency  = "sistema_latencia_disco"
 )
 
 // Rule define quando um valor vira amarelo ou vermelho. Um valor maior ou
@@ -150,5 +151,7 @@ func DefaultRules() []Rule {
 			Warn: 85, Crit: 95, For: time.Minute},
 		{ID: RuleDisk, Service: ServiceSystem, Name: "Uso de disco", Unit: "%",
 			Warn: 85, Crit: 95, For: time.Minute},
+		{ID: RuleDiskLatency, Service: ServiceSystem, Name: "Latência do disco", Unit: "ms",
+			Warn: 20, Crit: 100, For: time.Minute},
 	}
 }

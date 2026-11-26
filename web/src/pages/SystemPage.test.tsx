@@ -65,3 +65,27 @@ test("shows an empty state without samples and the engine states", async () => {
   expect(screen.getByText("Sniffer: inativo")).toBeInTheDocument();
   expect(screen.getByText("Poller: indisponível")).toBeInTheDocument();
 });
+
+const io = { io: true, leitura_bps: 2_097_152, escrita_bps: 1024, iops: 42.4, latencia_disco_ms: 35, disco_ocupado: 12 };
+
+test("shows disk throughput and latency when io is available", async () => {
+  renderPage([
+    { cpu: 10, memoria: 40, disco: 60, hora: at(2), ...io, latencia_disco_ms: 4 },
+    { cpu: 20, memoria: 41, disco: 60, hora: at(1), ...io },
+  ]);
+  expect(await screen.findByRole("img", { name: "Leitura e escrita do disco por segundo, 2 pontos" })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Latência do disco em ms, 2 pontos" })).toBeInTheDocument();
+  expect(screen.getByText("Leitura").nextElementSibling).toHaveTextContent("2,1 MB/s");
+  expect(screen.getByText("Escrita").nextElementSibling).toHaveTextContent("1 KB/s");
+  expect(screen.getByText("IOPS").nextElementSibling).toHaveTextContent("42,4");
+  const latency = screen.getByText("Latência do disco", { selector: "p" }).nextElementSibling;
+  expect(latency).toHaveTextContent("35 ms");
+  expect(latency).toHaveClass("text-aviso");
+});
+
+test("hides the I/O cards when io is false", async () => {
+  renderPage();
+  await screen.findByRole("img", { name: "CPU em percentual, 2 pontos" });
+  expect(screen.queryByText("IOPS")).not.toBeInTheDocument();
+  expect(screen.getByText(/I\/O do disco indisponível/)).toBeInTheDocument();
+});
