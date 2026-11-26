@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { Capture } from "../api/captures";
+import CaptureFile from "../components/CaptureFile";
+import CaptureRecorder from "../components/CaptureRecorder";
 import { Notice, PageHeader, Stat } from "../components/Card";
 import PacketTable, { count, type PacketRow } from "../components/PacketTable";
 import Select from "../components/Select";
@@ -41,13 +44,16 @@ export default function InspectorPage() {
   const [protoField, setProtoField] = useState("");
   const [filterError, setFilterError] = useState("");
   const [selected, setSelected] = useState<Row | null>(null);
+  // opened é a gravação aberta na tabela; com ela, o fluxo ao vivo para.
+  const [opened, setOpened] = useState<Capture | null>(null);
   const nextId = useRef(0);
   const acks = useRef<AckIndex>(new Map());
 
-  // Assina enquanto a página está aberta e não pausada; sair da página ou
-  // pausar manda ativo:false.
+  // Assina enquanto a página está aberta, não pausada e sem gravação aberta;
+  // sair da página, pausar ou abrir uma gravação manda ativo:false.
+  const live = !paused && opened === null;
   useEffect(() => {
-    if (paused) return;
+    if (!live) return;
     setInspector(true, filter);
     const off = onPackets((b) => {
       const batch = linkAcks(
@@ -65,7 +71,7 @@ export default function InspectorPage() {
       off();
       setInspector(false, filter);
     };
-  }, [paused, filter]);
+  }, [live, filter]);
 
   function applyFilter(e: FormEvent) {
     e.preventDefault();
@@ -93,19 +99,21 @@ export default function InspectorPage() {
       <PageHeader
         title="Inspetor de pacotes"
         aside={
-          <div className="flex gap-2">
-            <button type="button" className="botao-leve" onClick={clear}>
-              Limpar
-            </button>
-            <button type="button" className="botao" aria-pressed={paused} onClick={() => setPaused((p) => !p)}>
-              {paused ? "Retomar" : "Pausar"}
-            </button>
-          </div>
+          opened === null && (
+            <div className="flex gap-2">
+              <button type="button" className="botao-leve" onClick={clear}>
+                Limpar
+              </button>
+              <button type="button" className="botao" aria-pressed={paused} onClick={() => setPaused((p) => !p)}>
+                {paused ? "Retomar" : "Pausar"}
+              </button>
+            </div>
+          )
         }
       >
         Os pacotes das portas dos alvos, ao vivo, um por linha. No HTTP aparecem só o método e a rota, e no PostgreSQL só o
         tipo da mensagem: cabeçalhos, corpos e consultas nunca saem do servidor. A tabela guarda os últimos{" "}
-        {count(MAX_ROWS)} pacotes.
+        {count(MAX_ROWS)} pacotes. Para guardar o tráfego, grave em .pcap com o filtro aplicado, mais abaixo.
       </PageHeader>
 
       {sniffer !== "ativo" && (
@@ -156,17 +164,34 @@ export default function InspectorPage() {
         )}
       </form>
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
-        <Stat label="Na tabela" value={count(rows.length)} />
-        <Stat label="Descartados" value={count(dropped)} tone={dropped > 0 ? "text-aviso" : undefined} />
-        <Stat label="Fluxo" value={paused ? "pausado" : "ao vivo"} tone={paused ? "text-suave" : "text-destaque"} />
-      </div>
+      {opened ? (
+        <CaptureFile key={opened.id} capture={opened} onClose={() => setOpened(null)} />
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-4 sm:gap-6">
+            <Stat label="Na tabela" value={count(rows.length)} />
+            <Stat label="Descartados" value={count(dropped)} tone={dropped > 0 ? "text-aviso" : undefined} />
+            <Stat label="Fluxo" value={paused ? "pausado" : "ao vivo"} tone={paused ? "text-suave" : "text-destaque"} />
+          </div>
 
-      <PacketTable
-        rows={rows}
-        empty={paused ? "Pausado. Retome para ver os pacotes novos." : "Esperando pacotes…"}
-        selected={selected}
-        onSelect={setSelected}
+          <PacketTable
+            rows={rows}
+            empty={paused ? "Pausado. Retome para ver os pacotes novos." : "Esperando pacotes…"}
+            selected={selected}
+            onSelect={setSelected}
+          />
+        </>
+      )}
+
+      <CaptureRecorder
+        filter={filter}
+        canRecord={sniffer === "ativo"}
+        openedId={opened?.id ?? null}
+        onOpen={(c) => {
+          setOpened(c);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        onDeleted={(id) => setOpened((o) => (o?.id === id ? null : o))}
       />
     </div>
   );

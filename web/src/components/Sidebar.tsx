@@ -22,7 +22,6 @@ const routes: Record<string, string> = {
   "Comparação entre scans": "/relatorios",
   Sistema: "/sistema",
   "Inspetor de pacotes": "/inspetor",
-  Capturas: "/capturas",
 };
 
 // Só o primeiro item de cada rota acende como ativo, para a seção atual
@@ -45,7 +44,7 @@ const linkClass =
 
 const sections = [
   { title: "Monitoramento", items: ["Geral", "Alertas", "Requisições na API", "Consultas no banco", "DNS", "SMTP", "Status HTTP", "Sistema"] },
-  { title: "Tráfego", items: ["Inspetor de pacotes", "Capturas"] },
+  { title: "Tráfego", items: ["Inspetor de pacotes"] },
   { title: "Arsenal", items: ["Visão geral", "Nmap", "Nuclei", "Nikto", "SQLMap", "ffuf", "Amass", "testssl", "Vazamentos"] },
   { title: "Relatórios", items: ["Histórico", "Comparação entre scans", "Exportação em PDF"] },
 ];

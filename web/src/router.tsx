@@ -1,8 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import Layout from "./components/Layout";
 import AlertsPage from "./pages/AlertsPage";
-import CaptureInspectorPage from "./pages/CaptureInspectorPage";
-import CapturesPage from "./pages/CapturesPage";
 import InspectorPage from "./pages/InspectorPage";
 import ArsenalPage from "./pages/ArsenalPage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -32,8 +30,8 @@ export const router = createBrowserRouter([
       { path: "/smtp", element: <ProbeServicePage kind="smtp" /> },
       { path: "/sistema", element: <SystemPage /> },
       { path: "/inspetor", element: <InspectorPage /> },
-      { path: "/inspetor/captura/:id", element: <CaptureInspectorPage /> },
-      { path: "/capturas", element: <CapturesPage /> },
+      // As gravações .pcap ficam no Inspetor; o endereço antigo leva até ele.
+      { path: "/capturas", element: <Navigate to="/inspetor" replace /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

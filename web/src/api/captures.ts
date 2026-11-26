@@ -1,5 +1,5 @@
 import { useAppStore } from "../store/app";
-import type { Packet } from "../realtime/inspector";
+import type { InspectorFilter, Packet } from "../realtime/inspector";
 import { ApiError, apiFetch } from "./client";
 
 // Capture é uma gravação .pcap, como o backend devolve (internal/capture).
@@ -8,8 +8,11 @@ export type Capture = {
   inicio: string;
   fim?: string;
   duracao_s: number;
-  // porta 0 grava todas as portas dos alvos.
+  // ip, porta e protocolo são o filtro do Inspetor usado na gravação; vazios
+  // (e porta 0) gravam tudo o que o sniffer vê.
+  ip: string;
   porta: number;
+  protocolo: string;
   pacotes: number;
   bytes: number;
   descartados: number;
@@ -26,8 +29,14 @@ export function listCaptures(): Promise<Capture[]> {
   return apiFetch<Capture[]>("/api/capturas");
 }
 
-export function startCapture(duracao_s: number, porta: number): Promise<{ id: number }> {
-  return apiFetch<{ id: number }>("/api/capturas", { method: "POST", body: JSON.stringify({ duracao_s, porta }) });
+export function startCapture(duracao_s: number, filtro: InspectorFilter): Promise<{ id: number }> {
+  return apiFetch<{ id: number }>("/api/capturas", { method: "POST", body: JSON.stringify({ duracao_s, filtro }) });
+}
+
+// describeFilter resume o filtro de uma gravação numa linha.
+export function describeFilter(f: InspectorFilter): string {
+  const parts = [f.ip, f.porta ? `porta ${f.porta}` : "", f.protocolo].filter(Boolean);
+  return parts.length === 0 ? "todo o tráfego" : parts.join(" · ");
 }
 
 export function deleteCapture(id: number): Promise<void> {
