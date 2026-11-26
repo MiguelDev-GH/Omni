@@ -60,6 +60,10 @@ const (
 	RuleMemory       = "sistema_memoria"
 	RuleDisk         = "sistema_disco"
 	RuleDiskLatency  = "sistema_latencia_disco"
+	// Regras do DNS e do SMTP medidos no tráfego real.
+	RuleDNSTrafficFailures = "dns_falhas_trafego"
+	RuleSMTPRejections     = "smtp_rejeicoes"
+	RuleSMTPQueue          = "smtp_fila"
 )
 
 // Rule define quando um valor vira amarelo ou vermelho. Um valor maior ou
@@ -133,6 +137,12 @@ func DefaultRules() []Rule {
 			Warn: 20, Crit: 50},
 		{ID: RuleSMTPNoTLS, Service: ServiceSMTP, Name: "SMTP sem STARTTLS", Unit: "",
 			Warn: 1, Crit: 2},
+		{ID: RuleDNSTrafficFailures, Service: ServiceDNS, Name: "Falhas de resolução no tráfego", Unit: "%",
+			Warn: 5, Crit: 20, For: 30 * time.Second},
+		{ID: RuleSMTPRejections, Service: ServiceSMTP, Name: "Taxa de rejeição de e-mails", Unit: "%",
+			Warn: 10, Crit: 30, For: 30 * time.Second},
+		{ID: RuleSMTPQueue, Service: ServiceSMTP, Name: "Tamanho da fila de e-mails", Unit: "msgs",
+			Warn: 50, Crit: 200, For: 5 * time.Minute},
 		{ID: RuleAuthFailIP, Service: ServiceSecurity, Name: "Logins falhos por IP (brute-force)", Unit: "/min",
 			Warn: 10, Crit: 30},
 		{ID: RuleAuthFailUser, Service: ServiceSecurity, Name: "Logins falhos por conta", Unit: "/min",

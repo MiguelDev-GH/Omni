@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/MiguelDev-GH/omni/internal/mailqueue"
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 )
 
@@ -52,4 +53,20 @@ func TestSMTPWindowsRoundTrip(t *testing.T) {
 	got, err = s.SMTPSince(ctx, at, 10)
 	require.NoError(t, err)
 	assert.Empty(t, got)
+}
+
+func TestQueueSnapshotsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, s.AddQueueSnapshot(ctx, mailqueue.Snapshot{At: at, Messages: 3}))
+	require.NoError(t, s.AddQueueSnapshot(ctx, mailqueue.Snapshot{At: at.Add(30 * time.Second), Messages: 5}))
+	got, err := s.QueueSince(ctx, at, 10)
+	require.NoError(t, err)
+	assert.Equal(t, []mailqueue.Snapshot{{At: at, Messages: 3}, {At: at.Add(30 * time.Second), Messages: 5}}, got)
+
+	require.NoError(t, s.PruneQueue(ctx, at.Add(time.Second)))
+	got, err = s.QueueSince(ctx, at, 10)
+	require.NoError(t, err)
+	assert.Len(t, got, 1)
 }

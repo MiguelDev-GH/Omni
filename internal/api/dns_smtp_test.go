@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/MiguelDev-GH/omni/internal/mailqueue"
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 )
 
@@ -46,4 +47,26 @@ func TestSMTPHandler(t *testing.T) {
 
 	rec = do(t, srv, "GET", "/api/smtp?desde=x", "", true)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestSMTPQueueHandler(t *testing.T) {
+	srv, st := newTrafficServer(t)
+	srv.Handle("GET /api/smtp/fila", SMTPQueueHandler(st, true))
+	now := time.Now().UTC().Truncate(time.Second)
+	ctx := context.Background()
+	require.NoError(t, st.AddQueueSnapshot(ctx, mailqueue.Snapshot{At: now.Add(-time.Hour), Messages: 1}))
+	require.NoError(t, st.AddQueueSnapshot(ctx, mailqueue.Snapshot{At: now.Add(-time.Minute), Messages: 12}))
+
+	rec := do(t, srv, "GET", "/api/smtp/fila", "", true)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	got := decode[map[string]any](t, rec)
+	assert.Equal(t, true, got["configurado"])
+	counts := got["contagens"].([]any)
+	require.Len(t, counts, 1)
+	assert.Equal(t, 12.0, counts[0].(map[string]any)["mensagens"])
+
+	off, _ := newTrafficServer(t)
+	off.Handle("GET /api/smtp/fila", SMTPQueueHandler(st, false))
+	got = decode[map[string]any](t, do(t, off, "GET", "/api/smtp/fila", "", true))
+	assert.Equal(t, false, got["configurado"])
 }

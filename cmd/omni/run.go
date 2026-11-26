@@ -16,6 +16,7 @@ import (
 	"github.com/MiguelDev-GH/omni/internal/connstats"
 	"github.com/MiguelDev-GH/omni/internal/dbsize"
 	"github.com/MiguelDev-GH/omni/internal/discovery"
+	"github.com/MiguelDev-GH/omni/internal/mailqueue"
 	"github.com/MiguelDev-GH/omni/internal/orchestrator"
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/sniffer"
@@ -103,6 +104,7 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 	srv.Handle("GET /api/consultas/lentas", api.SlowQueriesHandler(st))
 	srv.Handle("GET /api/dns", api.DNSHandler(st))
 	srv.Handle("GET /api/smtp", api.SMTPHandler(st))
+	srv.Handle("GET /api/smtp/fila", api.SMTPQueueHandler(st, len(cfg.SMTPQueueDirs) > 0))
 	srv.Handle("GET /api/alertas/historico", api.AlertHistoryHandler(st))
 	srv.Handle("GET /api/alvos/{id}/relatorio", api.ReportHandler(st))
 	srv.Handle("GET /api/alertas", alerts.Handler(engine, alerts.EmailInfo{Enabled: cfg.Mail.Enabled(), Recipients: len(cfg.Mail.To)}))
@@ -165,6 +167,14 @@ func run(ctx context.Context, cfg config.Config, ln net.Listener) error {
 		defer wg.Done()
 		orch.MonitorDocker(bgCtx, dockerEvery)
 	}()
+	if len(cfg.SMTPQueueDirs) > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mailqueue.Run(bgCtx, pub, st, cfg.SMTPQueueDirs, mailqueue.DefaultInterval, cfg.CheckRetention)
+		}()
+		slog.Info("fila do SMTP ativa", "diretorios", len(cfg.SMTPQueueDirs))
+	}
 	if cfg.PGDSN != "" {
 		wg.Add(1)
 		go func() {

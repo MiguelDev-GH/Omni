@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/MiguelDev-GH/omni/internal/mailqueue"
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
 )
 
@@ -110,4 +111,47 @@ func nonNilCounts(m map[string]uint64) map[string]uint64 {
 		return map[string]uint64{}
 	}
 	return m
+}
+
+// AddQueueSnapshot grava uma contagem da fila do SMTP; a mesma hora, em
+// milissegundos, substitui a anterior.
+func (s *Store) AddQueueSnapshot(ctx context.Context, snap mailqueue.Snapshot) error {
+	_, err := s.db.ExecContext(ctx, `INSERT OR REPLACE INTO smtp_queue (time_ms, messages) VALUES (?, ?)`,
+		snap.At.UnixMilli(), snap.Messages)
+	return err
+}
+
+// QueueSince devolve as limit contagens mais recentes com hora >= since, em
+// ordem cronológica.
+func (s *Store) QueueSince(ctx context.Context, since time.Time, limit int) ([]mailqueue.Snapshot, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT time_ms, messages FROM smtp_queue WHERE time_ms >= ? ORDER BY time_ms DESC LIMIT ?`,
+		since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []mailqueue.Snapshot{}
+	for rows.Next() {
+		var (
+			snap mailqueue.Snapshot
+			ms   int64
+		)
+		if err := rows.Scan(&ms, &snap.Messages); err != nil {
+			return nil, err
+		}
+		snap.At = time.UnixMilli(ms).UTC()
+		list = append(list, snap)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// PruneQueue apaga as contagens da fila anteriores a before.
+func (s *Store) PruneQueue(ctx context.Context, before time.Time) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM smtp_queue WHERE time_ms < ?", before.UnixMilli())
+	return err
 }
