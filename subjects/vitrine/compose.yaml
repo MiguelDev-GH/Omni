@@ -1,0 +1,23 @@
+# Banco da vitrine cobaia. Usa a rede do host para que o tráfego app → banco
+# passe pela interface lo, onde o sniffer do Omni captura.
+name: vitrine-cobaia
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    network_mode: host
+    command: ["postgres", "-p", "5434", "-c", "listen_addresses=127.0.0.1", "-c", "ssl=off"]
+    environment:
+      POSTGRES_USER: vitrine
+      POSTGRES_PASSWORD: vitrine-cobaia
+      POSTGRES_DB: vitrine
+    volumes:
+      - vitrine-dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "5434", "-U", "vitrine"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  vitrine-dados:

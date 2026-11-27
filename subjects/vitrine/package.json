@@ -1,0 +1,40 @@
+{
+  "name": "vitrine-cobaia",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Loja online cobaia, com interface, falhas de propósito e comandos que simulam ataques contra ela",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "banco": "docker compose up -d --wait",
+    "banco:parar": "docker compose down",
+    "banco:apagar": "docker compose down -v",
+    "dev": "node scripts/dev.js",
+    "api": "node server/index.js",
+    "web": "vite",
+    "build": "vite build",
+    "trafego": "node scripts/trafego.js",
+    "cadastrar": "node scripts/cadastrar.js",
+    "ataque:ddos": "node scripts/ataques/ddos.js",
+    "ataque:forca-bruta": "node scripts/ataques/forca-bruta.js",
+    "ataque:spraying": "node scripts/ataques/spraying.js",
+    "ataque:varredura": "node scripts/ataques/varredura.js",
+    "ataque:idor": "node scripts/ataques/idor.js",
+    "ataque:sqli": "node scripts/ataques/sqli.js",
+    "ataque:lento": "node scripts/ataques/lento.js",
+    "ataque:derrubar": "node scripts/ataques/derrubar.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "pg": "8.13.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "6.0.7"
+  }
+}

@@ -109,12 +109,12 @@ make build               # compila a interface e gera ./omni
 ```bash
 export OMNI_TOKEN=$(openssl rand -hex 32)   # mínimo de 32 caracteres
 echo $OMNI_TOKEN                            # guarde: é a senha do painel
-OMNI_ADDR=127.0.0.1:8080 make backend       # pede a senha do sudo (setcap)
+OMNI_ADDR=127.0.0.1:8080 make init-reset    # pede a senha do sudo (setcap)
 ```
 
 Abra <http://127.0.0.1:8080> e informe o token. Ctrl+C encerra o Omni.
 
-Sem `OMNI_ADDR`, o Omni escolhe uma porta livre a cada execução, e o endereço sai no log (`painel=http://127.0.0.1:<porta>`). Sem `make backend`, o binário roda com `./omni`, mas o sniffer fica em `sem-permissao` até você aplicar `sudo setcap cap_net_raw,cap_net_admin=eip ./omni`.
+Sem `OMNI_ADDR`, o Omni escolhe uma porta livre a cada execução, e o endereço sai no log (`painel=http://127.0.0.1:<porta>`). Sem `make init-reset`, o binário roda com `./omni`, mas o sniffer fica em `sem-permissao` até você aplicar `sudo setcap cap_net_raw,cap_net_admin=eip ./omni`.
 
 #### 4. Testar com a aplicação cobaia
 
@@ -431,9 +431,11 @@ Para desenvolver a interface com recarga automática, `make dev` sobe o backend 
 OMNI_TOKEN=<token> make dev
 ```
 
-Para subir só o backend com um token aleatório novo, `make backend` compila o binário, aplica `setcap` com `sudo` (para a captura de pacotes), gera o `OMNI_TOKEN`, imprime no terminal e inicia o Omni. Se `OMNI_TOKEN` já estiver no ambiente, ele é reaproveitado.
+Para subir só o backend com um token aleatório novo, `make init-reset` compila o binário, aplica `setcap` com `sudo` (para a captura de pacotes), gera o `OMNI_TOKEN`, imprime no terminal e inicia o Omni. Se `OMNI_TOKEN` já estiver no ambiente, ele é reaproveitado.
 
-`make loja` sobe a loja cobaia (PostgreSQL, Caddy, API e carga) até Ctrl+C, sem credenciais: ela não conhece o Omni. `make loja port=3001` troca a porta da API (padrão 3000) e o Caddy acompanha. Para cadastrar os alvos no Omni, rode `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja-cadastrar` (token e porta saem no terminal do `make backend`) ou use a página de Alvos.
+`make loja` sobe a loja cobaia (PostgreSQL, Caddy, API e carga) até Ctrl+C, sem credenciais: ela não conhece o Omni. `make loja port=3001` troca a porta da API (padrão 3000) e o Caddy acompanha. Para cadastrar os alvos no Omni, rode `OMNI_TOKEN=<token> OMNI_URL=http://127.0.0.1:<porta> make loja-cadastrar` (token e porta saem no terminal do `make init-reset`) ou use a página de Alvos.
+
+`make vitrine` sobe a vitrine, uma loja online com interface em <http://127.0.0.1:5180> e falhas de propósito; `make vitrine-cadastrar` cria o alvo no Omni e `make vitrine-ataque a=ddos` (ou `forca-bruta`, `spraying`, `varredura`, `idor`, `sqli`, `lento`, `derrubar`) simula um ataque. O passo a passo está em [subjects/vitrine](subjects/vitrine/README.md).
 
 **Barra superior:** seletor global de alvo, estado dos motores (Sniffer, Poller, Docker), troca de tema e botão Sair. Os avisos (quedas, alertas, fim de varreduras) aparecem como notificações flutuantes no canto da tela.
 
