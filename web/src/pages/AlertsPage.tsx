@@ -43,11 +43,12 @@ const levelText: Record<Level, string> = {
 const timeFmt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium" });
 const formatTime = (iso: string) => timeFmt.format(new Date(iso));
 
+// LevelBadge mostra o nível só com o ponto colorido; o nome fica no title e
+// no rótulo acessível.
 export function LevelBadge({ level }: { level: Level }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${levelText[level]}`}>
-      <span aria-hidden="true" className={`size-1.5 rounded-full ${levelDot[level]}`} />
-      {levelLabel[level]}
+    <span role="img" aria-label={levelLabel[level]} title={levelLabel[level]} className="inline-flex items-center">
+      <span className={`size-2 rounded-full ${levelDot[level]}`} />
     </span>
   );
 }
@@ -215,8 +216,11 @@ export default function AlertsPage() {
                   <tr key={a.id} className="align-top">
                     <td className="pr-3 font-mono text-xs whitespace-nowrap text-suave tabular-nums">{formatTime(a.hora)}</td>
                     <td className="pr-3 whitespace-nowrap">
-                      <LevelBadge level={a.nivel} />
-                      <span className="text-xs text-apagado"> (era {levelLabel[a.nivel_anterior].toLowerCase()})</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <LevelBadge level={a.nivel_anterior} />
+                        <span aria-hidden="true" className="text-xs text-apagado">→</span>
+                        <LevelBadge level={a.nivel} />
+                      </span>
                     </td>
                     <td className="pr-3">{a.nome}</td>
                     <td className="pr-3 font-mono text-xs">{a.recurso || serviceTitle[a.servico] || a.servico}</td>
