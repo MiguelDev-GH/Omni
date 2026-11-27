@@ -59,7 +59,7 @@ test("groups the current level by service", async () => {
   renderPage();
   const web = await screen.findByRole("region", { name: "Web server" });
   await within(web).findByText("fora do ar");
-  expect(within(web).getAllByText("Vermelho").length).toBeGreaterThan(0);
+  expect(within(web).getAllByRole("img", { name: "Vermelho" }).length).toBeGreaterThan(0);
   expect(within(web).getByText(/loja:3000/)).toBeInTheDocument();
 
   const sys = screen.getByRole("region", { name: "Sistema" });
@@ -77,7 +77,7 @@ test("shows the history and the e-mail state", async () => {
   expect(rows).toHaveLength(1);
   expect(rows[0]).toHaveTextContent("Disponibilidade");
   expect(rows[0]).toHaveTextContent("connection refused");
-  expect(rows[0]).toHaveTextContent("era verde");
+  expect(within(rows[0]!).getAllByRole("img").map((el) => el.getAttribute("aria-label"))).toEqual(["Verde", "Vermelho"]);
   expect(screen.getByRole("note")).toHaveTextContent("Notificação por e-mail desligada");
 });
 
@@ -89,7 +89,7 @@ test("live alerts update the page", async () => {
   );
   const rows = within(screen.getByRole("table", { name: "Histórico de alertas" })).getAllByRole("row").slice(1);
   expect(rows).toHaveLength(2);
-  expect(rows[0]).toHaveTextContent("era vermelho");
+  expect(within(rows[0]!).getAllByRole("img").map((el) => el.getAttribute("aria-label"))).toEqual(["Vermelho", "Verde"]);
   expect(within(screen.getByRole("region", { name: "Web server" })).getByText("no ar")).toBeInTheDocument();
 });
 

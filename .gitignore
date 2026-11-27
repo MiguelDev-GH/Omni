@@ -10,3 +10,5 @@ internal/web/static/*
 !internal/web/static/placeholder.html
 .claude/*
 !.claude/skills/
+# anotações locais de teste
+infos.md
