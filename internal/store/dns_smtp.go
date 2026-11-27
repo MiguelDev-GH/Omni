@@ -25,9 +25,27 @@ func (s *Store) InsertDNSWindow(ctx context.Context, w l7.DNSWindow) error {
 // DNSSince devolve as limit janelas DNS mais recentes com início >= since,
 // em ordem cronológica.
 func (s *Store) DNSSince(ctx context.Context, since time.Time, limit int) ([]l7.DNSWindow, error) {
-	rows, err := s.db.QueryContext(ctx,
+	list, err := s.queryDNS(ctx,
 		`SELECT start_ms, queries, failures, by_rcode, p50_ms, p95_ms FROM dns_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// DNSBetween devolve as janelas DNS com from <= início < to, em ordem
+// cronológica, até maxGroupRows.
+func (s *Store) DNSBetween(ctx context.Context, from, to time.Time) ([]l7.DNSWindow, error) {
+	return s.queryDNS(ctx,
+		`SELECT start_ms, queries, failures, by_rcode, p50_ms, p95_ms FROM dns_windows
+		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
+		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+}
+
+func (s *Store) queryDNS(ctx context.Context, query string, args ...any) ([]l7.DNSWindow, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +67,7 @@ func (s *Store) DNSSince(ctx context.Context, since time.Time, limit int) ([]l7.
 		}
 		list = append(list, w)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	reverse(list)
-	return list, nil
+	return list, rows.Err()
 }
 
 // InsertSMTPWindow grava uma janela SMTP; uma janela com o mesmo início, em
@@ -74,9 +88,27 @@ func (s *Store) InsertSMTPWindow(ctx context.Context, w l7.SMTPWindow) error {
 // SMTPSince devolve as limit janelas SMTP mais recentes com início >= since,
 // em ordem cronológica.
 func (s *Store) SMTPSince(ctx context.Context, since time.Time, limit int) ([]l7.SMTPWindow, error) {
-	rows, err := s.db.QueryContext(ctx,
+	list, err := s.querySMTP(ctx,
 		`SELECT start_ms, attempts, delivered, rejected, aborted, by_code, p50_ms, p95_ms FROM smtp_windows
 		 WHERE start_ms >= ? ORDER BY start_ms DESC LIMIT ?`, since.UnixMilli(), limit)
+	if err != nil {
+		return nil, err
+	}
+	reverse(list)
+	return list, nil
+}
+
+// SMTPBetween devolve as janelas SMTP com from <= início < to, em ordem
+// cronológica, até maxGroupRows.
+func (s *Store) SMTPBetween(ctx context.Context, from, to time.Time) ([]l7.SMTPWindow, error) {
+	return s.querySMTP(ctx,
+		`SELECT start_ms, attempts, delivered, rejected, aborted, by_code, p50_ms, p95_ms FROM smtp_windows
+		 WHERE start_ms >= ? AND start_ms < ? ORDER BY start_ms LIMIT ?`,
+		from.UnixMilli(), to.UnixMilli(), maxGroupRows)
+}
+
+func (s *Store) querySMTP(ctx context.Context, query string, args ...any) ([]l7.SMTPWindow, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -98,11 +130,7 @@ func (s *Store) SMTPSince(ctx context.Context, since time.Time, limit int) ([]l7
 		}
 		list = append(list, w)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	reverse(list)
-	return list, nil
+	return list, rows.Err()
 }
 
 // nonNilCounts troca um mapa nil por um vazio, para o JSON sair "{}".
@@ -148,6 +176,32 @@ func (s *Store) QueueSince(ctx context.Context, since time.Time, limit int) ([]m
 	}
 	reverse(list)
 	return list, nil
+}
+
+// QueueBetween devolve o pico da fila do SMTP em cada intervalo de step
+// contado a partir de from, com from <= hora < to, em ordem cronológica.
+func (s *Store) QueueBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]mailqueue.Snapshot, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT MIN(time_ms), MAX(messages) FROM smtp_queue WHERE time_ms >= ?1 AND time_ms < ?2
+		 GROUP BY (time_ms - ?1) / ?3 ORDER BY 1`,
+		from.UnixMilli(), to.UnixMilli(), max(step.Milliseconds(), 1))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []mailqueue.Snapshot{}
+	for rows.Next() {
+		var (
+			snap mailqueue.Snapshot
+			ms   int64
+		)
+		if err := rows.Scan(&ms, &snap.Messages); err != nil {
+			return nil, err
+		}
+		snap.At = time.UnixMilli(ms).UTC()
+		list = append(list, snap)
+	}
+	return list, rows.Err()
 }
 
 // PruneQueue apaga as contagens da fila anteriores a before.

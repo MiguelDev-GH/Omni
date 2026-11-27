@@ -3,11 +3,15 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
 	"sort"
 	"time"
 
 	"github.com/MiguelDev-GH/omni/internal/alerts"
+	"github.com/MiguelDev-GH/omni/internal/connstats"
+	"github.com/MiguelDev-GH/omni/internal/dbsize"
 	"github.com/MiguelDev-GH/omni/internal/findings"
+	"github.com/MiguelDev-GH/omni/internal/mailqueue"
 	"github.com/MiguelDev-GH/omni/internal/poller"
 	"github.com/MiguelDev-GH/omni/internal/sniffer"
 	"github.com/MiguelDev-GH/omni/internal/sniffer/l7"
@@ -35,6 +39,11 @@ type ReportStore interface {
 	HTTPBetween(ctx context.Context, from, to time.Time) ([]l7.HTTPWindow, error)
 	DBBetween(ctx context.Context, from, to time.Time) ([]l7.DBWindow, error)
 	SystemBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]sysmetrics.Snapshot, error)
+	DNSBetween(ctx context.Context, from, to time.Time) ([]l7.DNSWindow, error)
+	SMTPBetween(ctx context.Context, from, to time.Time) ([]l7.SMTPWindow, error)
+	QueueBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]mailqueue.Snapshot, error)
+	ConnectionsBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]connstats.Snapshot, error)
+	DBSizesBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]dbsize.Sample, error)
 	WorstAlertsBetween(ctx context.Context, from, to time.Time, limit int) ([]alerts.Alert, error)
 	AlertSummaryBetween(ctx context.Context, from, to time.Time) ([]store.AlertRuleSummary, error)
 	ListScans(ctx context.Context, targetID int64) ([]store.Scan, error)
@@ -59,10 +68,13 @@ type ReportScan struct {
 
 // Report é a resposta de GET /api/alvos/{id}/relatorio.
 type Report struct {
-	Target   target.Target `json:"alvo"`
-	From     time.Time     `json:"desde"`
-	To       time.Time     `json:"ate"`
-	StepSecs int64         `json:"passo_s"`
+	Target target.Target `json:"alvo"`
+	// Server é o nome da máquina onde o Omni roda, que identifica o relatório
+	// quando o alvo é verificado por 127.0.0.1. Vazio se não der para ler.
+	Server   string    `json:"servidor"`
+	From     time.Time `json:"desde"`
+	To       time.Time `json:"ate"`
+	StepSecs int64     `json:"passo_s"`
 	// AlertCounts conta todas as mudanças de nível do intervalo pelo nível de
 	// chegada; AlertSummary faz o mesmo por regra.
 	AlertCounts  map[alerts.Level]int     `json:"contagem_alertas"`
@@ -75,6 +87,11 @@ type Report struct {
 	HTTP    []l7.HTTPWindow       `json:"http"`
 	DB      []l7.DBWindow         `json:"banco"`
 	System  []sysmetrics.Snapshot `json:"sistema"`
+	DNS     []l7.DNSWindow        `json:"dns"`
+	SMTP    []l7.SMTPWindow       `json:"smtp"`
+	Queue   []mailqueue.Snapshot  `json:"fila_smtp"`
+	Conns   []connstats.Snapshot  `json:"conexoes"`
+	DBSizes []dbsize.Sample       `json:"tamanho_banco"`
 	Scans   []ReportScan          `json:"varreduras"`
 }
 
@@ -87,7 +104,8 @@ func reportStep(window time.Duration) time.Duration {
 // ReportHandler responde GET /api/alvos/{id}/relatorio?desde=&ate= com o que o
 // PDF precisa: alertas, disponibilidade, séries dos gráficos agrupadas em até
 // 300 pontos e as varreduras do alvo criadas no intervalo. Tráfego, HTTP,
-// banco e sistema são do servidor inteiro, não só do alvo. Intervalo máximo de
+// banco, DNS, SMTP, conexões e sistema são do servidor inteiro, não só do
+// alvo. Intervalo máximo de
 // 168 h; sem parâmetros, as últimas 24 h.
 func ReportHandler(rs ReportStore) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -114,8 +132,9 @@ func buildReport(ctx context.Context, rs ReportStore, id int64, from, to time.Ti
 		return Report{}, err
 	}
 	step := reportStep(to.Sub(from))
+	server, _ := os.Hostname()
 	rep := Report{
-		Target: t, From: from.UTC(), To: to.UTC(), StepSecs: int64(step / time.Second),
+		Target: t, Server: server, From: from.UTC(), To: to.UTC(), StepSecs: int64(step / time.Second),
 		AlertCounts: map[alerts.Level]int{alerts.Green: 0, alerts.Yellow: 0, alerts.Red: 0},
 	}
 
@@ -157,6 +176,28 @@ func buildReport(ctx context.Context, rs ReportStore, id int64, from, to time.Ti
 	rep.DB = bucketDB(dbWins, from, step)
 
 	if rep.System, err = rs.SystemBetween(ctx, from, to, step); err != nil {
+		return rep, err
+	}
+
+	dnsWins, err := rs.DNSBetween(ctx, from, to)
+	if err != nil {
+		return rep, err
+	}
+	rep.DNS = bucketDNS(dnsWins, from, step)
+
+	smtpWins, err := rs.SMTPBetween(ctx, from, to)
+	if err != nil {
+		return rep, err
+	}
+	rep.SMTP = bucketSMTP(smtpWins, from, step)
+
+	if rep.Queue, err = rs.QueueBetween(ctx, from, to, step); err != nil {
+		return rep, err
+	}
+	if rep.Conns, err = rs.ConnectionsBetween(ctx, from, to, step); err != nil {
+		return rep, err
+	}
+	if rep.DBSizes, err = rs.DBSizesBetween(ctx, from, to, step); err != nil {
 		return rep, err
 	}
 
@@ -312,7 +353,7 @@ func bucketTraffic(list []sniffer.Window, from time.Time, step time.Duration) []
 	return out
 }
 
-// bucketHTTP soma requisições e status por faixa. Os percentis viram a média
+// bucketHTTP soma requisições, status e códigos por faixa. Os percentis viram a média
 // dos percentis das janelas ponderada pelas requisições, uma aproximação.
 func bucketHTTP(list []l7.HTTPWindow, from time.Time, step time.Duration) []l7.HTTPWindow {
 	out := []l7.HTTPWindow{}
@@ -320,13 +361,14 @@ func bucketHTTP(list []l7.HTTPWindow, from time.Time, step time.Duration) []l7.H
 	for _, w := range list {
 		if s := slot(w.Start, from, step); s != cur {
 			cur = s
-			out = append(out, l7.HTTPWindow{Start: w.Start, ByStatus: map[string]uint64{}, Routes: []l7.RouteStats{}})
+			out = append(out, l7.HTTPWindow{Start: w.Start, ByStatus: map[string]uint64{}, ByCode: map[string]uint64{}, Routes: []l7.RouteStats{}})
 		}
 		b := &out[len(out)-1]
 		b.P50MS = weighted(b.P50MS, b.Requests, w.P50MS, w.Requests)
 		b.P95MS = weighted(b.P95MS, b.Requests, w.P95MS, w.Requests)
 		b.Requests += w.Requests
 		addCounts(b.ByStatus, w.ByStatus)
+		addCounts(b.ByCode, w.ByCode)
 	}
 	return out
 }
@@ -345,7 +387,49 @@ func bucketDB(list []l7.DBWindow, from time.Time, step time.Duration) []l7.DBWin
 		b.P95MS = weighted(b.P95MS, b.Queries, w.P95MS, w.Queries)
 		b.Queries += w.Queries
 		b.Errors += w.Errors
+		b.TxFailed += w.TxFailed
 		addCounts(b.ByKind, w.ByKind)
+	}
+	return out
+}
+
+// bucketDNS faz o mesmo que bucketHTTP para as janelas DNS.
+func bucketDNS(list []l7.DNSWindow, from time.Time, step time.Duration) []l7.DNSWindow {
+	out := []l7.DNSWindow{}
+	cur := int64(-1)
+	for _, w := range list {
+		if s := slot(w.Start, from, step); s != cur {
+			cur = s
+			out = append(out, l7.DNSWindow{Start: w.Start, ByRCode: map[string]uint64{}})
+		}
+		b := &out[len(out)-1]
+		b.P50MS = weighted(b.P50MS, b.Queries, w.P50MS, w.Queries)
+		b.P95MS = weighted(b.P95MS, b.Queries, w.P95MS, w.Queries)
+		b.Queries += w.Queries
+		b.Failures += w.Failures
+		addCounts(b.ByRCode, w.ByRCode)
+	}
+	return out
+}
+
+// bucketSMTP faz o mesmo que bucketHTTP para as janelas SMTP; os percentis
+// são ponderados pelas tentativas.
+func bucketSMTP(list []l7.SMTPWindow, from time.Time, step time.Duration) []l7.SMTPWindow {
+	out := []l7.SMTPWindow{}
+	cur := int64(-1)
+	for _, w := range list {
+		if s := slot(w.Start, from, step); s != cur {
+			cur = s
+			out = append(out, l7.SMTPWindow{Start: w.Start, ByCode: map[string]uint64{}})
+		}
+		b := &out[len(out)-1]
+		b.P50MS = weighted(b.P50MS, b.Attempts, w.P50MS, w.Attempts)
+		b.P95MS = weighted(b.P95MS, b.Attempts, w.P95MS, w.Attempts)
+		b.Attempts += w.Attempts
+		b.Delivered += w.Delivered
+		b.Rejected += w.Rejected
+		b.Aborted += w.Aborted
+		addCounts(b.ByCode, w.ByCode)
 	}
 	return out
 }

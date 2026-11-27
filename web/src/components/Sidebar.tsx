@@ -20,6 +20,7 @@ const routes: Record<string, string> = {
   testssl: "/arsenal/testssl",
   Histórico: "/relatorios",
   "Comparação entre scans": "/relatorios",
+  "Exportação em PDF": "/relatorios/pdf",
   Sistema: "/sistema",
   "Inspetor de pacotes": "/inspetor",
 };

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { TargetReport } from "../api/targetReport";
-import { buildReportPdf, niceMax, reportFileName } from "./reportPdf";
+import { buildReportPdf, isLoopback, niceMax, reportFileName } from "./reportPdf";
 
 const from = Date.parse("2026-11-24T00:00:00Z");
 const to = from + 24 * 3_600_000;
@@ -10,6 +10,7 @@ const slots = Array.from({ length: (to - from) / (step * 1000) }, (_, i) => from
 
 export function fixture(over: Partial<TargetReport> = {}): TargetReport {
   return {
+    servidor: "srv-loja-01",
     alvo: { id: 3, nome: "Loja Ação", host: "127.0.0.1", portas_app: [8080, 8443], porta_banco: 5432 },
     desde: iso(from),
     ate: iso(to),
@@ -36,9 +37,14 @@ export function fixture(over: Partial<TargetReport> = {}): TargetReport {
       { alvo_id: 3, porta: 8443, tipo: "http", no_ar: i < 24 || i > 32, latencia_ms: 60 + 30 * Math.cos(i / 7), hora: iso(s) },
     ]),
     trafego: slots.map((s, i) => ({ inicio: iso(s), bytes: 4e6 + 3e6 * Math.sin(i / 15), pacotes: 3000, descartados: 0, protocolos: { HTTP: 2e6 }, top_origens: [] })),
-    http: slots.map((s, i) => ({ inicio: iso(s), requisicoes: 600 + 200 * Math.sin(i / 20), status: { "2xx": 580, "5xx": i % 40 === 0 ? 20 : 0 }, p50_ms: 30, p95_ms: 120 + 40 * Math.sin(i / 9) })),
-    banco: slots.filter((_, i) => i < 120 || i > 160).map((s, i) => ({ inicio: iso(s), consultas: 300, erros: i % 50 === 0 ? 4 : 0, tipos: { SELECT: 300 }, p50_ms: 2, p95_ms: 9 })),
-    sistema: slots.map((s, i) => ({ hora: iso(s), cpu: 30 + 25 * Math.sin(i / 12), memoria: 61, disco: 44 })),
+    http: slots.map((s, i) => ({ inicio: iso(s), requisicoes: 600 + 200 * Math.sin(i / 20), status: { "2xx": 580, "5xx": i % 40 === 0 ? 20 : 0 }, codigos: { "404": 2, ...(i % 40 === 0 ? { "503": 20 } : {}) }, p50_ms: 30, p95_ms: 120 + 40 * Math.sin(i / 9) })),
+    banco: slots.filter((_, i) => i < 120 || i > 160).map((s, i) => ({ inicio: iso(s), consultas: 300, erros: i % 50 === 0 ? 4 : 0, tipos: { SELECT: 300 }, p50_ms: 2, p95_ms: 9, transacoes_falhas: i % 25 === 0 ? 1 : 0 })),
+    sistema: slots.map((s, i) => ({ hora: iso(s), cpu: 30 + 25 * Math.sin(i / 12), memoria: 61, disco: 44, io: true, leitura_bps: 2e5, escrita_bps: 5e5 + 1e5 * Math.sin(i / 8), iops: 40, latencia_disco_ms: 1.5, disco_ocupado: 12 })),
+    dns: slots.map((s, i) => ({ inicio: iso(s), consultas: 120, falhas: i % 30 === 0 ? 3 : 0, rcodes: { NOERROR: 117, NXDOMAIN: i % 30 === 0 ? 3 : 0 }, p50_ms: 4, p95_ms: 18 })),
+    smtp: slots.map((s, i) => ({ inicio: iso(s), tentativas: 10, entregues: 9, rejeitados: 1, abortados: 0, codigos: { "550": 1 }, p50_ms: 80, p95_ms: 240 + i })),
+    fila_smtp: slots.map((s, i) => ({ hora: iso(s), mensagens: 2 + (i % 12) })),
+    conexoes: slots.map((s, i) => ({ hora: iso(s), portas: [{ porta: 8080, tipo: "app" as const, estabelecidas: 20 + (i % 9), estados: {}, clientes: [] }, { porta: 5432, tipo: "banco" as const, estabelecidas: 8, estados: {}, clientes: [] }] })),
+    tamanho_banco: slots.map((s, i) => ({ banco: "loja", bytes: 5e8 + i * 1e5, hora: iso(s) })),
     varreduras: [
       {
         id: 12,
@@ -71,6 +77,29 @@ test("the PDF carries the target, alerts, uptime, scans and charts", () => {
   for (const s of ["Loja A", "127.0.0.1", "Alertas", "Disponibilidade", "Arsenal", "Painel de administra", "Varredura #13", "Tr", "Sistema", "98,96%"]) {
     expect(raw).toContain(s);
   }
+});
+
+test("the PDF carries the metrics added after the first report", () => {
+  const { raw } = text(fixture());
+  for (const s of ["Disco: leitura e escrita", "IOPS", "Conex", "Tamanho do banco", "Consultas DNS", "NXDOMAIN", "Envios SMTP", "550", "Fila do SMTP", "com falha", "404", "503"]) {
+    expect(raw).toContain(s);
+  }
+});
+
+test("the header names the server and marks a loopback host", () => {
+  const { raw } = text(fixture());
+  expect(raw).toContain("Servidor");
+  expect(raw).toContain("srv-loja-01");
+  expect(raw).toContain("127.0.0.1 \\(esta m");
+  const remote = text(fixture({ servidor: "", alvo: { id: 3, nome: "api", host: "10.0.0.5", portas_app: [80] } })).raw;
+  expect(remote).toContain("10.0.0.5");
+  expect(remote).not.toContain("esta m");
+  expect(remote).not.toContain("Servidor");
+});
+
+test("isLoopback covers IPv4, IPv6 and localhost", () => {
+  for (const h of ["127.0.0.1", "127.1.2.3", "::1", "[::1]", "localhost", " LOCALHOST "]) expect(isLoopback(h)).toBe(true);
+  for (const h of ["10.0.0.5", "loja.exemplo.com", "1270.0.0.1", ""]) expect(isLoopback(h)).toBe(false);
 });
 
 test("an attack with many IPs lists only the worst changes but keeps exact totals", () => {
@@ -114,6 +143,11 @@ test("an empty interval still produces a readable report", () => {
       http: [],
       banco: [],
       sistema: [],
+      dns: [],
+      smtp: [],
+      fila_smtp: [],
+      conexoes: [],
+      tamanho_banco: [],
       varreduras: [],
     }),
   );

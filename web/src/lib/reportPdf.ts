@@ -254,9 +254,53 @@ export function niceMax(v: number): number {
 
 const t = (iso: string) => new Date(iso).getTime();
 
+// sumCounts soma os mapas de contagem das janelas.
+function sumCounts(maps: (Record<string, number> | undefined)[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of maps) for (const [k, v] of Object.entries(m ?? {})) out[k] = (out[k] ?? 0) + v;
+  return out;
+}
+
+// topCounts lista as limit maiores contagens, como "404: 12, 500: 3".
+function topCounts(m: Record<string, number>, limit = 5): string {
+  return Object.entries(m)
+    .filter(([, v]) => v > 0)
+    .sort(([ka, a], [kb, b]) => b - a || ka.localeCompare(kb))
+    .slice(0, limit)
+    .map(([k, v]) => `${k}: ${num(v)}`)
+    .join(", ");
+}
+
+// bySeries agrupa os pontos pelo nome da série, uma cor por série.
+function bySeries(points: { name: string; t: number; v: number }[]): Series[] {
+  const groups = new Map<string, Point[]>();
+  for (const p of points) groups.set(p.name, [...(groups.get(p.name) ?? []), { t: p.t, v: p.v }]);
+  return [...groups.entries()].map(([name, pts], i) => ({ name, color: palette[i % palette.length] ?? accent, points: pts }));
+}
+
+// isLoopback diz se o host aponta para a própria máquina do Omni.
+export function isLoopback(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\.\d+\.\d+\.\d+$/.test(h);
+}
+
 function header(w: Writer, rep: TargetReport, generatedAt: Date) {
   const doc = w.doc;
-  doc.setFillColor(...tint).rect(0, 0, PAGE_W, 50, "F");
+  const from = new Date(rep.desde);
+  const to = new Date(rep.ate);
+  const ports = targetPorts(rep.alvo);
+  // Com 127.0.0.1 o host é igual em todo relatório; quem identifica a
+  // máquina é o nome do servidor.
+  const meta: [string, string][] = [
+    ["Host", isLoopback(rep.alvo.host) ? `${rep.alvo.host} (esta máquina)` : rep.alvo.host],
+    ["Portas", ports.length > 0 ? ports.join(", ") : "-"],
+    ["Intervalo", `${dateTime(from)} até ${dateTime(to)} (${durationText(to.getTime() - from.getTime())})`],
+    ["Gerado em", dateTime(generatedAt)],
+  ];
+  if (rep.alvo.dominio) meta.unshift(["Domínio", rep.alvo.dominio]);
+  if (rep.servidor) meta.unshift(["Servidor", rep.servidor]);
+
+  doc.setFillColor(...tint).rect(0, 0, PAGE_W, Math.max(50, 33 + meta.length * 4), "F");
   doc.setFont("helvetica", "bold").setFontSize(9);
   w.color(accent);
   doc.text("OMNI", MARGIN, 14);
@@ -267,16 +311,6 @@ function header(w: Writer, rep: TargetReport, generatedAt: Date) {
   w.color(ink);
   doc.text(rep.alvo.nome, MARGIN, 26);
 
-  const from = new Date(rep.desde);
-  const to = new Date(rep.ate);
-  const ports = targetPorts(rep.alvo);
-  const meta: [string, string][] = [
-    ["Host", rep.alvo.host],
-    ["Portas", ports.length > 0 ? ports.join(", ") : "-"],
-    ["Intervalo", `${dateTime(from)} até ${dateTime(to)} (${durationText(to.getTime() - from.getTime())})`],
-    ["Gerado em", dateTime(generatedAt)],
-  ];
-  if (rep.alvo.dominio) meta.splice(1, 0, ["Domínio", rep.alvo.dominio]);
   doc.setFontSize(8.5);
   let y = 33;
   for (const [k, v] of meta) {
@@ -290,7 +324,7 @@ function header(w: Writer, rep: TargetReport, generatedAt: Date) {
   }
   w.y = Math.max(56, y + 4);
   w.text(
-    "Alertas, tráfego, HTTP, banco e sistema refletem o servidor inteiro, não só este alvo. Disponibilidade e Arsenal são deste alvo. " +
+    "Alertas, tráfego, HTTP, banco, DNS, SMTP, conexões e sistema refletem o servidor inteiro, não só este alvo. Disponibilidade e Arsenal são deste alvo. " +
       "Nos gráficos, cada ponto agrupa uma faixa de tempo; o p50 e o p95 agrupados são uma aproximação.",
     { size: 8, color: soft, gap: 2 },
   );
@@ -430,8 +464,8 @@ function serverCharts(w: Writer, rep: TargetReport, from: number, to: number, st
   });
 
   const http = rep.http ?? [];
-  const status: Record<string, number> = {};
-  for (const x of http) for (const [k, v] of Object.entries(x.status ?? {})) status[k] = (status[k] ?? 0) + v;
+  const status = sumCounts(http.map((x) => x.status));
+  const codes = topCounts(sumCounts(http.map((x) => x.codigos)));
   const totalReq = http.reduce((s, x) => s + x.requisicoes, 0);
   const statusText = Object.entries(status)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -453,6 +487,7 @@ function serverCharts(w: Writer, rep: TargetReport, from: number, to: number, st
     stepMs,
     format: rate,
   });
+  if (codes) w.text(`Códigos de erro mais frequentes: ${codes}.`, { size: 8, color: soft, gap: 3 });
   w.chart({
     title: "Latência HTTP",
     series: [
@@ -468,12 +503,14 @@ function serverCharts(w: Writer, rep: TargetReport, from: number, to: number, st
   const db = rep.banco ?? [];
   const totalQ = db.reduce((s, x) => s + x.consultas, 0);
   const totalErr = db.reduce((s, x) => s + x.erros, 0);
+  const totalTx = db.reduce((s, x) => s + (x.transacoes_falhas ?? 0), 0);
   w.chart({
     title: "Consultas ao banco",
-    subtitle: `total ${num(totalQ)} · ${num(totalErr)} com erro`,
+    subtitle: `total ${num(totalQ)} · ${num(totalErr)} com erro · ${num(totalTx)} transaç${totalTx === 1 ? "ão" : "ões"} com falha`,
     series: [
       { name: "Consultas", color: palette[0], points: db.map((x) => ({ t: t(x.inicio), v: perMin(x.consultas) })) },
       { name: "Erros", color: danger, points: db.map((x) => ({ t: t(x.inicio), v: perMin(x.erros) })) },
+      { name: "Transações com falha", color: palette[1], points: db.map((x) => ({ t: t(x.inicio), v: perMin(x.transacoes_falhas ?? 0) })) },
     ],
     from,
     to,
@@ -507,6 +544,96 @@ function serverCharts(w: Writer, rep: TargetReport, from: number, to: number, st
     format: pct,
     yMax: 100,
   });
+
+  const io = sys.filter((x) => x.io);
+  const avg = (f: (x: (typeof io)[number]) => number) => (io.length > 0 ? io.reduce((n, x) => n + f(x), 0) / io.length : 0);
+  w.chart({
+    title: "Disco: leitura e escrita",
+    subtitle:
+      io.length > 0
+        ? `média ${num(avg((x) => x.iops ?? 0), 1)} IOPS · ${formatMs(avg((x) => x.latencia_disco_ms ?? 0))} por operação · ${num(avg((x) => x.disco_ocupado ?? 0))}% ocupado`
+        : "dispositivo do disco não encontrado",
+    series: [
+      { name: "Leitura", color: palette[3], points: io.map((x) => ({ t: t(x.hora), v: x.leitura_bps ?? 0 })) },
+      { name: "Escrita", color: palette[1], points: io.map((x) => ({ t: t(x.hora), v: x.escrita_bps ?? 0 })) },
+    ],
+    from,
+    to,
+    stepMs,
+    format: (v) => `${formatBytes(v)}/s`,
+  });
+
+  const conns = rep.conexoes ?? [];
+  w.chart({
+    title: "Conexões estabelecidas",
+    subtitle: "pico por faixa, por porta",
+    series: bySeries(conns.flatMap((c) => c.portas.map((p) => ({ name: `${p.porta}/${p.tipo}`, t: t(c.hora), v: p.estabelecidas })))),
+    from,
+    to,
+    stepMs,
+    format: (v) => num(v),
+  });
+
+  const sizes = rep.tamanho_banco ?? [];
+  if (sizes.length > 0) {
+    w.chart({
+      title: "Tamanho do banco",
+      subtitle: "maior medição por faixa",
+      series: bySeries(sizes.map((x) => ({ name: x.banco, t: t(x.hora), v: x.bytes }))).slice(0, palette.length),
+      from,
+      to,
+      stepMs,
+      format: formatBytes,
+    });
+  }
+
+  const dns = rep.dns ?? [];
+  const dnsQ = dns.reduce((n, x) => n + x.consultas, 0);
+  const dnsFail = dns.reduce((n, x) => n + x.falhas, 0);
+  const rcodes = topCounts(sumCounts(dns.map((x) => x.rcodes)));
+  w.chart({
+    title: "Consultas DNS",
+    subtitle: `total ${num(dnsQ)} · ${num(dnsFail)} com falha${rcodes ? ` (${rcodes})` : ""}`,
+    series: [
+      { name: "Consultas", color: palette[0], points: dns.map((x) => ({ t: t(x.inicio), v: perMin(x.consultas) })) },
+      { name: "Falhas", color: danger, points: dns.map((x) => ({ t: t(x.inicio), v: perMin(x.falhas) })) },
+    ],
+    from,
+    to,
+    stepMs,
+    format: rate,
+  });
+
+  const smtp = rep.smtp ?? [];
+  const sum = (f: (x: (typeof smtp)[number]) => number) => smtp.reduce((n, x) => n + f(x), 0);
+  const smtpCodes = topCounts(sumCounts(smtp.map((x) => x.codigos)));
+  w.chart({
+    title: "Envios SMTP",
+    subtitle: `${num(sum((x) => x.tentativas))} tentativas · ${num(sum((x) => x.entregues))} entregues · ${num(sum((x) => x.rejeitados))} rejeitados · ${num(sum((x) => x.abortados))} abortados`,
+    series: [
+      { name: "Tentativas", color: palette[0], points: smtp.map((x) => ({ t: t(x.inicio), v: perMin(x.tentativas) })) },
+      { name: "Entregues", color: palette[5], points: smtp.map((x) => ({ t: t(x.inicio), v: perMin(x.entregues) })) },
+      { name: "Rejeitados", color: danger, points: smtp.map((x) => ({ t: t(x.inicio), v: perMin(x.rejeitados) })) },
+    ],
+    from,
+    to,
+    stepMs,
+    format: rate,
+  });
+  if (smtpCodes) w.text(`Recusas mais frequentes: ${smtpCodes}.`, { size: 8, color: soft, gap: 3 });
+
+  const queue = rep.fila_smtp ?? [];
+  if (queue.length > 0) {
+    w.chart({
+      title: "Fila do SMTP",
+      subtitle: `pico por faixa · maior ${num(Math.max(...queue.map((x) => x.mensagens)))} mensagens`,
+      series: [{ name: "Mensagens", color: palette[2], points: queue.map((x) => ({ t: t(x.hora), v: x.mensagens })) }],
+      from,
+      to,
+      stepMs,
+      format: (v) => num(v),
+    });
+  }
 }
 
 function scanBlock(w: Writer, s: ReportScan) {

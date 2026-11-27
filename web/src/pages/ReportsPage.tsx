@@ -4,7 +4,6 @@ import { compareScan, listScans, scanFindings, severities, severityLabels, type 
 import { Card, InternalBadge, PageHeader } from "../components/Card";
 import FindingsDiff from "../components/FindingsDiff";
 import FindingsTable, { severityClasses } from "../components/FindingsTable";
-import ReportPdfForm from "../components/ReportPdfForm";
 import Select from "../components/Select";
 import { useAppStore } from "../store/app";
 import { statusLabels } from "../arsenal/common";
@@ -61,7 +60,6 @@ export default function ReportsPage() {
     );
   }, [opened, scanEvents]);
 
-  const selectedTarget = targets.find((t) => t.id === selected);
   const mine = (scans ?? []).filter((s) => s.alvo_id === selected);
   const shown = detail && detail.scanId === opened ? detail : null;
 
@@ -85,12 +83,6 @@ export default function ReportsPage() {
             options={targets.map((t) => ({ value: t.id, label: t.nome, hint: t.host }))}
           />
         </div>
-      )}
-
-      {selectedTarget && (
-        <Card title="Relatório em PDF" plane>
-          <ReportPdfForm target={selectedTarget} />
-        </Card>
       )}
 
       <Card title="Histórico de varreduras" plane>

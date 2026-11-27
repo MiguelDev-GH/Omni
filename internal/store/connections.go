@@ -76,6 +76,39 @@ func (s *Store) ConnectionsSince(ctx context.Context, since time.Time, limit int
 	return list, rows.Err()
 }
 
+// ConnectionsBetween devolve, por porta, o pico de conexões estabelecidas em
+// cada intervalo de step contado a partir de from, com from <= hora < to. A
+// hora de cada coleta é o início do intervalo; estados e clientes saem
+// vazios.
+func (s *Store) ConnectionsBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]connstats.Snapshot, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT ?1 + (time_ms - ?1) / ?3 * ?3 AS slot, port, kind, MAX(established) FROM conn_samples
+		 WHERE time_ms >= ?1 AND time_ms < ?2 GROUP BY slot, port, kind ORDER BY slot, port, kind`,
+		from.UnixMilli(), to.UnixMilli(), max(step.Milliseconds(), 1))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []connstats.Snapshot{}
+	for rows.Next() {
+		var (
+			ms int64
+			p  connstats.PortConns
+		)
+		if err := rows.Scan(&ms, &p.Port, &p.Kind, &p.Established); err != nil {
+			return nil, err
+		}
+		p.States, p.Clients = map[string]int{}, []connstats.ClientCount{}
+		at := time.UnixMilli(ms).UTC()
+		if n := len(list); n == 0 || !list[n-1].At.Equal(at) {
+			list = append(list, connstats.Snapshot{At: at, Ports: []connstats.PortConns{}})
+		}
+		last := &list[len(list)-1]
+		last.Ports = append(last.Ports, p)
+	}
+	return list, rows.Err()
+}
+
 // PruneConnections apaga as coletas anteriores a before.
 func (s *Store) PruneConnections(ctx context.Context, before time.Time) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM conn_samples WHERE time_ms < ?", before.UnixMilli())

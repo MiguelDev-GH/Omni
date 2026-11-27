@@ -53,6 +53,33 @@ func (s *Store) DBSizesSince(ctx context.Context, since time.Time) ([]dbsize.Sam
 	return list, rows.Err()
 }
 
+// DBSizesBetween devolve, por banco, o maior tamanho medido em cada intervalo
+// de step contado a partir de from, com from <= hora < to. A hora de cada
+// medição é o início do intervalo.
+func (s *Store) DBSizesBetween(ctx context.Context, from, to time.Time, step time.Duration) ([]dbsize.Sample, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT ?1 + (time_ms - ?1) / ?3 * ?3 AS slot, name, MAX(bytes) FROM db_sizes
+		 WHERE time_ms >= ?1 AND time_ms < ?2 GROUP BY slot, name ORDER BY slot, name`,
+		from.UnixMilli(), to.UnixMilli(), max(step.Milliseconds(), 1))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	list := []dbsize.Sample{}
+	for rows.Next() {
+		var (
+			m  dbsize.Sample
+			ms int64
+		)
+		if err := rows.Scan(&ms, &m.Name, &m.Bytes); err != nil {
+			return nil, err
+		}
+		m.At = time.UnixMilli(ms).UTC()
+		list = append(list, m)
+	}
+	return list, rows.Err()
+}
+
 // PruneDBSizes apaga as medições anteriores a before.
 func (s *Store) PruneDBSizes(ctx context.Context, before time.Time) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM db_sizes WHERE time_ms < ?", before.UnixMilli())

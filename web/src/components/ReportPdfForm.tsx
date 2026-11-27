@@ -58,8 +58,8 @@ export default function ReportPdfForm({ target }: { target: Target }) {
   return (
     <div className="space-y-4">
       <p className="max-w-3xl text-sm text-suave">
-        Alertas, disponibilidade das portas, varreduras do Arsenal com os achados e os gráficos de tráfego, HTTP, banco e sistema do
-        período. Os dados ficam guardados por até {MAX_REPORT_HOURS / 24} dias.
+        Alertas, disponibilidade das portas, varreduras do Arsenal com os achados e os gráficos de tráfego, HTTP, banco, sistema e
+        disco, conexões, DNS e SMTP do período. Os dados ficam guardados por até {MAX_REPORT_HOURS / 24} dias.
       </p>
       <div role="radiogroup" aria-label="Intervalo" className="inline-flex flex-wrap gap-1 rounded-lg bg-texto/5 p-1">
         {presets.map((p) => (
