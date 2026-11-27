@@ -444,6 +444,7 @@ Para subir só o backend com um token aleatório novo, `make init-reset` compila
 | `make build` | Compila a interface (`web/`) e gera o binário `./omni` com ela embutida. | Go, Node |
 | `make dev` | Sobe o backend e o Vite com recarga automática, cada um numa porta alta livre, e imprime o endereço do painel. Para desenvolver a interface. | Go, Node |
 | `make init-reset` | Compila o `./omni`, aplica `setcap` com `sudo` (libera a captura de pacotes) e sobe o Omni, gerando e imprimindo um `OMNI_TOKEN` novo (ou reaproveitando o do ambiente). Usa a interface já embutida. | Go, sudo; `OMNI_ADDR` opcional fixa a porta |
+| `make reset` | Apaga o estado do Omni (banco SQLite, capturas `.pcap` e linha de base de integridade), como se ele nunca tivesse rodado. Recusa rodar com o Omni no ar; os alvos somem e precisam ser recadastrados. | O Omni parado |
 | `make loja` | Sobe a loja cobaia (PostgreSQL, Caddy, API e carga) até Ctrl+C, sem falar com o Omni. `make loja port=3001` troca a porta da API (padrão 3000). | Docker, Go |
 | `make loja-cadastrar` | Cadastra os alvos da loja (`loja` e `loja-tls`) no Omni. | `OMNI_TOKEN` e `OMNI_URL` |
 | `make vitrine` | Sobe a vitrine: banco no Docker, API em `127.0.0.1:4000` e site em <http://127.0.0.1:5180>, até Ctrl+C (se a API cair, volta sozinha). Com `OMNI_TOKEN` **e** `OMNI_URL` no ambiente, cadastra o alvo no Omni antes de subir; sem eles, pula o cadastro e avisa. | Node, Docker; `OMNI_TOKEN`/`OMNI_URL` opcionais |

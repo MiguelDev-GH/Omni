@@ -1,4 +1,4 @@
-.PHONY: build web dev init-reset loja loja-cadastrar vitrine vitrine-cadastrar vitrine-ataque check
+.PHONY: build web dev init-reset reset loja loja-cadastrar vitrine vitrine-cadastrar vitrine-ataque check
 
 # build compila o frontend, copia para internal/web/static e gera o binário.
 build: web
@@ -23,6 +23,14 @@ init-reset:
 	@export OMNI_TOKEN="$${OMNI_TOKEN:-$$(openssl rand -hex 32)}"; \
 	echo "OMNI_TOKEN=$$OMNI_TOKEN"; \
 	exec ./omni
+
+# reset apaga o estado do Omni (banco SQLite, capturas .pcap e linha de base de
+# integridade), como se ele nunca tivesse rodado. Pare o Omni antes. Os alvos
+# somem: recadastre-os com make vitrine-cadastrar depois do make init-reset.
+reset:
+	@if pgrep -x omni >/dev/null; then echo "o Omni está rodando; pare-o (Ctrl+C) antes do make reset" >&2; exit 1; fi
+	rm -f omni.db omni.db-shm omni.db-wal integridade.json
+	rm -rf capturas
 
 # loja sobe a loja cobaia (containers, API e carga) até Ctrl+C, na porta de
 # port= (padrão 3000). Não precisa de credenciais: ela não conhece o Omni.
